@@ -1,4 +1,4 @@
-/* This file is intended to replace colors-deprecated.css with the ui-refresh */
+/* This file will be deprecated with the ui-refresh. Please duplicate any changes here into colors.css */
 
 /* Theme: Classic (default) */
 :root {
@@ -23,8 +23,8 @@
 
 /* Theme: Light */
 :root.theme-light {
-  --color-layer-0: #E9ECEE; /* ColorToken.LightGray7; */
-  --color-layer-1: #ECEFF1; /* ColorToken.LightGray5; */
+  --color-layer-0: #FFFFFF; /* ColorToken.White; */
+  --color-layer-1: #E9ECEE; /* ColorToken.LightGray7; */
   --color-layer-2: #FFFFFF; /* ColorToken.White; */
   --color-layer-3: #F7F8FA; /* ColorToken.LightGray1; */
   --color-layer-4: #FFFFFF; /* ColorToken.White; */
@@ -45,9 +45,9 @@
 /* Theme: Dark */
 :root.theme-dark {
   --color-layer-0: #000000; /* ColorToken.Black; */
-  --color-layer-1: #1B1B1D; /* ColorToken.DarkGray14; */
-  --color-layer-2: #212124; /* ColorToken.DarkGray11; */
-  --color-layer-3: #28282B; /* ColorToken.DarkGray9; */
+  --color-layer-1: #18181B; /* ColorToken.DarkGray12; */
+  --color-layer-2: #0C0C0D; /* ColorToken.DarkGray15; */
+  --color-layer-3: #212124; /* ColorToken.DarkGray11; */
   --color-layer-4: #303033; /* ColorToken.DarkGray6; */
   --color-layer-5: #3B3B3F; /* ColorToken.DarkGray5; */
   --color-layer-6: #494950; /* ColorToken.DarkGray4; */

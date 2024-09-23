@@ -1,6 +1,6 @@
-/* This file is intended to replace custom-styles-deprecated.css with the ui-refresh */
+/* This file will be deprecated with the ui-refresh. Please duplicate any changes here into custom-styles.css */
 
-@import './colors.css';
+@import './colors-deprecated.css';
 
 @font-face {
   font-family: "Satoshi";
