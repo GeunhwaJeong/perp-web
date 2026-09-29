@@ -26,7 +26,7 @@ import {
 
 import { assertNever } from '@/lib/assertNever';
 import { mapIfPresent } from '@/lib/do';
-import { AttemptNumber } from '@/lib/numbers';
+import { AttemptNumber, MustNumber } from '@/lib/numbers';
 
 import { validateTriggerOrder } from '../triggers/errors';
 import { TriggerOrderState, TriggerPriceInputType } from '../triggers/types';
@@ -41,6 +41,11 @@ import {
   TradeFormSummary,
   TradeFormType,
 } from './types';
+
+export const MIN_TWAP_DURATION_MINUTES = 5;
+export const MAX_TWAP_DURATION_MINUTES = 24 * 60;
+export const MIN_TWAP_FREQUENCY_SECONDS = 30;
+export const MAX_TWAP_FREQUENCY_SECONDS = 3600;
 
 const marketOrderErrorSlippage = 0.1;
 const marketOrderWarningSlippage = 0.05;
@@ -137,7 +142,9 @@ function validateNonMarketInputData(
   const state = summary.effectiveTrade;
   if (
     inputData.currentTradeMarketOrderbook == null &&
-    (state.type === TradeFormType.MARKET || state.type === TradeFormType.TRIGGER_MARKET)
+    (state.type === TradeFormType.MARKET ||
+      state.type === TradeFormType.TRIGGER_MARKET ||
+      state.type === TradeFormType.TWAP)
   ) {
     errors.push(
       simpleValidationError({
@@ -269,6 +276,60 @@ function validateFieldsBasic(
             (goodTilInSeconds ?? 0) > (90 * timeUnits.day) / timeUnits.second
               ? STRING_KEYS.INVALID_GOOD_TIL_MAX_90_DAYS
               : STRING_KEYS.MODIFY_GOOD_TIL,
+        })
+      );
+    }
+  }
+
+  if (options.needsDuration) {
+    const totalMinutes = getTotalDurationMinutes(state);
+    if (totalMinutes < MIN_TWAP_DURATION_MINUTES) {
+      errors.push(
+        simpleValidationError({
+          code: 'TWAP_DURATION_TOO_SHORT',
+          type: ErrorType.error,
+          fields: ['duration.hours', 'duration.minutes'],
+          titleKey: STRING_KEYS.DURATION_TOO_SHORT,
+          textKey: STRING_KEYS.DURATION_TOO_SHORT,
+        })
+      );
+    } else if (totalMinutes > MAX_TWAP_DURATION_MINUTES) {
+      errors.push(
+        simpleValidationError({
+          code: 'TWAP_DURATION_TOO_LONG',
+          type: ErrorType.error,
+          fields: ['duration.hours', 'duration.minutes'],
+          titleKey: STRING_KEYS.DURATION_TOO_LONG,
+          textKey: STRING_KEYS.DURATION_TOO_LONG,
+        })
+      );
+    }
+  }
+
+  if (options.needsDuration && options.needsFrequency) {
+    const frequency = AttemptNumber(state.frequencySeconds) ?? 0;
+    const totalMinutes = getTotalDurationMinutes(state);
+
+    if (frequency < MIN_TWAP_FREQUENCY_SECONDS || frequency > MAX_TWAP_FREQUENCY_SECONDS) {
+      errors.push(
+        simpleValidationError({
+          code: 'REQUIRED_TWAP_FREQUENCY',
+          type: ErrorType.error,
+          fields: ['duration.frequencySeconds'],
+          titleKey: STRING_KEYS.FREQUENCY_REQUIRED,
+          textKey: STRING_KEYS.FREQUENCY_REQUIRED,
+        })
+      );
+    }
+
+    if (totalMinutes > 0 && frequency > 0 && (totalMinutes * 60) % frequency !== 0) {
+      errors.push(
+        simpleValidationError({
+          code: 'TWAP_DURATION_NOT_INTERVAL_OF_FREQUENCY',
+          type: ErrorType.error,
+          fields: ['duration.hours', 'duration.minutes'],
+          titleKey: STRING_KEYS.FREQUENCY_NOT_INTERVAL_OF_DURATION,
+          textKey: STRING_KEYS.FREQUENCY_NOT_INTERVAL_OF_DURATION,
         })
       );
     }
@@ -446,6 +507,12 @@ function validateAdvancedTradeConditions(
     const slippageError = validateOrderbookOrIndexSlippage(summary);
     if (slippageError) {
       errors.push(slippageError);
+    }
+  } else if (state.type === TradeFormType.TWAP) {
+    // TWAP orders use market suborders - basic validation only
+    const liquidityError = validateLiquidity(summary);
+    if (liquidityError) {
+      errors.push(liquidityError);
     }
     // For limit orders, validate isolated margin requirements
   } else if (
@@ -1203,6 +1270,13 @@ function validateBracketOrders(
     }
   }
   return errors;
+}
+
+function getTotalDurationMinutes(state: TradeForm): number {
+  const hours = MustNumber(state.durationHours);
+  const minutes = MustNumber(state.durationMinutes);
+
+  return hours * 60 + minutes;
 }
 
 function isAttempingBracketOperation(state: TriggerOrderState | undefined): boolean {

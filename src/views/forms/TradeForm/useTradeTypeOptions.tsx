@@ -60,7 +60,9 @@ export const useTradeTypeOptions = (opts?: { showAssetIcon?: boolean; showAll?: 
                 ? stringGetter({ key: STRING_KEYS.STOP_ORDER_SHORT })
                 : selectedTradeType === TradeFormType.SCALE
                   ? stringGetter({ key: STRING_KEYS.SCALE })
-                  : stringGetter({ key: STRING_KEYS.ADVANCED }),
+                  : selectedTradeType === TradeFormType.TWAP
+                    ? stringGetter({ key: STRING_KEYS.TWAP })
+                    : stringGetter({ key: STRING_KEYS.ADVANCED }),
             value: '' as TradeFormType,
             subitems: allTradeTypeItems.slice(2),
           }

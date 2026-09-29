@@ -117,6 +117,9 @@ export enum TradeBoxKeys {
   ScaleEndPrice = 'scale.endPrice',
   ScaleTotalOrders = 'scale.totalOrders',
   ScaleSkew = 'scale.skew',
+  DurationHours = 'duration.hours',
+  DurationMinutes = 'duration.minutes',
+  FrequencySeconds = 'duration.frequencySeconds',
 }
 
 export type InputErrorData = {

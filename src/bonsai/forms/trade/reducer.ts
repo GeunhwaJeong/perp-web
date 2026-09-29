@@ -30,6 +30,9 @@ const getMinimumRequiredFields = (
     size: undefined,
     timeInForce: undefined,
     triggerPrice: undefined,
+    durationHours: undefined,
+    durationMinutes: undefined,
+    frequencySeconds: undefined,
     stopLossOrder: undefined,
     takeProfitOrder: undefined,
     scaleStartPrice: undefined,
@@ -162,6 +165,22 @@ export const tradeFormReducer = createVanillaReducer({
     setGoodTilTime: (state, goodTil: { duration: string; unit: TimeUnit }) => ({
       ...state,
       goodTil,
+    }),
+
+    // Duration actions
+    setDurationHours: (state, durationHours: string) => ({
+      ...state,
+      durationHours,
+    }),
+
+    setDurationMinutes: (state, durationMinutes: string) => ({
+      ...state,
+      durationMinutes,
+    }),
+
+    setFrequencySeconds: (state, frequencySeconds: string) => ({
+      ...state,
+      frequencySeconds,
     }),
 
     showTriggers: (state) => ({
