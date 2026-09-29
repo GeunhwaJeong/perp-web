@@ -1,7 +1,6 @@
-import { ElementType, useMemo } from 'react';
+import { useMemo } from 'react';
 
 import { BonsaiCore } from '@/bonsai/ontology';
-import { useMfaEnrollment, usePrivy } from '@privy-io/react-auth';
 import { LAMPORTS_PER_SOL } from '@solana/web3.js';
 import styled, { css } from 'styled-components';
 import tw from 'twin.macro';
@@ -13,7 +12,7 @@ import { STRING_KEYS } from '@/constants/localization';
 import { isDev } from '@/constants/networks';
 import { SMALL_USD_DECIMALS, USD_DECIMALS } from '@/constants/numbers';
 import { StatsigFlags } from '@/constants/statsig';
-import { ConnectorType, DydxChainAsset, wallets, WalletType } from '@/constants/wallets';
+import { DydxChainAsset } from '@/constants/wallets';
 
 import { useAccountBalance } from '@/hooks/useAccountBalance';
 import { useAccounts } from '@/hooks/useAccounts';
@@ -27,7 +26,6 @@ import { useStringGetter } from '@/hooks/useStringGetter';
 import { useSubaccount } from '@/hooks/useSubaccount';
 import { useTokenConfigs } from '@/hooks/useTokenConfigs';
 
-import { AppleIcon, AppleLightIcon, DiscordIcon, GoogleIcon, TwitterIcon } from '@/icons';
 import { headerMixins } from '@/styles/headerMixins';
 import { layoutMixins } from '@/styles/layoutMixins';
 
@@ -47,7 +45,6 @@ import { useAppDispatch, useAppSelector } from '@/state/appTypes';
 import { AppTheme } from '@/state/appUiConfigs';
 import { getAppTheme } from '@/state/appUiConfigsSelectors';
 import { openDialog } from '@/state/dialogs';
-import { selectIsKeplrConnected, selectIsTurnkeyConnected } from '@/state/walletSelectors';
 
 import { isTruthy } from '@/lib/isTruthy';
 import { MustBigNumber } from '@/lib/numbers';
@@ -68,29 +65,21 @@ export const AccountMenu = () => {
   const dispatch = useAppDispatch();
   const onboardingState = useAppSelector(getOnboardingState);
   const freeCollateral = useAppSelector(getSubaccountFreeCollateral);
-  const isKeplr = useAppSelector(selectIsKeplrConnected);
-  const isTurnkey = useAppSelector(selectIsTurnkeyConnected);
   const spotWalletData = useAppSelector(BonsaiCore.spot.walletPositions.data);
 
   const { nativeTokenBalance, usdcBalance } = useAccountBalance();
 
   const { usdcImage, usdcLabel, chainTokenImage, chainTokenLabel } = useTokenConfigs();
-  const theme = useAppSelector(getAppTheme);
 
   const { debugCompliance } = useEnvFeatures();
+  const theme = useAppSelector(getAppTheme);
   const {
     sourceAccount: { walletInfo },
     dydxAddress,
-    hdKey,
     solanaAddress,
     canDeriveSolanaWallet,
   } = useAccounts();
   const { registerAffiliate } = useSubaccount();
-
-  const privy = usePrivy();
-  const { google, discord, twitter } = privy.user ?? {};
-
-  const { showMfaEnrollmentModal } = useMfaEnrollment();
 
   const onRecoverKeys = () => {
     dispatch(openDialog(DialogTypes.Onboarding()));
@@ -101,7 +90,6 @@ export const AccountMenu = () => {
   const usedBalanceBN = MustBigNumber(usdcBalance);
 
   const showConfirmPendingDeposit =
-    walletInfo?.name === WalletType.Keplr &&
     usedBalanceBN.gt(AMOUNT_RESERVED_FOR_GAS_USDC) &&
     usedBalanceBN.minus(AMOUNT_RESERVED_FOR_GAS_USDC).toFixed(2) !== '0.00';
 
@@ -114,55 +102,8 @@ export const AccountMenu = () => {
       return null;
     }
 
-    if (
-      onboardingState === OnboardingState.AccountConnected &&
-      walletInfo.name === WalletType.Privy
-    ) {
-      if (google) {
-        return <Icon iconComponent={GoogleIcon as ElementType} />;
-      }
-
-      if (discord) {
-        return <Icon iconComponent={DiscordIcon as ElementType} />;
-      }
-
-      if (twitter) {
-        return <Icon iconComponent={TwitterIcon as ElementType} />;
-      }
-
-      return (
-        <Icon
-          tw="rounded-[0.25rem]"
-          iconComponent={wallets[WalletType.Privy].icon as ElementType}
-        />
-      );
-    }
-
-    if (
-      onboardingState === OnboardingState.AccountConnected &&
-      walletInfo.connectorType === ConnectorType.Turnkey
-    ) {
-      if (walletInfo.providerName === 'google') {
-        return <Icon iconComponent={GoogleIcon as ElementType} />;
-      }
-
-      if (walletInfo.providerName === 'apple') {
-        return (
-          <Icon
-            iconComponent={
-              theme === AppTheme.Light
-                ? (AppleIcon as ElementType)
-                : (AppleLightIcon as ElementType)
-            }
-          />
-        );
-      }
-
-      return <Icon iconComponent={wallets[WalletType.Turnkey].icon as ElementType} />;
-    }
-
     return <WalletIcon wallet={walletInfo} />;
-  }, [onboardingState, walletInfo, google, discord, twitter, theme]);
+  }, [onboardingState, walletInfo]);
 
   return onboardingState === OnboardingState.Disconnected ? (
     <OnboardingTriggerButton size={ButtonSize.XSmall} />
@@ -221,7 +162,7 @@ export const AccountMenu = () => {
                   stringGetter={stringGetter}
                 />
               </div>
-              {(isDev || isKeplr) && (
+              {isDev && (
                 <div>
                   <div>
                     <$label>
@@ -324,13 +265,6 @@ export const AccountMenu = () => {
           onSelect: onRecoverKeys,
           separator: true,
         },
-        onboardingState === OnboardingState.AccountConnected &&
-          isTurnkey && {
-            value: 'ManageAccount',
-            icon: <Icon iconName={IconName.User} />,
-            label: stringGetter({ key: STRING_KEYS.ACCOUNT_MANAGEMENT }),
-            onSelect: () => dispatch(openDialog(DialogTypes.ManageAccount())),
-          },
         affiliatesEnabled &&
           onboardingState === OnboardingState.AccountConnected && {
             value: 'Affiliates',
@@ -405,32 +339,6 @@ export const AccountMenu = () => {
                     )
                   );
                 },
-              },
-            ]
-          : []),
-        onboardingState === OnboardingState.AccountConnected &&
-          hdKey && {
-            value: 'MobileQrSignIn',
-            icon: <Icon iconName={IconName.Qr} />,
-            label: stringGetter({ key: STRING_KEYS.TITLE_SIGN_INTO_MOBILE }),
-            onSelect: () => dispatch(openDialog(DialogTypes.MobileSignIn({}))),
-          },
-        onboardingState === OnboardingState.AccountConnected &&
-          hdKey &&
-          !isTurnkey && {
-            value: 'MnemonicExport',
-            icon: <Icon iconName={IconName.ExportKeys} />,
-            label: <span>{stringGetter({ key: STRING_KEYS.EXPORT_SECRET_PHRASE })}</span>,
-            highlightColor: 'destroy' as const,
-            onSelect: () => dispatch(openDialog(DialogTypes.MnemonicExport())),
-          },
-        ...(privy.ready && privy.authenticated
-          ? [
-              {
-                value: 'MFA',
-                icon: <Icon iconName={IconName.Lock} />,
-                label: stringGetter({ key: STRING_KEYS.MULTI_FACTOR_AUTH }),
-                onSelect: () => showMfaEnrollmentModal(),
               },
             ]
           : []),

@@ -10,29 +10,19 @@ import { forceOpenDialog } from '@/state/dialogs';
 import { track } from '@/lib/analytics/analytics';
 
 import { useComplianceState } from '../useComplianceState';
-import { useAutoconnectMobileWalletBrowser } from './useAutoconnectMobileWalletBrowser';
 
 const useOnboardingFlow = ({ onClick }: { onClick?: () => void } = {}) => {
   const dispatch = useAppDispatch();
-  const { autoconnectMobileWallet, canAutoconnectMobileWallet, hasAttemptedMobileWalletConnect } =
-    useAutoconnectMobileWalletBrowser();
 
   const openOnboardingDialog = () => {
-    const enableAutoconnectMobileWallet =
-      canAutoconnectMobileWallet && !hasAttemptedMobileWalletConnect;
-
     onClick?.();
     track(
       AnalyticsEvents.OnboardingTriggerClick({
         state: onboardingState,
-        autoconnectMobileWallet: enableAutoconnectMobileWallet,
+        autoconnectMobileWallet: false,
       })
     );
-    if (enableAutoconnectMobileWallet) {
-      autoconnectMobileWallet();
-    } else {
-      dispatch(forceOpenDialog(DialogTypes.Onboarding()));
-    }
+    dispatch(forceOpenDialog(DialogTypes.Onboarding()));
   };
 
   const { disableConnectButton } = useComplianceState();

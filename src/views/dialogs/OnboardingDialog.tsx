@@ -1,24 +1,17 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 
 import { debounce } from 'lodash';
-import styled, { css } from 'styled-components';
+import styled from 'styled-components';
 import tw from 'twin.macro';
 
-import { EvmDerivedAccountStatus, OnboardingSteps } from '@/constants/account';
-import { AnalyticsEvents } from '@/constants/analytics';
-import { DialogProps, DialogTypes, OnboardingDialogProps } from '@/constants/dialogs';
+import { DialogProps, OnboardingDialogProps } from '@/constants/dialogs';
 import { STRING_KEYS } from '@/constants/localization';
-import { StatsigFlags } from '@/constants/statsig';
 import { timeUnits } from '@/constants/time';
-import { ConnectorType, WalletInfo, WalletType } from '@/constants/wallets';
+import { ConnectorType, WalletInfo } from '@/constants/wallets';
 
 import { useAccounts } from '@/hooks/useAccounts';
 import { useBreakpoints } from '@/hooks/useBreakpoints';
-import { useDisplayedWallets } from '@/hooks/useDisplayedWallets';
-import { useEnableTurnkey } from '@/hooks/useEnableTurnkey';
-import { useAppSelectorWithArgs } from '@/hooks/useParameterizedSelector';
 import { useSimpleUiEnabled } from '@/hooks/useSimpleUiEnabled';
-import { useStatsigGateValue } from '@/hooks/useStatsig';
 import { useStringGetter } from '@/hooks/useStringGetter';
 import { useURLConfigs } from '@/hooks/useURLConfigs';
 
@@ -27,43 +20,31 @@ import { formMixins } from '@/styles/formMixins';
 import { layoutMixins } from '@/styles/layoutMixins';
 
 import { Dialog, DialogPlacement } from '@/components/Dialog';
-import { GreenCheckCircle } from '@/components/GreenCheckCircle';
 import { Icon, IconName } from '@/components/Icon';
 import { Link } from '@/components/Link';
-import { Ring } from '@/components/Ring';
-import { WalletIcon } from '@/components/WalletIcon';
 import { WithTooltip } from '@/components/WithTooltip';
 
 import { setDisplayChooseWallet, setOnboardedThisSession } from '@/state/account';
 import { calculateOnboardingStep } from '@/state/accountCalculators';
-import { useAppDispatch } from '@/state/appTypes';
-import { openDialog } from '@/state/dialogs';
-
-import { track } from '@/lib/analytics/analytics';
-import { testFlags } from '@/lib/testFlags';
+import { useAppDispatch, useAppSelector } from '@/state/appTypes';
 
 import { LanguageSelector } from '../menus/LanguageSelector';
 import { ChooseWallet } from './OnboardingDialog/ChooseWallet';
-import { GenerateKeys } from './OnboardingDialog/GenerateKeys';
-import { SignIn } from './OnboardingDialog/SignIn';
 
+/**
+ * Sign-in dialog. Connecting a Wallet Standard wallet is the whole flow: the connected
+ * account is the trading account, so there is no key derivation step after this.
+ */
 export const OnboardingDialog = ({
   setIsOpen: setIsOpenRaw,
 }: DialogProps<OnboardingDialogProps>) => {
   const dispatch = useAppDispatch();
-  const [derivationStatus, setDerivationStatus] = useState(EvmDerivedAccountStatus.NotDerived);
-
   const stringGetter = useStringGetter();
   const { isMobile } = useBreakpoints();
   const { walletLearnMore } = useURLConfigs();
-  const { selectWallet, sourceAccount } = useAccounts();
-  const showNewDepositFlow =
-    useStatsigGateValue(StatsigFlags.ffDepositRewrite) || testFlags.showNewDepositFlow;
-  const isTurnkeyEnabled = useEnableTurnkey();
-  const currentOnboardingStep = useAppSelectorWithArgs(calculateOnboardingStep, isTurnkeyEnabled);
+  const { selectWallet, dydxAddress } = useAccounts();
+  const currentOnboardingStep = useAppSelector(calculateOnboardingStep);
   const isSimpleUi = useSimpleUiEnabled();
-  const { dydxAddress } = useAccounts();
-  const privyWallet = useDisplayedWallets().find((wallet) => wallet.name === WalletType.Privy);
 
   const setIsOpen = useCallback(
     (open: boolean) => {
@@ -85,45 +66,7 @@ export const OnboardingDialog = ({
     if (!currentOnboardingStep || dydxAddress) {
       setIsOpen(false);
     }
-  }, [currentOnboardingStep, setIsOpen, dispatch, showNewDepositFlow, dydxAddress]);
-
-  const setIsOpenFromDialog = useCallback(
-    (open: boolean) => {
-      setIsOpen(open);
-    },
-    [setIsOpen]
-  );
-
-  const onDisplayChooseWallet = () => {
-    track(AnalyticsEvents.OnboardingSignInWithWalletClick());
-    dispatch(setDisplayChooseWallet(true));
-  };
-
-  const onSignInWithSocials = () => {
-    track(AnalyticsEvents.OnboardingSignInWithSocialsClick());
-    dispatch(setDisplayChooseWallet(false));
-  };
-
-  const onSignInWithPasskey = () => {
-    setIsOpen(false);
-    dispatch(
-      openDialog(
-        DialogTypes.SetupPasskey({ onClose: () => dispatch(openDialog(DialogTypes.Onboarding())) })
-      )
-    );
-  };
-
-  const onSubmitEmail = ({ userEmail }: { userEmail: string }) => {
-    setIsOpen(false);
-
-    dispatch(
-      openDialog(
-        DialogTypes.CheckEmail({
-          userEmail,
-        })
-      )
-    );
-  };
+  }, [currentOnboardingStep, setIsOpen, dydxAddress]);
 
   const onChooseWallet = useMemo(
     () =>
@@ -132,163 +75,67 @@ export const OnboardingDialog = ({
           window.open(wallet.downloadLink, '_blank');
           return;
         }
-        if (wallet.name === WalletType.Privy || wallet.name === WalletType.Keplr) {
-          setIsOpenFromDialog(false);
-        }
         selectWallet(wallet);
       }, timeUnits.second),
-    [selectWallet, setIsOpenFromDialog]
-  );
-
-  const privyUserOption = Boolean(import.meta.env.VITE_PRIVY_APP_ID) && privyWallet && (
-    <Link isAccent tw="font-small-medium" onClick={() => onChooseWallet(privyWallet)}>
-      Privy User?
-    </Link>
+    [selectWallet]
   );
 
   return (
     <$Dialog
       isOpen={Boolean(currentOnboardingStep)}
-      onBack={
-        isTurnkeyEnabled && currentOnboardingStep === OnboardingSteps.ChooseWallet
-          ? onSignInWithSocials
-          : undefined
+      setIsOpen={setIsOpen}
+      title={
+        <div tw="flex items-center gap-0.5">
+          {stringGetter({ key: STRING_KEYS.CONNECT_YOUR_WALLET })}
+          <$WithTooltip
+            tw="text-color-text-0"
+            tooltipString={stringGetter({
+              key: STRING_KEYS.WALLET_DEFINITION,
+              params: {
+                ABOUT_WALLETS_LINK: (
+                  <Link href={walletLearnMore} withIcon isInline>
+                    {stringGetter({ key: STRING_KEYS.ABOUT_WALLETS })}
+                  </Link>
+                ),
+              },
+            })}
+          >
+            <$QuestionIcon iconName={IconName.QuestionMark} />
+          </$WithTooltip>
+        </div>
       }
-      setIsOpen={setIsOpenFromDialog}
-      {...(currentOnboardingStep &&
-        {
-          [OnboardingSteps.SignIn]: {
-            title: (
-              <div tw="row justify-between">
-                {stringGetter({ key: STRING_KEYS.SIGN_IN_TITLE })}
-                {privyUserOption}
-              </div>
-            ),
-            description: stringGetter({
-              key: STRING_KEYS.SIGN_IN_DESCRIPTION,
-            }),
-            children: (
-              <$Content>
-                <SignIn
-                  onChooseWallet={onChooseWallet}
-                  onDisplayChooseWallet={onDisplayChooseWallet}
-                  onSignInWithPasskey={onSignInWithPasskey}
-                  onSubmitEmail={({ userEmail }: { userEmail: string }) =>
-                    onSubmitEmail({ userEmail })
-                  }
-                />
-              </$Content>
-            ),
-          },
-          [OnboardingSteps.ChooseWallet]: {
-            title: isTurnkeyEnabled ? (
-              stringGetter({ key: STRING_KEYS.SIGN_IN_WITH_WALLET })
-            ) : (
-              <div tw="flex items-center gap-0.5">
-                {stringGetter({ key: STRING_KEYS.CONNECT_YOUR_WALLET })}
-                <$WithTooltip
-                  tw="text-color-text-0"
-                  tooltipString={stringGetter({
-                    key: STRING_KEYS.WALLET_DEFINITION,
-                    params: {
-                      ABOUT_WALLETS_LINK: (
-                        <Link href={walletLearnMore} withIcon isInline>
-                          {stringGetter({ key: STRING_KEYS.ABOUT_WALLETS })}
-                        </Link>
-                      ),
-                    },
-                  })}
-                >
-                  <$QuestionIcon iconName={IconName.QuestionMark} />
-                </$WithTooltip>
-              </div>
-            ),
-            description: isTurnkeyEnabled
-              ? stringGetter({ key: STRING_KEYS.SIGN_IN_DESCRIPTION })
-              : stringGetter({ key: STRING_KEYS.SELECT_WALLET_FROM_OPTIONS }),
-            children: (
-              <$Content>
-                <ChooseWallet
-                  onChooseWallet={onChooseWallet}
-                  onSignInWithSocials={onSignInWithSocials}
-                  onSignInWithPasskey={onSignInWithPasskey}
-                />
-              </$Content>
-            ),
-            hasFooterBorder: true,
-            slotFooter: !isSimpleUi && !isTurnkeyEnabled && (
-              <$Footer>
-                <div tw="flex flex-col gap-0.5 text-color-text-0 font-small-medium">
-                  <h3 tw="text-color-text-2 font-medium-book">
-                    {stringGetter({ key: STRING_KEYS.SELECT_LANGUAGE })}
-                  </h3>
-                  {stringGetter({ key: STRING_KEYS.CHOOSE_PREFERRED_LANGUAGE })}
-                </div>
-                <$LanguageSelector />
-              </$Footer>
-            ),
-          },
-          [OnboardingSteps.KeyDerivation]: {
-            slotIcon: isSimpleUi
-              ? sourceAccount.walletInfo && <WalletIcon wallet={sourceAccount.walletInfo} />
-              : {
-                  [EvmDerivedAccountStatus.NotDerived]: sourceAccount.walletInfo && (
-                    <WalletIcon wallet={sourceAccount.walletInfo} />
-                  ),
-                  [EvmDerivedAccountStatus.Deriving]: <$Ring withAnimation value={0.25} />,
-                  [EvmDerivedAccountStatus.EnsuringDeterminism]: (
-                    <$Ring withAnimation value={0.25} />
-                  ),
-                  [EvmDerivedAccountStatus.Derived]: <GreenCheckCircle />,
-                }[derivationStatus],
-            title: stringGetter({ key: STRING_KEYS.SIGN_MESSAGE }),
-            description: isSimpleUi ? (
-              <span tw="font-small-book">
-                {stringGetter({
-                  key: STRING_KEYS.FREE_SIGNING,
-                  params: {
-                    FREE: (
-                      <span tw="text-green">
-                        {stringGetter({ key: STRING_KEYS.FREE_TRADING_TITLE_ASTERISK_FREE })}
-                      </span>
-                    ),
-                  },
-                })}
-              </span>
-            ) : (
-              stringGetter({ key: STRING_KEYS.SIGNATURE_CREATES_COSMOS_WALLET })
-            ),
-            children: (
-              <$Content>
-                <GenerateKeys status={derivationStatus} setStatus={setDerivationStatus} />
-              </$Content>
-            ),
-            width: '23rem',
-          },
-        }[currentOnboardingStep])}
+      description={stringGetter({ key: STRING_KEYS.SELECT_WALLET_FROM_OPTIONS })}
+      hasFooterBorder
+      slotFooter={
+        !isSimpleUi && (
+          <$Footer>
+            <div tw="flex flex-col gap-0.5 text-color-text-0 font-small-medium">
+              <h3 tw="text-color-text-2 font-medium-book">
+                {stringGetter({ key: STRING_KEYS.SELECT_LANGUAGE })}
+              </h3>
+              {stringGetter({ key: STRING_KEYS.CHOOSE_PREFERRED_LANGUAGE })}
+            </div>
+            <$LanguageSelector />
+          </$Footer>
+        )
+      }
       placement={isMobile ? DialogPlacement.FullScreen : DialogPlacement.Default}
-    />
+    >
+      <$Content>
+        <ChooseWallet onChooseWallet={onChooseWallet} />
+      </$Content>
+    </$Dialog>
   );
 };
 const $Content = tw.div`flexColumn gap-1`;
 
-const $Dialog = styled(Dialog)<{ width?: string }>`
-  @media ${breakpoints.notMobile} {
-    ${({ width }) =>
-      width &&
-      css`
-        --dialog-width: ${width};
-      `}
-  }
-
+const $Dialog = styled(Dialog)`
   @media ${breakpoints.notTablet} {
     --dialog-header-backgroundColor: var(--color-layer-3);
   }
 
   --dialog-icon-size: 1.25rem;
 `;
-
-const $Ring = tw(Ring)`w-1.25 h-1.25 [--ring-color:--color-accent]`;
 
 const $WithTooltip = styled(WithTooltip)`
   a {

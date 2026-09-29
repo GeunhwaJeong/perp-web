@@ -20,7 +20,6 @@ import { useEnableSpot } from '@/hooks/useEnableSpot';
 import { useLocaleSeparators } from '@/hooks/useLocaleSeparators';
 import { useSimpleUiEnabled } from '@/hooks/useSimpleUiEnabled';
 import { useStringGetter } from '@/hooks/useStringGetter';
-import { useTurnkeyAuth } from '@/providers/TurnkeyAuthProvider';
 
 import breakpoints from '@/styles/breakpoints';
 import { formMixins } from '@/styles/formMixins';
@@ -59,7 +58,7 @@ export const DepositAddressDialog = ({ setIsOpen }: DialogProps<DepositDialog2Pr
   const { complianceState } = useComplianceState();
 
   const { dydxAddress, solanaAddress } = useAccounts();
-  const { isUploadingAddress } = useTurnkeyAuth();
+  const isUploadingAddress = false;
   const {
     depositAddresses,
     isLoadingDepositAddresses,

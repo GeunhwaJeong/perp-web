@@ -1,9 +1,7 @@
 import { type onboarding } from '@dydxprotocol/v4-client-js';
-import { type WalletType as CosmosWalletType } from 'graz';
 import { type EIP6963ProviderInfo } from 'mipd';
 
 import { STRING_KEYS } from '@/constants/localization';
-import { LoginMethod } from '@/types/turnkey';
 
 import {
   CoinbaseIcon,
@@ -68,6 +66,8 @@ export enum WalletType {
 }
 
 export enum ConnectorType {
+  // A wallet discovered through the Wallet Standard; the only connector the app signs with.
+  WalletStandard = 'walletStandard',
   Injected = 'injected',
   // Not a real connector type, but a link to download the wallet for those who don't have it installed
   DownloadWallet = 'downloadWallet',
@@ -75,12 +75,11 @@ export enum ConnectorType {
   WalletConnect = 'walletConnect',
   Cosmos = 'cosmos',
   Test = 'test',
-  Privy = 'privy',
   PhantomSolana = 'phantomSolana',
-  Turnkey = 'turnkey',
 }
 
 export enum WalletNetworkType {
+  Haneul = 'haneul',
   Evm = 'evm',
   Cosmos = 'cosmos',
   Solana = 'solana',
@@ -88,6 +87,13 @@ export enum WalletNetworkType {
 
 // This is the type stored in localstorage, so it must consist of only serializable fields
 export type WalletInfo =
+  | {
+      connectorType: ConnectorType.WalletStandard;
+      // Stable identifier from the Wallet Standard registration, used to reconnect.
+      walletId: string;
+      name: string;
+      icon?: string;
+    }
   | ({
       connectorType: ConnectorType.Injected;
     } & Pick<EIP6963ProviderInfo<string>, 'icon' | 'name' | 'rdns'>)
@@ -95,21 +101,12 @@ export type WalletInfo =
       connectorType:
         | ConnectorType.Coinbase
         | ConnectorType.WalletConnect
-        | ConnectorType.PhantomSolana
-        | ConnectorType.Privy;
+        | ConnectorType.PhantomSolana;
       name: WalletType;
     }
   | {
-      connectorType: ConnectorType.Turnkey;
-      name: WalletType.Turnkey;
-      userEmail?: string;
-      providerName?: string;
-      loginMethod: LoginMethod;
-      requiresAddressUpload?: boolean;
-    }
-  | {
       connectorType: ConnectorType.Cosmos;
-      name: CosmosWalletType;
+      name: string;
     }
   | { connectorType: ConnectorType.Test; name: WalletType.TestWallet }
   | { connectorType: ConnectorType.DownloadWallet; name: string; downloadLink: string };
@@ -190,36 +187,12 @@ export const getSignTypedData = (selectedDydxChainId: DydxChainId) =>
     },
   }) as const;
 
-/**
- * @description Overwrites the types and message to include salt for Turnkey onboarding
- * @returns Typed data to sign for dYdX Chain onboarding with turnkey
- */
-export const getSignTypedDataForTurnkey = ({
-  selectedDydxChainId,
-  salt,
-}: {
-  selectedDydxChainId: DydxChainId;
-  salt: string;
-}) =>
-  ({
-    ...getSignTypedData(selectedDydxChainId),
-    types: {
-      dYdX: [
-        { name: 'action', type: 'string' },
-        { name: 'salt', type: 'string' },
-      ],
-    },
-    message: {
-      action: WALLETS_CONFIG_MAP[selectedDydxChainId].signTypedDataAction,
-      salt,
-    },
-  }) as const;
-
 export type PrivateInformation = ReturnType<typeof onboarding.deriveHDKeyFromEthereumSignature>;
 
 export type EvmAddress = `0x${string}`;
 export type SolAddress = `${string}`;
-export type DydxAddress = `dydx${string}`;
+// Haneul account addresses are 0x-prefixed 32-byte hex strings.
+export type DydxAddress = string;
 
 // Extension wallet EIP-6963 identifiers
 export const PHANTOM_MIPD_RDNS = 'app.phantom';

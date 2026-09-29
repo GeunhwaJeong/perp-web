@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo } from 'react';
 
-import { useWallets } from '@privy-io/react-auth';
 import { useAccount, useSwitchChain } from 'wagmi';
 
 import { ConnectorType } from '@/constants/wallets';
@@ -21,7 +20,6 @@ export const useMatchingEvmNetwork = ({
   const { chain } = useAccount();
   const { sourceAccount } = useAccounts();
   const { isPending, switchChainAsync } = useSwitchChain();
-  const { wallets } = useWallets();
 
   const isMatchingNetwork = useMemo(() => {
     // In the Keplr wallet, the network will always match
@@ -34,11 +32,7 @@ export const useMatchingEvmNetwork = ({
 
   const matchNetwork = useCallback(async () => {
     if (!isMatchingNetwork) {
-      if (sourceAccount.walletInfo?.connectorType === ConnectorType.Privy) {
-        await wallets[0]?.switchChain(Number(chainId));
-      } else {
-        await switchChainAsync({ chainId: Number(chainId) }, { onError, onSuccess });
-      }
+      await switchChainAsync({ chainId: Number(chainId) }, { onError, onSuccess });
     }
   }, [chainId, chain]);
 

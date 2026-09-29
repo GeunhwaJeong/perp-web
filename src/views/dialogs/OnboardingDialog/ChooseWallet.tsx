@@ -1,13 +1,12 @@
 import styled, { css } from 'styled-components';
 
 import { AlertType } from '@/constants/alerts';
-import { ButtonAction, ButtonSize, ButtonType } from '@/constants/buttons';
+import { ButtonAction, ButtonSize } from '@/constants/buttons';
 import { STRING_KEYS } from '@/constants/localization';
 import { ConnectorType, WalletInfo, wallets } from '@/constants/wallets';
 
 import { useAccounts } from '@/hooks/useAccounts';
 import { useDisplayedWallets } from '@/hooks/useDisplayedWallets';
-import { useEnableTurnkey } from '@/hooks/useEnableTurnkey';
 import { useSimpleUiEnabled } from '@/hooks/useSimpleUiEnabled';
 import { useStringGetter } from '@/hooks/useStringGetter';
 import { useURLConfigs } from '@/hooks/useURLConfigs';
@@ -17,72 +16,34 @@ import { layoutMixins } from '@/styles/layoutMixins';
 
 import { AlertMessage } from '@/components/AlertMessage';
 import { Button } from '@/components/Button';
-import { Icon, IconName } from '@/components/Icon';
 import { Link } from '@/components/Link';
-import { HorizontalSeparatorFiller } from '@/components/Separator';
-import { AccentTag } from '@/components/Tag';
 import { WalletIcon } from '@/components/WalletIcon';
+
+const walletDisplayName = (
+  wallet: WalletInfo,
+  stringGetter: ReturnType<typeof useStringGetter>
+) => {
+  if (
+    wallet.connectorType === ConnectorType.WalletStandard ||
+    wallet.connectorType === ConnectorType.Injected
+  ) {
+    return wallet.name;
+  }
+  const config = wallets[wallet.name as keyof typeof wallets];
+  return config ? stringGetter({ key: config.stringKey }) : wallet.name;
+};
 
 export const ChooseWallet = ({
   onChooseWallet,
-  onSignInWithSocials,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  onSignInWithPasskey,
 }: {
   onChooseWallet: (wallet: WalletInfo) => void;
-  onSignInWithSocials: () => void;
-  onSignInWithPasskey: () => void;
 }) => {
   const stringGetter = useStringGetter();
   const { walletLearnMore } = useURLConfigs();
   const isSimpleUi = useSimpleUiEnabled();
-  const isTurnkeyEnabled = useEnableTurnkey();
 
   const displayedWallets = useDisplayedWallets();
   const { selectedWallet, selectedWalletError } = useAccounts();
-
-  const alternateOptions = (
-    <div tw="flexColumn gap-0.75">
-      <div tw="row gap-0.5">
-        <HorizontalSeparatorFiller />
-        <span>or</span>
-        <HorizontalSeparatorFiller />
-      </div>
-
-      {/* <$OtherOptionButton
-        type={ButtonType.Button}
-        action={ButtonAction.Base}
-        size={ButtonSize.BasePlus}
-        onClick={onSignInWithPasskey}
-      >
-        <div tw="row gap-0.5">
-          <Icon iconName={IconName.Passkey} />
-          Sign in with Passkey
-        </div>
-
-        <Icon iconName={IconName.ChevronRight} />
-      </$OtherOptionButton> */}
-
-      <$OtherOptionButton
-        type={ButtonType.Button}
-        action={ButtonAction.Base}
-        size={ButtonSize.BasePlus}
-        onClick={onSignInWithSocials}
-      >
-        <div tw="row gap-0.5">
-          <Icon iconName={IconName.SocialLogin} />
-          Sign in with Socials
-        </div>
-
-        <div tw="row gap-0.5">
-          <AccentTag tw="rounded-[0.5rem]" isHighlighted>
-            {stringGetter({ key: STRING_KEYS.RECOMMENDED })}
-          </AccentTag>
-          <Icon tw="text-color-layer-7" iconName={IconName.ChevronRight} />
-        </div>
-      </$OtherOptionButton>
-    </div>
-  );
 
   return (
     <>
@@ -91,41 +52,36 @@ export const ChooseWallet = ({
           <h4>
             {stringGetter({
               key: STRING_KEYS.COULD_NOT_CONNECT,
-              params: {
-                WALLET:
-                  selectedWallet.connectorType === ConnectorType.Injected
-                    ? selectedWallet.name
-                    : stringGetter({
-                        key: wallets[selectedWallet.name as keyof typeof wallets].stringKey,
-                      }),
-              },
+              params: { WALLET: walletDisplayName(selectedWallet, stringGetter) },
             })}
           </h4>
           {selectedWalletError}
         </$AlertMessage>
       )}
 
-      <$Wallets isSimpleUi={isSimpleUi}>
-        {displayedWallets.map((wallet) => (
-          <$WalletButton
-            action={ButtonAction.Base}
-            key={wallet.name}
-            onClick={() => onChooseWallet(wallet)}
-            slotLeft={<WalletIcon wallet={wallet} size="1.5em" />}
-            size={isSimpleUi ? ButtonSize.Large : ButtonSize.Small}
-          >
-            <$WalletName>
-              {wallet.connectorType === ConnectorType.Injected
-                ? wallet.name
-                : stringGetter({ key: wallets[wallet.name as keyof typeof wallets].stringKey })}
-            </$WalletName>
-          </$WalletButton>
-        ))}
-      </$Wallets>
+      {displayedWallets.length === 0 ? (
+        <$Empty>No wallets detected. Install a Haneul wallet extension and reload.</$Empty>
+      ) : (
+        <$Wallets isSimpleUi={isSimpleUi}>
+          {displayedWallets.map((wallet) => (
+            <$WalletButton
+              action={ButtonAction.Base}
+              key={
+                wallet.connectorType === ConnectorType.WalletStandard
+                  ? wallet.walletId
+                  : wallet.name
+              }
+              onClick={() => onChooseWallet(wallet)}
+              slotLeft={<WalletIcon wallet={wallet} size="1.5em" />}
+              size={isSimpleUi ? ButtonSize.Large : ButtonSize.Small}
+            >
+              <$WalletName>{walletDisplayName(wallet, stringGetter)}</$WalletName>
+            </$WalletButton>
+          ))}
+        </$Wallets>
+      )}
 
-      {isTurnkeyEnabled && alternateOptions}
-
-      {!isSimpleUi && !isTurnkeyEnabled && (
+      {!isSimpleUi && (
         <$Link href={walletLearnMore} withIcon>
           {stringGetter({ key: STRING_KEYS.LEARN_ABOUT_WALLETS })}
         </$Link>
@@ -138,6 +94,13 @@ const $AlertMessage = styled(AlertMessage)`
   h4 {
     font: var(--font-small-medium);
   }
+`;
+
+const $Empty = styled.div`
+  color: var(--color-text-0);
+  font: var(--font-base-book);
+  text-align: center;
+  padding: 1rem 0;
 `;
 
 const $Wallets = styled.div<{ isSimpleUi?: boolean }>`
@@ -191,16 +154,5 @@ const $Link = styled(Link)`
   font: var(--font-base-book);
   &:hover {
     color: var(--color-text-1);
-  }
-`;
-
-const $OtherOptionButton = styled(Button)`
-  width: 100%;
-  border-radius: 0.75rem;
-  justify-content: space-between;
-  --icon-size: 1rem;
-
-  @media ${breakpoints.tablet} {
-    border-radius: 1rem;
   }
 `;

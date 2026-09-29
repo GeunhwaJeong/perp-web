@@ -1,16 +1,12 @@
 import { lazy, Suspense, useEffect, useMemo, useRef } from 'react';
 
 import isPropValid from '@emotion/is-prop-valid';
-import { PrivyProvider } from '@privy-io/react-auth';
-import { WagmiProvider } from '@privy-io/wagmi';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { TurnkeyProvider } from '@turnkey/sdk-react';
-import { GrazProvider } from 'graz';
 import { matchPath, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { PersistGate } from 'redux-persist/integration/react';
 import styled, { css, StyleSheetManager, WebTarget } from 'styled-components';
+import { WagmiProvider } from 'wagmi';
 
-import { config as grazConfig } from '@/constants/graz';
 import { AppRoute, DEFAULT_TRADE_ROUTE } from '@/constants/routes';
 
 import { AccountsProvider } from '@/hooks/useAccounts';
@@ -38,7 +34,7 @@ import { HeaderDesktop } from '@/layout/Header/HeaderDesktop';
 import { NotificationsToastArea } from '@/layout/NotificationsToastArea';
 
 import { parseLocationHash } from '@/lib/urlUtils';
-import { config, privyConfig } from '@/lib/wagmi';
+import { config } from '@/lib/wagmi';
 
 import { BonsaiCore } from './bonsai/ontology';
 import { ComplianceBanner } from './components/ComplianceBanner';
@@ -46,7 +42,7 @@ import { RestrictionWarning } from './components/RestrictionWarning';
 import { DialogTypes } from './constants/dialogs';
 import { LocalStorageKey } from './constants/localStorage';
 import { CustomFlags, StatsigFlags } from './constants/statsig';
-import { TURNKEY_CONFIG } from './constants/turnkey';
+import { HaneulWalletProvider } from './haneul/HaneulWalletProvider';
 import { SkipProvider } from './hooks/transfers/skipClient';
 import { useAnalytics } from './hooks/useAnalytics';
 import { useBreakpoints } from './hooks/useBreakpoints';
@@ -63,8 +59,6 @@ import { useUpdateTransfers } from './hooks/useUpdateTransfers';
 import { WalletConnectionProvider } from './hooks/useWalletConnection';
 import { isTruthy } from './lib/isTruthy';
 import { AffiliatesPage } from './pages/affiliates/AffiliatesPage';
-import { TurnkeyAuthProvider } from './providers/TurnkeyAuthProvider';
-import { TurnkeyWalletProvider } from './providers/TurnkeyWalletProvider';
 import { persistor } from './state/_store';
 import { setOnboardedThisSession } from './state/account';
 import { setCurrentPath } from './state/app';
@@ -313,23 +307,16 @@ const wrapProvider = (Component: React.ComponentType<any>, props?: any) => {
 };
 
 const providers = [
-  wrapProvider(PrivyProvider, {
-    appId: import.meta.env.VITE_PRIVY_APP_ID ?? 'dummyappiddummyappiddummy',
-    clientId: import.meta.env.VITE_PRIVY_APP_CLIENT_ID,
-    config: privyConfig,
-  }),
   wrapProvider(StatsigProvider),
   wrapProvider(QueryClientProvider, { client: appQueryClient }),
-  wrapProvider(GrazProvider, { grazOptions: grazConfig }),
+  // EVM read-only provider kept for the transfer dialogs until they move to native deposits.
   wrapProvider(WagmiProvider, { config, reconnectOnMount: false }),
   wrapProvider(LocaleProvider),
   wrapProvider(RestrictionProvider),
-  wrapProvider(TurnkeyProvider, { config: TURNKEY_CONFIG }),
   wrapProvider(DydxProvider),
-  wrapProvider(TurnkeyWalletProvider),
+  wrapProvider(HaneulWalletProvider),
   wrapProvider(WalletConnectionProvider),
   wrapProvider(AccountsProvider),
-  wrapProvider(TurnkeyAuthProvider),
   wrapProvider(SubaccountProvider),
   wrapProvider(SkipProvider),
   wrapProvider(NotificationsProvider),

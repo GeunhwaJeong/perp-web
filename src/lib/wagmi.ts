@@ -1,6 +1,4 @@
 // Custom connectors
-import type { PrivyClientConfig } from '@privy-io/react-auth';
-import { createConfig } from '@privy-io/wagmi';
 import { FallbackTransport, http, Transport, type Chain } from 'viem';
 import {
   arbitrum,
@@ -37,14 +35,12 @@ import {
   scroll,
   sepolia,
 } from 'viem/chains';
-import { fallback } from 'wagmi';
+import { createConfig, fallback } from 'wagmi';
 import {
   coinbaseWallet as coinbaseWalletConnector,
   walletConnect as walletConnectConnector,
 } from 'wagmi/connectors';
 
-import { LocalStorageKey } from '@/constants/localStorage';
-import { DEFAULT_APP_ENVIRONMENT, ENVIRONMENT_CONFIG_MAP } from '@/constants/networks';
 import {
   ConnectorType,
   WALLET_CONNECT_EXPLORER_RECOMMENDED_IDS,
@@ -54,8 +50,6 @@ import {
 import { getMipdConnectorByRdns } from '@/hooks/useMipdInjectedWallets';
 
 import { isTruthy } from './isTruthy';
-import { getLocalStorage } from './localStorage';
-import { validateAgainstAvailableEnvironments } from './network';
 
 // Config
 
@@ -166,25 +160,6 @@ const RPCTransports = [mainnet, ...WAGMI_SUPPORTED_CHAINS].reduce(
   {} as Record<string, FallbackTransport<Transport[]>>
 );
 
-const defaultSelectedNetwork = getLocalStorage({
-  key: LocalStorageKey.SelectedNetwork,
-  defaultValue: DEFAULT_APP_ENVIRONMENT,
-  validateFn: validateAgainstAvailableEnvironments,
-});
-const defaultChainId = Number(ENVIRONMENT_CONFIG_MAP[defaultSelectedNetwork].ethereumChainId);
-
-export const privyConfig: PrivyClientConfig = {
-  embeddedWallets: {
-    createOnLogin: 'users-without-wallets',
-    requireUserPasswordOnCreate: false,
-    noPromptOnSignature: true,
-  },
-  appearance: {
-    theme: '#28283c',
-  },
-  defaultChain: defaultChainId === mainnet.id ? mainnet : sepolia,
-};
-
 type WalletConnectConfig = {
   client: {
     name: string;
@@ -263,5 +238,5 @@ export function isWagmiConnectorType(wallet: WalletInfo | undefined): boolean {
 
 /* This method checks if the resolved wallet address is returned by wagmi */
 export function isWagmiResolvedWallet(wallet: WalletInfo | undefined): boolean {
-  return isWagmiConnectorType(wallet) || wallet?.connectorType === ConnectorType.Privy;
+  return isWagmiConnectorType(wallet);
 }
