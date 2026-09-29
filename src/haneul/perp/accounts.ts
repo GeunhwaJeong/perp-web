@@ -43,8 +43,8 @@ export const listAccountCaps = async (
   const caps: { cap: string; account: string }[] = [];
   let cursor: string | null = null;
   do {
-    // eslint-disable-next-line no-await-in-loop -- pages are sequential by cursor
     const page: HaneulClientTypes.ListOwnedObjectsResponse<{ content: true }> =
+      // eslint-disable-next-line no-await-in-loop -- pages are sequential by cursor
       await client.core.listOwnedObjects<{ content: true }>({
         owner,
         type: types.accountCap,

@@ -18,8 +18,8 @@ export const eventsOf = (events: ChainEvent[], suffix: string) =>
 export const extractAbort = (error: unknown): HaneulAbort | undefined => {
   const err = error as {
     MoveAbort?: { abortCode?: string; location?: { module?: string; functionName?: string } };
-  };
-  const abort = err.MoveAbort;
+  } | null;
+  const abort = err?.MoveAbort;
   if (!abort?.abortCode) return undefined;
   return {
     module: abort.location?.module ?? 'unknown',
@@ -42,17 +42,15 @@ export const settleTransaction = async (
     include: { effects: true, events: true },
   });
   const transaction = settled.Transaction ?? settled.FailedTransaction;
-  const status = transaction.effects.status;
-  if (!transaction || !status || !status.success) {
-    const abort = status && !status.success ? extractAbort(status.error) : undefined;
-    const message = abort
-      ? describeAbort(abort)
-      : (status && !status.success && status.error.message) || 'Transaction failed';
+  const { status } = transaction.effects;
+  if (!status.success) {
+    const abort = extractAbort(status.error);
+    const message = abort ? describeAbort(abort) : status.error.message;
     throw new HaneulTransactionError(message, { abort, digest });
   }
-  const events: ChainEvent[] = (transaction.events ?? []).map((e) => ({
+  const events: ChainEvent[] = transaction.events.map((e) => ({
     type: e.eventType,
-    json: (e.json ?? {}) as Record<string, unknown>,
+    json: e.json as Record<string, unknown>,
   }));
   return { digest: transaction.digest, events };
 };
@@ -64,22 +62,36 @@ const ABORT_IN_MESSAGE = /abort code: (\d+), in '0x[0-9a-f]+::(\w+)::(\w+)'/;
  * the abort only in their message. Normalize them so callers see the same
  * `HaneulTransactionError` as for an on-chain failure.
  */
+/** Wallets wrap SDK errors, so the abort may sit anywhere along the `cause` chain. */
+const causeChain = (error: unknown) => {
+  const chain: unknown[] = [];
+  let current = error;
+  while (current != null && chain.length < 8 && !chain.includes(current)) {
+    chain.push(current);
+    current = (current as { cause?: unknown }).cause;
+  }
+  return chain;
+};
+
 export const normalizeTransactionError = (error: unknown): HaneulTransactionError => {
   if (error instanceof HaneulTransactionError) return error;
-  const structured = extractAbort((error as { reason?: unknown }).reason);
+  const chain = causeChain(error);
+  const structured = chain
+    .map((e) => extractAbort((e as { reason?: unknown } | null)?.reason))
+    .find((a) => a != null);
   if (structured) {
     return new HaneulTransactionError(describeAbort(structured), {
       abort: structured,
       cause: error,
     });
   }
-  const message = error instanceof Error ? error.message : String(error);
-  const m = ABORT_IN_MESSAGE.exec(message);
+  const messages = chain.map((e) => (e instanceof Error ? e.message : String(e)));
+  const m = messages.map((msg) => ABORT_IN_MESSAGE.exec(msg)).find((x) => x != null);
   if (m) {
     const abort: HaneulAbort = { code: Number(m[1]), module: m[2]!, function: m[3] };
     return new HaneulTransactionError(describeAbort(abort), { abort, cause: error });
   }
-  return new HaneulTransactionError(message, { cause: error });
+  return new HaneulTransactionError(messages[0] ?? 'Transaction failed', { cause: error });
 };
 
 /** Signs and executes with a local signer (scripts and tests); the app signs through the wallet. */
@@ -104,10 +116,12 @@ export const simulateReturnValues = async (tx: Transaction, client: ClientWithCo
     include: { commandResults: true, effects: true },
   });
   const transaction = result.Transaction ?? result.FailedTransaction;
-  const status = transaction.effects.status;
-  if (!transaction || !status.success) {
-    const abort = status && !status.success ? extractAbort(status.error) : undefined;
-    throw new HaneulTransactionError(abort ? describeAbort(abort) : 'Simulation failed', { abort });
+  const { status } = transaction.effects;
+  if (!status.success) {
+    const abort = extractAbort(status.error);
+    throw new HaneulTransactionError(abort ? describeAbort(abort) : status.error.message, {
+      abort,
+    });
   }
   return result.commandResults.map((c) => c.returnValues.map((v) => v.bcs));
 };
