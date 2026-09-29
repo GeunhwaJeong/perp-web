@@ -1,887 +1,343 @@
-/* eslint-disable max-classes-per-file */
-import { parseTransactionError } from '@/bonsai/lib/extractErrors';
-import {
-  isOperationFailure,
-  isOperationSuccess,
-  isWrappedOperationFailureError,
-  OperationResult,
-  wrapOperationFailure,
-  wrapOperationSuccess,
-  WrappedOperationFailureError,
-} from '@/bonsai/lib/operationResult';
-import { logBonsaiError, logBonsaiInfo } from '@/bonsai/logs';
 import { BonsaiCore } from '@/bonsai/ontology';
 import { OrderStatus, SubaccountOrder } from '@/bonsai/types/summaryTypes';
-import { IndexedTx } from '@cosmjs/stargate';
-import { Method } from '@cosmjs/tendermint-rpc';
+import { dAppKit } from '@/haneul/dAppKit';
 import {
-  CompositeClient,
-  LocalWallet,
-  OrderExecution,
-  OrderFlags,
-  OrderSide,
-  OrderTimeInForce,
-  OrderType,
-  SubaccountClient,
-} from '@dydxprotocol/v4-client-js';
-import { isEmpty } from 'lodash';
+  eventsOf,
+  findPerpAccount,
+  hasMarketPosition,
+  HaneulTransactionError,
+  loadPerpDeployment,
+  ORDER_TYPE,
+  PerpTransactionBuilder,
+  SIDE,
+  collateralToUnits,
+  priceToUnits,
+  sizeToUnits,
+  type OrderSpec,
+  type PerpAccount,
+  type PerpDeployment,
+} from '@/haneul/perp';
+import { signAndExecute } from '@/haneul/perp/executor';
+import { OrderExecution, OrderSide, OrderTimeInForce, OrderType } from '@dydxprotocol/v4-client-js';
 
-import {
-  AnalyticsEvents,
-  TradeAdditionalMetadata,
-  TradeMetadataSource,
-  TransactionMemo,
-} from '@/constants/analytics';
+import { AnalyticsEvents, TradeMetadataSource } from '@/constants/analytics';
 import { STRING_KEYS } from '@/constants/localization';
-import { timeUnits } from '@/constants/time';
-import {
-  MARKET_ORDER_MAX_SLIPPAGE,
-  POST_TRANSFER_PLACE_ORDER_DELAY,
-  SHORT_TERM_ORDER_DURATION,
-  UNCOMMITTED_ORDER_TIMEOUT_MS,
-} from '@/constants/trade';
+import { isDev } from '@/constants/networks';
+import { PlaceOrderStatuses } from '@/constants/trade';
 
 import type { RootStore } from '@/state/_store';
 import { store as reduxStore } from '@/state/_store';
-import { getSubaccountId, getUserWalletAddress } from '@/state/accountInfoSelectors';
-import { getSelectedDydxChainId, getSelectedNetwork } from '@/state/appSelectors';
-import { createAppSelector } from '@/state/appTypes';
+import { getUserWalletAddress } from '@/state/accountInfoSelectors';
 import {
   cancelAllSubmitted,
+  cancelOrderConfirmed,
   cancelOrderFailed,
   cancelOrderSubmitted,
   closeAllPositionsSubmitted,
+  placeOrderConfirmed,
   placeOrderFailed,
   placeOrderSubmitted,
-  placeOrderTimeout,
 } from '@/state/localOrders';
-import { getLocalWalletNonce, selectIsKeplrConnected } from '@/state/walletSelectors';
 
 import { track } from '@/lib/analytics/analytics';
-import { calc } from '@/lib/do';
 import { operationFailureToErrorParams, wrapSimpleError } from '@/lib/errorHelpers';
-import { StatefulOrderError, stringifyTransactionError } from '@/lib/errors';
-import { localWalletManager } from '@/lib/hdKeyManager';
-import {
-  AttemptBigNumber,
-  AttemptNumber,
-  MAX_INT_ROUGHLY,
-  MustBigNumber,
-  MustNumber,
-} from '@/lib/numbers';
-import { parseToPrimitives, ToPrimitives } from '@/lib/parseToPrimitives';
-import { ConvertBigNumberToNumber, purgeBigNumbers } from '@/lib/purgeBigNumber';
-import { createTimer, startTimer } from '@/lib/simpleTimer';
-import { sleep } from '@/lib/timeUtils';
-import { isPresent } from '@/lib/typeUtils';
 
-import { createMiddleware, createMiddlewareFailureResult, taskBuilder } from './SimpleMiddleware';
-import { StateConditionNotifier, Tracker } from './StateConditionNotifier';
-import { getSimpleOrderStatus } from './calculators/orders';
 import { TradeFormPayload } from './forms/trade/types';
-import { PlaceOrderMarketInfo, PlaceOrderPayload } from './forms/triggers/types';
-import { getLazyLocalWallet } from './lib/lazyDynamicLibs';
-import { CompositeClientManager } from './rest/lib/compositeClientManager';
-import { estimateLiveValidatorHeight } from './selectors/apiStatus';
+import { PlaceOrderPayload } from './forms/triggers/types';
+import {
+  isOperationFailure,
+  isOperationSuccess,
+  OperationResult,
+  wrapOperationFailure,
+  wrapOperationSuccess,
+} from './lib/operationResult';
+import { logBonsaiError, logBonsaiInfo } from './logs';
 
-interface TransactionSupervisorShared {
-  store: RootStore;
-  compositeClientManager: typeof CompositeClientManager;
-  stateNotifier: StateConditionNotifier;
-  maybeDydxLocalWallet?: LocalWallet | null;
-}
+const FN = 'AccountTransactionSupervisor';
 
-const selectOrdersAndFills = createAppSelector(
-  BonsaiCore.account.allOrders.data,
-  BonsaiCore.account.fills.data,
-  (orders, fills) => ({ orders, fills })
-);
+type Context = {
+  deployment: PerpDeployment;
+  builder: PerpTransactionBuilder;
+  address: string;
+  account: PerpAccount;
+};
 
-interface CancelOrderPayload {
-  clientId: number;
-  orderFlags: OrderFlags;
-  clobPairId: number;
-  goodTilBlock: number | undefined;
-  goodTilBlockTime: number | undefined;
-  subaccountNumber: number;
+type PlacedOrder = { clientId: string; orderId?: string; filled: boolean };
 
-  originalOrder: ConvertBigNumberToNumber<SubaccountOrder> | undefined;
-}
+const isMarketOrder = (payload: PlaceOrderPayload) => payload.type === OrderType.MARKET;
 
-const BLOCK_TIME_BIAS_FOR_SHORT_TERM_ESTIMATION = 0.9;
-export const SHORT_TERM_ORDER_DURATION_SAFETY_MARGIN = 5;
+const isTriggerOrder = (payload: PlaceOrderPayload) =>
+  payload.type === OrderType.STOP_LIMIT ||
+  payload.type === OrderType.STOP_MARKET ||
+  payload.type === OrderType.TAKE_PROFIT_LIMIT ||
+  payload.type === OrderType.TAKE_PROFIT_MARKET;
 
+/** Maps the form's time-in-force and execution options onto the engine's order type code. */
+const orderTypeCode = (payload: PlaceOrderPayload) => {
+  if ((payload.postOnly ?? false) || payload.execution === OrderExecution.POST_ONLY) {
+    return ORDER_TYPE.POST_ONLY;
+  }
+  if (payload.execution === OrderExecution.FOK || payload.timeInForce === OrderTimeInForce.FOK) {
+    return ORDER_TYPE.FOK;
+  }
+  if (payload.execution === OrderExecution.IOC || payload.timeInForce === OrderTimeInForce.IOC) {
+    return ORDER_TYPE.IOC;
+  }
+  return ORDER_TYPE.GTC;
+};
+
+const toOrderSpec = (
+  payload: PlaceOrderPayload,
+  market: PerpDeployment['markets'][string]
+): OrderSpec => {
+  const isAsk = payload.side === OrderSide.SELL ? SIDE.ASK : SIDE.BID;
+  const size = sizeToUnits(payload.size, market.lotSize);
+  if (isMarketOrder(payload)) {
+    return { kind: 'market', isAsk, size, reduceOnly: payload.reduceOnly ?? false };
+  }
+  return {
+    kind: 'limit',
+    isAsk,
+    size,
+    price: priceToUnits(payload.price, market.tickSize),
+    orderType: orderTypeCode(payload),
+    clientOrderId: BigInt(payload.clientId),
+    reduceOnly: payload.reduceOnly ?? false,
+    expirationTimestampMs:
+      payload.goodTilTimeInSeconds != null && payload.goodTilTimeInSeconds > 0
+        ? BigInt(Date.now() + payload.goodTilTimeInSeconds * 1000)
+        : undefined,
+  };
+};
+
+const failure = (message: string, stringKey?: string) =>
+  wrapSimpleError(FN, message, stringKey ?? STRING_KEYS.SOMETHING_WENT_WRONG);
+
+/**
+ * Write path for the perpetuals engine. Orders, cancels and closes become programmable
+ * transactions signed by the connected wallet; on-chain finality is the confirmation, so
+ * local order state is updated from the transaction's events rather than from an indexer.
+ */
 export class AccountTransactionSupervisor {
   private store: RootStore;
 
-  private cachedDydxLocalWallet: LocalWallet | null;
+  private accounts = new Map<string, PerpAccount>();
 
-  private shared: TransactionSupervisorShared;
+  private positions = new Set<string>();
 
-  constructor(store: RootStore, compositeClientManager: typeof CompositeClientManager) {
+  /** Engine order id -> market, for orders placed in this session. */
+  private orderMarkets = new Map<string, string>();
+
+  constructor(store: RootStore) {
     this.store = store;
-    this.cachedDydxLocalWallet = null;
-
-    this.shared = {
-      compositeClientManager,
-      store,
-      stateNotifier: new StateConditionNotifier(store),
-    };
   }
 
-  private wrapOperation<T, Payload, P, Q>(
-    nameForLogging: string,
-    basePayload: Payload,
-    fn: (args: { payload: Payload } & AddClientAndWalletMiddlewareProps) => Promise<T>,
-    tracking?: Tracker<P, Q>
-  ) {
-    return async () => {
-      const maybeDydxLocalWallet = await this.getCosmosLocalWallet();
-
-      const result = await taskBuilder({ payload: basePayload })
-        .with<AddSharedContextMiddlewareProps>(
-          addSharedContextMiddleware(nameForLogging, { ...this.shared, maybeDydxLocalWallet })
-        )
-        .with<ValidateLocalWalletMiddlewareProps>(validateLocalWalletMiddleware())
-        .with<StateTrackingProps<Q>>(stateTrackingMiddleware(tracking))
-        .with<BonsaiLoggingMiddlewareProps>(bonsaiLoggingMiddleware())
-        .with<AddClientAndWalletMiddlewareProps>(addClientAndWalletMiddleware(this.store))
-        .do(
-          chainOperationEngine(async (context) => {
-            const { compositeClient, localWallet, payload } = context;
-            return fn({
-              payload,
-              compositeClient,
-              localWallet,
-            });
-          })
-        );
-
-      return result;
-    };
+  /** Orders placed through this supervisor, so cancels can find their market before an indexer exists. */
+  knownOrderMarket(orderId: string) {
+    return this.orderMarkets.get(orderId);
   }
 
-  private async getCosmosLocalWallet() {
-    const state = this.store.getState();
-    const isKeplrConnected = selectIsKeplrConnected(state);
+  forgetAccount() {
+    this.accounts.clear();
+    this.positions.clear();
+  }
 
-    if (isKeplrConnected && window.keplr) {
-      if (this.cachedDydxLocalWallet) {
-        return this.cachedDydxLocalWallet;
+  private async context(): Promise<OperationResult<Context>> {
+    const network = dAppKit.stores.$currentNetwork.get();
+    const deployment = await loadPerpDeployment(network);
+    if (!deployment) {
+      return failure(`No perpetuals deployment configured for ${network}`);
+    }
+    const address = getUserWalletAddress(this.store.getState());
+    if (!address) {
+      return failure('No wallet connected', STRING_KEYS.NO_LOCAL_WALLET);
+    }
+    let account = this.accounts.get(`${network}:${address}`);
+    if (!account) {
+      account = await findPerpAccount(dAppKit.getClient(), deployment, address);
+      if (!account) {
+        return failure('Deposit collateral to open a trading account first');
       }
-
-      const chainId = getSelectedDydxChainId(state);
-      const dydxOfflineSigner = await window.keplr.getOfflineSigner(chainId);
-      const dydxLocalWallet = await (
-        await getLazyLocalWallet()
-      ).fromOfflineSigner(dydxOfflineSigner);
-
-      this.cachedDydxLocalWallet = dydxLocalWallet;
-      return dydxLocalWallet;
+      this.accounts.set(`${network}:${address}`, account);
     }
-
-    return undefined;
+    return wrapOperationSuccess({
+      deployment,
+      builder: new PerpTransactionBuilder(deployment),
+      address,
+      account,
+    });
   }
 
-  private createCancelOrderPayload(orderId: string): CancelOrderPayload | undefined {
-    const state = this.store.getState();
-    const orders = BonsaiCore.account.allOrders.data(state);
-    const order = orders.find((o) => o.id === orderId);
-    const fnName = 'AccountTransactionSupervisor/createCancelOrderPayload';
-
-    if (!order) {
-      logBonsaiError(fnName, 'Order not found', {
-        orderId,
-      });
-      return undefined;
-    }
-
-    if (order.status === OrderStatus.Canceled) {
-      logBonsaiInfo(fnName, 'Order already canceled', { orderId });
-      return undefined;
-    }
-
-    const clobPairId = order.clobPairId;
-    const clientId = AttemptNumber(order.clientId);
-
-    if (clientId == null || clobPairId == null) {
-      logBonsaiError(fnName, 'Invalid client ID or CLOB pair ID', {
-        orderId,
-      });
-      return undefined;
-    }
-
-    let orderFlags: OrderFlags | undefined;
-
-    switch (order.orderFlags) {
-      case '0':
-        orderFlags = OrderFlags.SHORT_TERM;
-        break;
-      case '32':
-        orderFlags = OrderFlags.CONDITIONAL;
-        break;
-      case '64':
-        orderFlags = OrderFlags.LONG_TERM;
-        break;
-      case '128':
-        orderFlags = OrderFlags.TWAP;
-        break;
-      default:
-        logBonsaiError(fnName, 'Unsupported order flags', {
-          orderId,
-          orderFlags: order.orderFlags,
-        });
-        return undefined;
-    }
-
-    return {
-      clientId,
-      orderFlags,
-      clobPairId,
-      goodTilBlock: order.goodTilBlock ?? undefined,
-      goodTilBlockTime: order.goodTilBlockTimeSeconds ?? undefined,
-      subaccountNumber: order.subaccountNumber,
-
-      originalOrder: purgeBigNumbers(order),
-    };
-  }
-
-  private async executeCancelOrder(orderId: string, onConfirmed?: () => void) {
-    const cancelPayload = this.createCancelOrderPayload(orderId);
-    const fnName = 'AccountTransactionSupervisor/executeCancelOrder';
-
-    if (cancelPayload == null) {
-      return wrapSimpleError(
-        fnName,
-        'Unable to create cancel payload for order',
-        STRING_KEYS.NO_ORDERS_TO_CANCEL
-      );
-    }
-
-    return this.wrapOperation(
-      fnName,
-      cancelPayload,
-      async ({ compositeClient, localWallet, payload }) => {
-        // Create a SubaccountClient using the wallet and subaccount number
-        const subaccountClient = SubaccountClient.forLocalWallet(
-          localWallet,
-          payload.subaccountNumber
-        );
-
-        // Initiate the cancellation using cancelRawOrder
-        return compositeClient.cancelRawOrder(
-          subaccountClient,
-          payload.clientId,
-          payload.orderFlags,
-          payload.clobPairId,
-          payload.goodTilBlock === 0 ? undefined : payload.goodTilBlock,
-          payload.goodTilBlockTime === 0 ? undefined : payload.goodTilBlockTime
-        );
-      },
-      {
-        selector: BonsaiCore.account.allOrders.data,
-        validator: (orders) => {
-          const order = orders.find((o) => o.id === orderId);
-          if (
-            order?.status != null &&
-            getSimpleOrderStatus(order.status) === OrderStatus.Canceled
-          ) {
-            return order;
-          }
-          return undefined;
-        },
-        onTrigger: (success) => {
-          if (success) {
-            onConfirmed?.();
-          }
-        },
-      }
-    )();
-  }
-
-  private getCancelableOrders(marketId?: string): SubaccountOrder[] {
-    const state = this.store.getState();
-    const orders = BonsaiCore.account.openOrders.data(state);
-
-    return orders.filter((order) => marketId == null || order.marketId === marketId);
-  }
-
-  private getCloseAllPositionsPayloads(): PlaceOrderPayload[] | undefined {
-    const state = this.store.getState();
-    const positions = BonsaiCore.account.parentSubaccountPositions.data(state);
-    const fnName = 'AccountTransactionSupervisor/getCloseAllPositionsPayloads';
-
-    if (positions == null || positions.length === 0) {
-      // technically could be fine, just no-op
-      return [];
-    }
-
-    // Get current blockchain height for goodTilBlock
-    const currentHeight = estimateLiveValidatorHeight(
-      state,
-      BLOCK_TIME_BIAS_FOR_SHORT_TERM_ESTIMATION
+  private async ensurePosition(ctx: Context, marketId: string) {
+    const key = `${ctx.deployment.network}:${ctx.account.account}:${marketId}`;
+    if (this.positions.has(key)) return false;
+    const exists = await hasMarketPosition(
+      dAppKit.getClient(),
+      ctx.deployment,
+      marketId,
+      ctx.account.accountId,
+      ctx.address
     );
-    if (currentHeight == null) {
-      logBonsaiError(
-        fnName,
-        'cannot generate close all positions payload because validatorHeight is null'
-      );
-      return undefined;
+    if (exists) {
+      this.positions.add(key);
+      return false;
     }
-
-    const markets = BonsaiCore.markets.markets.data(state);
-    if (markets == null) {
-      logBonsaiError(fnName, 'cannot generate close all positions payload because markets is null');
-      return undefined;
-    }
-
-    return positions
-      .filter((position) => position.unsignedSize.gt(0))
-      .map((position): PlaceOrderPayload | undefined => {
-        const clientId = Math.floor(Math.random() * MAX_INT_ROUGHLY);
-
-        // Get market information to calculate price with slippage
-        const marketId = position.market;
-        const market = markets[marketId];
-        const oraclePrice = AttemptBigNumber(market?.oraclePrice);
-
-        if (!market || oraclePrice == null || oraclePrice.isZero()) {
-          logBonsaiError(
-            fnName,
-            'cannot generate close position payload because market is null or oracle is bad',
-            { market }
-          );
-          return undefined;
-        }
-
-        // Determine order side (opposite of position side)
-        const positionSize = position.signedSize;
-        const side = positionSize.isGreaterThan(0) ? OrderSide.SELL : OrderSide.BUY;
-
-        // Calculate price with slippage
-        const price =
-          side === OrderSide.BUY
-            ? oraclePrice.times(1 + MARKET_ORDER_MAX_SLIPPAGE).toNumber()
-            : oraclePrice.times(1 - MARKET_ORDER_MAX_SLIPPAGE).toNumber();
-
-        const clobPairId = AttemptNumber(market.clobPairId);
-        if (clobPairId == null) {
-          return undefined;
-        }
-        const marketInfo: PlaceOrderMarketInfo = {
-          clobPairId,
-          atomicResolution: market.atomicResolution,
-          stepBaseQuantums: market.stepBaseQuantums,
-          quantumConversionExponent: market.quantumConversionExponent,
-          subticksPerTick: market.subticksPerTick,
-        };
-
-        // Calculate goodTilBlock if we have current height
-        const goodTilBlock =
-          currentHeight + SHORT_TERM_ORDER_DURATION - SHORT_TERM_ORDER_DURATION_SAFETY_MARGIN;
-
-        // Return the order payload
-        return {
-          subaccountNumber: position.subaccountNumber,
-          marketId,
-          clobPairId,
-          clientId,
-          type: OrderType.MARKET,
-          side,
-          price,
-          size: positionSize.abs().toNumber(),
-          reduceOnly: true,
-          postOnly: false,
-          timeInForce: OrderTimeInForce.IOC,
-          execution: OrderExecution.DEFAULT,
-          goodTilBlock,
-          goodTilTimeInSeconds: undefined,
-          memo: TransactionMemo.placeOrder,
-          triggerPrice: undefined,
-          transferToSubaccountAmount: undefined,
-          marketInfo,
-          currentHeight,
-          twapParameters: undefined,
-        };
-      })
-      .filter(isPresent);
+    return true;
   }
 
-  private async executeSubaccountTransfer(outerPayload: {
-    amount: number;
-    fromSubaccountNumber: number;
-    toSubaccountNumber: number;
-    targetAddress: string;
-  }) {
-    const selectSubaccountBalance = createAppSelector(
-      BonsaiCore.account.childSubaccountSummaries.data,
-      (summaries) => {
-        const summary = summaries?.[outerPayload.toSubaccountNumber];
-        return summary?.equity.toNumber() ?? 0;
-      }
-    );
-    const startState = this.store.getState();
-    const startBalance = selectSubaccountBalance(startState);
+  private markPosition(ctx: Context, marketId: string) {
+    this.positions.add(`${ctx.deployment.network}:${ctx.account.account}:${marketId}`);
+  }
 
-    const result = await this.wrapOperation(
-      'AccountTransactionSupervisor/executeSubaccountTransfer',
-      outerPayload,
-      async ({ compositeClient, localWallet, payload }) => {
-        const isIsolatedCancel = payload.toSubaccountNumber === 0;
+  private toFailure(error: unknown): OperationResult<never> {
+    if (error instanceof HaneulTransactionError) {
+      logBonsaiError(FN, error.message, { abort: error.abort, digest: error.digest });
+      return wrapOperationFailure(error.message, undefined);
+    }
+    const message = error instanceof Error ? error.message : String(error);
+    logBonsaiError(FN, message, { error });
+    return wrapOperationFailure(message, undefined);
+  }
 
-        const tx = await compositeClient.transferToSubaccount(
-          SubaccountClient.forLocalWallet(localWallet, payload.fromSubaccountNumber),
-          payload.targetAddress,
-          payload.toSubaccountNumber,
-          MustBigNumber(payload.amount).toFixed(6),
-          isIsolatedCancel
-            ? TransactionMemo.cancelOrderTransfer
-            : TransactionMemo.transferForIsolatedMarginOrder
-        );
-
-        return tx;
+  /**
+   * Places every payload of one market in a single session. Isolated-margin transfers
+   * become collateral allocations, and the first order on a market creates the position
+   * at the market's initial margin ratio.
+   */
+  private async executeSession(
+    ctx: Context,
+    marketId: string,
+    payloads: PlaceOrderPayload[],
+    source: TradeMetadataSource
+  ): Promise<OperationResult<PlacedOrder[]>> {
+    const market = ctx.deployment.markets[marketId];
+    if (!market) return failure(`Market ${marketId} is not available on ${ctx.deployment.network}`);
+    const createPosition = await this.ensurePosition(ctx, marketId);
+    const allocate = payloads.reduce((sum, p) => sum + (p.transferToSubaccountAmount ?? 0), 0);
+    const tx = ctx.builder.session({
+      ref: { account: ctx.account.account, cap: ctx.account.cap },
+      marketId,
+      orders: payloads.map((p) => toOrderSpec(p, market)),
+      options: {
+        createPosition,
+        initialMarginRatio: createPosition ? BigInt(market.initialMarginRatio) : undefined,
+        allocate:
+          allocate > 0
+            ? collateralToUnits(allocate, ctx.deployment.collateral.decimals)
+            : undefined,
+        allocateMissingMargin: true,
+        deallocateFreeCollateral: false,
       },
-      {
-        selector: selectSubaccountBalance,
-        validator: (balance) => {
-          if (balance >= startBalance + outerPayload.amount * 0.9) {
-            return { newBalance: balance };
-          }
-          return undefined;
-        },
-      }
-    )();
-    return result;
+    });
+    try {
+      const result = await signAndExecute(tx);
+      this.markPosition(ctx, marketId);
+      const posted = eventsOf(result.events, '::events::PostedOrder');
+      const placed: PlacedOrder[] = payloads.map((p) => {
+        const match = posted.find((e) => String(e.client_order_id ?? '') === String(p.clientId));
+        const orderId = match ? String(match.order_id) : undefined;
+        if (orderId) this.orderMarkets.set(orderId, marketId);
+        return { clientId: `${p.clientId}`, orderId, filled: isMarketOrder(p) || !orderId };
+      });
+      logBonsaiInfo(FN, 'session executed', { digest: result.digest, marketId, placed, source });
+      return wrapOperationSuccess(placed);
+    } catch (error) {
+      return this.toFailure(error);
+    }
   }
 
-  private async executePlaceOrder(
+  public async placeOrder(
     payload: PlaceOrderPayload,
     source: TradeMetadataSource
   ): Promise<OperationResult<any>> {
-    const totalTimer = startTimer();
-    const afterSubmitTimer = createTimer();
-
-    const placeOrderResult = await this.wrapOperation(
-      'AccountTransactionSupervisor/placeOrder',
-      payload,
-      async ({ compositeClient, localWallet, payload: innerPayload }) => {
-        const {
-          subaccountNumber: subaccountNumberToUse,
-          marketId,
-          type,
-          side,
-          price,
-          size,
-          clientId,
-          timeInForce,
-          goodTilTimeInSeconds,
-          goodTilBlock,
-          execution,
-          postOnly,
-          reduceOnly,
-          triggerPrice,
-          marketInfo,
-          currentHeight,
-          memo,
-          twapParameters,
-        } = innerPayload;
-
-        // Set timeout for order to be considered failed if not committed
-        setTimeout(() => {
-          this.store.dispatch(placeOrderTimeout(clientId.toString()));
-        }, UNCOMMITTED_ORDER_TIMEOUT_MS);
-
-        const subaccountClientToUse = SubaccountClient.forLocalWallet(
-          localWallet,
-          subaccountNumberToUse
-        );
-
-        // Place order
-        const tx = await compositeClient.placeOrder(
-          subaccountClientToUse,
-          marketId,
-          type,
-          side,
-          price,
-          size,
-          clientId,
-          timeInForce,
-          goodTilTimeInSeconds ?? 0,
-          execution,
-          postOnly ?? undefined,
-          reduceOnly ?? undefined,
-          triggerPrice ?? undefined,
-          marketInfo ?? undefined,
-          currentHeight ?? undefined,
-          goodTilBlock ?? undefined,
-          memo,
-          Method.BroadcastTxSync,
-          twapParameters ?? undefined
-        );
-
-        if ((tx as IndexedTx | undefined)?.code !== 0) {
-          throw new StatefulOrderError('Stateful order has failed to commit.', tx);
-        }
-
-        return tx;
-      },
-      {
-        selector: BonsaiCore.account.allOrders.data,
-        validator: (orders) => {
-          const order = orders.find((o) => o.clientId === `${payload.clientId}`);
-          if (order != null) {
-            return order;
-          }
-          return undefined;
-        },
-      }
-    )();
-
-    if (isOperationFailure(placeOrderResult)) {
-      this.store.dispatch(
-        placeOrderFailed({
-          clientId: `${payload.clientId}`,
-          errorParams: operationFailureToErrorParams(placeOrderResult),
-        })
-      );
+    if (isTriggerOrder(payload)) {
+      return failure('Conditional orders are not available yet');
     }
+    this.store.dispatch(
+      placeOrderSubmitted({
+        marketId: payload.marketId,
+        clientId: `${payload.clientId}`,
+        orderType: payload.type,
+        subaccountNumber: payload.subaccountNumber,
+      })
+    );
+    track(
+      AnalyticsEvents.TradePlaceOrder({ ...payload, source, volume: payload.size * payload.price })
+    );
 
-    // Log market order fills
-    if (isOperationSuccess(placeOrderResult) && payload.type === OrderType.MARKET) {
-      afterSubmitTimer.start();
-      this.shared.stateNotifier.notifyWhenTrue(
-        selectOrdersAndFills,
-        ({ orders, fills }) => {
-          const matchingOrder = orders.find((order) => order.clientId === `${payload.clientId}`);
-          if (matchingOrder?.id == null) {
-            return undefined;
-          }
-
-          const matchingFill = fills.find((fill) => fill.orderId === matchingOrder.id);
-          if (matchingFill != null) {
-            return { order: matchingOrder, fill: matchingFill };
-          }
-
-          return undefined;
-        },
-        (result) => {
-          if (result != null) {
-            logBonsaiInfo('AccountTransactionSupervisor/placeOrder', 'Market order filled', {
-              payload,
-              order: purgeBigNumbers(result.order),
-              fill: purgeBigNumbers(result.fill),
-              totalTimeToFill: totalTimer.elapsed(),
-              timeToFillAfterSubmit: afterSubmitTimer.elapsed(),
-              source,
-            });
-            track(
-              AnalyticsEvents.TradeMarketOrderFilled({
-                order: payload,
-                roundtripMs: totalTimer.elapsed(),
-                sinceSubmissionMs: afterSubmitTimer.elapsed(),
-                volume: MustBigNumber(result.fill.size)
-                  .times(result.fill.price ?? 0)
-                  .toNumber(),
-                size: MustNumber(result.fill.size),
-                price: MustNumber(result.fill.price),
-                fill: result.fill,
-                source,
-              })
-            );
-          } else {
-            logBonsaiInfo('AccountTransactionSupervisor/placeOrder', 'Market order never filled', {
-              payload,
-            });
-          }
-        },
-        10 * timeUnits.second
-      );
-    }
-
-    return placeOrderResult;
+    const ctx = await this.context();
+    const result = isOperationFailure(ctx)
+      ? ctx
+      : await this.executeSession(ctx.payload, payload.marketId, [payload], source);
+    this.settlePlacements(result, [payload]);
+    return result;
   }
 
-  // does subaccount transfer and place order and manages local order state
-  public async placeOrder(
-    payloadArg: PlaceOrderPayload,
-    source: TradeMetadataSource
-  ): Promise<OperationResult<any>> {
-    const maybeDydxLocalWallet = await this.getCosmosLocalWallet();
+  public async placeCompoundOrder(order: TradeFormPayload, source: TradeMetadataSource) {
+    const main = order.orderPayload;
+    const scale = order.scaleOrderPayloads ?? [];
+    const triggers = (order.triggersPayloads ?? []).filter((t) => t.placePayload != null);
+    if (triggers.length > 0) {
+      return failure('Conditional orders are not available yet');
+    }
+    const payloads = [main, ...scale].filter((p): p is PlaceOrderPayload => p != null);
+    if (payloads.length === 0) return wrapOperationSuccess(true);
+    if (payloads.length === 1) return this.placeOrder(payloads[0]!, source);
 
-    return (
-      taskBuilder({ payload: payloadArg })
-        .with<AddSharedContextMiddlewareProps>(
-          addSharedContextMiddleware('AccountTransactionSupervisor/placeOrderWrapper', {
-            ...this.shared,
-            maybeDydxLocalWallet,
+    const marketId = payloads[0]!.marketId;
+    if (payloads.some((p) => p.marketId !== marketId)) {
+      return failure('All orders of one submission must target the same market');
+    }
+    payloads.forEach((p) =>
+      this.store.dispatch(
+        placeOrderSubmitted({
+          marketId: p.marketId,
+          clientId: `${p.clientId}`,
+          orderType: p.type,
+          subaccountNumber: p.subaccountNumber,
+        })
+      )
+    );
+    const ctx = await this.context();
+    const result = isOperationFailure(ctx)
+      ? ctx
+      : await this.executeSession(ctx.payload, marketId, payloads, source);
+    this.settlePlacements(result, payloads);
+    return result;
+  }
+
+  private settlePlacements(result: OperationResult<PlacedOrder[]>, payloads: PlaceOrderPayload[]) {
+    if (isOperationFailure(result)) {
+      payloads.forEach((p) =>
+        this.store.dispatch(
+          placeOrderFailed({
+            clientId: `${p.clientId}`,
+            errorParams: operationFailureToErrorParams(result),
           })
         )
-        .with<ValidateLocalWalletMiddlewareProps>(validateLocalWalletMiddleware())
-        // fully prepare/augment the trade payload
-        .with<{
-          trackingMetadata: TradeAdditionalMetadata;
-          transferMetadata: { sourceSubaccount: number; sourceAddress: string };
-          isShortTermOrder: boolean;
-        }>(async (context, next) => {
-          const sourceSubaccount = getSubaccountId(this.store.getState());
-          const sourceAddress = getUserWalletAddress(this.store.getState());
-          if (sourceSubaccount == null || sourceAddress == null) {
-            return createMiddlewareFailureResult(
-              wrapSimpleError(
-                context.fnName,
-                'unknown parent subaccount number or address',
-                STRING_KEYS.SOMETHING_WENT_WRONG
-              ),
-              context
-            );
-          }
-          const transferMetadata = { sourceSubaccount, sourceAddress };
-
-          const payload = context.payload;
-          const isShortTermOrder = isShortTermOrderPayload(payload);
-
-          // these properties are calculated for logging purposes only here
-          // do NOT use for order submission because they will be stale by the time we are submitting
-          const currentHeight = estimateLiveValidatorHeight(
-            this.store.getState(),
-            BLOCK_TIME_BIAS_FOR_SHORT_TERM_ESTIMATION
-          );
-          const goodTilBlock =
-            isShortTermOrder && currentHeight != null
-              ? currentHeight + SHORT_TERM_ORDER_DURATION - SHORT_TERM_ORDER_DURATION_SAFETY_MARGIN
-              : undefined;
-
-          const trackingMetadata: TradeAdditionalMetadata = {
-            source,
-            volume: payload.size * payload.price,
-          };
-
-          return next({
-            ...context,
-            payload: {
-              ...payload,
-              goodTilBlock,
-              currentHeight,
-            },
-            trackingMetadata,
-            transferMetadata,
-            isShortTermOrder,
-          });
+      );
+      return;
+    }
+    result.payload.forEach((placed) =>
+      this.store.dispatch(
+        placeOrderConfirmed({
+          clientId: placed.clientId,
+          orderId: placed.orderId,
+          status: placed.filled ? PlaceOrderStatuses.Filled : PlaceOrderStatuses.Placed,
         })
-        // handle store dispatching
-        .with<{}>(async (context, next) => {
-          const { payload } = context;
-          this.store.dispatch(
-            placeOrderSubmitted({
-              marketId: payload.marketId,
-              clientId: `${payload.clientId}`,
-              orderType: payload.type,
-              subaccountNumber: payload.subaccountNumber,
-            })
-          );
-          const overallResult = await next(context);
-          if (isOperationFailure(overallResult.result)) {
-            this.store.dispatch(
-              placeOrderFailed({
-                clientId: `${payload.clientId}`,
-                errorParams: operationFailureToErrorParams(overallResult.result),
-              })
-            );
-          }
-          return overallResult;
-        })
-        // analytics
-        .with<{ confirmedEvent: SimpleEvent<{}> }>(async (context, next) => {
-          const { payload, trackingMetadata } = context;
-          track(AnalyticsEvents.TradePlaceOrder({ ...payload, ...trackingMetadata }));
-          const startTime = startTimer();
-          const submitTime = createTimer();
-
-          const confirmedEvent = new SimpleEvent<{}>();
-          confirmedEvent.addListener(() => {
-            track(
-              AnalyticsEvents.TradePlaceOrderConfirmed({
-                ...payload,
-                roundtripMs: startTime.elapsed(),
-                sinceSubmissionMs: submitTime.elapsed(),
-                ...trackingMetadata,
-              })
-            );
-          });
-
-          const overallResult = await next({ ...context, confirmedEvent });
-          submitTime.start();
-
-          if (isOperationFailure(overallResult.result)) {
-            track(
-              AnalyticsEvents.TradePlaceOrderSubmissionFailed({
-                ...payload,
-                error: overallResult.result.errorString,
-                durationMs: startTime.elapsed(),
-                ...trackingMetadata,
-              })
-            );
-          } else if (isOperationSuccess(overallResult.result)) {
-            track(
-              AnalyticsEvents.TradePlaceOrderSubmissionConfirmed({
-                ...payload,
-                durationMs: startTime.elapsed(),
-                ...trackingMetadata,
-              })
-            );
-          }
-
-          return overallResult;
-        })
-        .do(async (context) => {
-          const { payload, transferMetadata } = context;
-
-          const overallResult = await this.wrapOperation(
-            context.fnName,
-            payload,
-            async ({ payload: innerPayload }) => {
-              const subaccountTransferResult = await calc(async () => {
-                if (
-                  innerPayload.transferToSubaccountAmount != null &&
-                  innerPayload.transferToSubaccountAmount > 0
-                ) {
-                  const res = await this.executeSubaccountTransfer({
-                    fromSubaccountNumber: transferMetadata.sourceSubaccount,
-                    toSubaccountNumber: innerPayload.subaccountNumber,
-                    amount: innerPayload.transferToSubaccountAmount,
-                    targetAddress: transferMetadata.sourceAddress,
-                  });
-                  await sleep(POST_TRANSFER_PLACE_ORDER_DELAY);
-                  return res;
-                }
-
-                return wrapOperationSuccess({});
-              });
-
-              if (isOperationFailure(subaccountTransferResult)) {
-                throw new WrappedOperationFailureError(subaccountTransferResult);
-              }
-
-              // we must calculate block height as late as possible for max accuracy
-              const currentHeight = estimateLiveValidatorHeight(
-                this.store.getState(),
-                BLOCK_TIME_BIAS_FOR_SHORT_TERM_ESTIMATION
-              );
-              if (currentHeight == null) {
-                return createMiddlewareFailureResult(
-                  wrapSimpleError(
-                    context.fnName,
-                    'validator height unknown',
-                    STRING_KEYS.UNKNOWN_VALIDATOR_HEIGHT
-                  ),
-                  context
-                );
-              }
-              const goodTilBlock = context.isShortTermOrder
-                ? currentHeight +
-                  SHORT_TERM_ORDER_DURATION -
-                  SHORT_TERM_ORDER_DURATION_SAFETY_MARGIN
-                : undefined;
-
-              const placeOrderResult = await this.executePlaceOrder(
-                {
-                  ...innerPayload,
-                  currentHeight,
-                  goodTilBlock,
-                },
-                source
-              );
-
-              if (isOperationFailure(placeOrderResult)) {
-                throw new WrappedOperationFailureError(placeOrderResult);
-              }
-              return placeOrderResult.payload;
-            },
-            {
-              selector: BonsaiCore.account.allOrders.data,
-              validator: (orders) => {
-                const order = orders.find((o) => o.clientId === `${payload.clientId}`);
-                if (order != null) {
-                  return order;
-                }
-                return undefined;
-              },
-              onTrigger: (success) => {
-                if (success) {
-                  context.confirmedEvent.trigger({});
-                }
-              },
-            }
-          )();
-
-          return overallResult;
-        })
+      )
     );
   }
 
-  public async closeAllPositions() {
-    track(AnalyticsEvents.TradeCloseAllPositionsClick({}));
-    const maybeDydxLocalWallet = await this.getCosmosLocalWallet();
-
-    return taskBuilder({ payload: {} })
-      .with<AddSharedContextMiddlewareProps>(
-        addSharedContextMiddleware('AccountTransactionSupervisor/closeAllPositions', {
-          ...this.shared,
-          maybeDydxLocalWallet,
-        })
-      )
-      .with<ValidateLocalWalletMiddlewareProps>(validateLocalWalletMiddleware())
-      .with<{ closePayloads: PlaceOrderPayload[] }>(async (context, next) => {
-        const closePayloads = this.getCloseAllPositionsPayloads();
-
-        if (closePayloads == null) {
-          return createMiddlewareFailureResult(
-            wrapSimpleError(
-              context.fnName,
-              'error generating close position payloads',
-              STRING_KEYS.SOMETHING_WENT_WRONG
-            ),
-            context
-          );
-        }
-
-        if (closePayloads.length === 0) {
-          return createMiddlewareFailureResult(
-            wrapSimpleError(
-              context.fnName,
-              'no positions to close',
-              STRING_KEYS.NO_POSITIONS_TO_CLOSE
-            ),
-            context
-          );
-        }
-
-        return next({ ...context, closePayloads });
-      })
-      .do(async ({ closePayloads }) => {
-        this.store.dispatch(
-          closeAllPositionsSubmitted(
-            closePayloads.map((payload) => ({
-              marketId: payload.marketId,
-              clientId: `${payload.clientId}`,
-              orderType: payload.type,
-              subaccountNumber: payload.subaccountNumber,
-            }))
-          )
-        );
-
-        const results = await Promise.all(
-          closePayloads.map((p) => this.executePlaceOrder(p, 'CloseAllPositionsButton'))
-        );
-
-        if (results.every(isOperationSuccess)) {
-          return wrapOperationSuccess({
-            results,
-          });
-        }
-
-        return results.find(isOperationFailure)!;
-      });
+  private resolveOrderMarket(
+    orderId: string
+  ): { marketId: string; order?: SubaccountOrder } | undefined {
+    const known = this.orderMarkets.get(orderId);
+    const order = BonsaiCore.account.allOrders
+      .data(this.store.getState())
+      .find((o) => o.id === orderId);
+    const marketId = known ?? order?.marketId;
+    return marketId ? { marketId, order } : undefined;
   }
 
   public async cancelOrder({
@@ -890,848 +346,177 @@ export class AccountTransactionSupervisor {
   }: {
     orderId: string;
     withNotification?: boolean;
-  }) {
-    const maybeDydxLocalWallet = await this.getCosmosLocalWallet();
-
-    return (
-      taskBuilder({ payload: { orderId, withNotification } })
-        .with<AddSharedContextMiddlewareProps>(
-          addSharedContextMiddleware('AccountTransactionSupervisor/cancelOrder', {
-            ...this.shared,
-            maybeDydxLocalWallet,
-          })
-        )
-        .with<ValidateLocalWalletMiddlewareProps>(validateLocalWalletMiddleware())
-        // populate order details
-        .with<{ order: SubaccountOrder; uuid: string }>(async (context, next) => {
-          const uuid = crypto.randomUUID();
-          const order = this.getCancelableOrders().find((o) => o.id === orderId);
-          if (order == null) {
-            return createMiddlewareFailureResult(
-              wrapSimpleError(
-                context.fnName,
-                'invalid or missing order id',
-                STRING_KEYS.NO_ORDERS_TO_CANCEL
-              ),
-              context
-            );
-          }
-          return next({ ...context, order, uuid });
-        })
-        // dispatch store updates
-        .with<{}>(async (context, next) => {
-          if (withNotification) {
-            context.shared.store.dispatch(
-              cancelOrderSubmitted({
-                order: context.order,
-                orderId: context.order.id,
-                uuid: context.uuid,
-              })
-            );
-          }
-
-          const result = await next(context);
-
-          if (isOperationFailure(result.result) && withNotification) {
-            context.shared.store.dispatch(
-              cancelOrderFailed({
-                uuid: context.uuid,
-                errorParams: operationFailureToErrorParams(result.result),
-              })
-            );
-          }
-
-          return result;
-        })
-        // cancel analytics events
-        .with<{ onConfirm: () => undefined }>(async (context, next) => {
-          track(AnalyticsEvents.TradeCancelOrder({ orderId }));
-
-          const startTime = startTimer();
-          const submitTime = createTimer();
-
-          const result = await next({
-            ...context,
-            onConfirm: () => {
-              track(
-                AnalyticsEvents.TradeCancelOrderConfirmed({
-                  orderId,
-                  roundtripMs: startTime.elapsed(),
-                  sinceSubmissionMs: submitTime.elapsed(),
-                })
-              );
-            },
-          });
-          submitTime.start();
-
-          if (isOperationFailure(result.result)) {
-            track(
-              AnalyticsEvents.TradeCancelOrderSubmissionFailed({
-                orderId,
-                error: result.result.errorString,
-                durationMs: startTime.elapsed(),
-              })
-            );
-          } else {
-            track(
-              AnalyticsEvents.TradeCancelOrderSubmissionConfirmed({
-                orderId,
-                durationMs: startTime.elapsed(),
-              })
-            );
-          }
-
-          return result;
-        })
-        .do(async (context) => {
-          const result = await this.executeCancelOrder(orderId, () => {
-            context.onConfirm();
-          });
-          return result;
-        })
-    );
-  }
-
-  public async cancelAllOrders({ marketId }: { marketId?: string }) {
-    track(AnalyticsEvents.TradeCancelAllOrdersClick({ marketId }));
-    const maybeDydxLocalWallet = await this.getCosmosLocalWallet();
-
-    return taskBuilder({ payload: { marketId } })
-      .with<AddSharedContextMiddlewareProps>(
-        addSharedContextMiddleware('AccountTransactionSupervisor/cancelAllOrders', {
-          ...this.shared,
-          maybeDydxLocalWallet,
-        })
-      )
-      .with<ValidateLocalWalletMiddlewareProps>(validateLocalWalletMiddleware())
-      .with<{ ordersWithUuids: Array<{ order: SubaccountOrder; uuid: string }> }>(
-        async (context, next) => {
-          const orders = this.getCancelableOrders(marketId);
-
-          if (orders.length === 0) {
-            return createMiddlewareFailureResult(
-              wrapSimpleError(
-                context.fnName,
-                'no orders to cancel',
-                STRING_KEYS.NO_ORDERS_TO_CANCEL
-              ),
-              context
-            );
-          }
-
-          const ordersWithUuids = orders.map((order) => ({
-            order,
-            uuid: crypto.randomUUID(),
-          }));
-
-          return next({ ...context, ordersWithUuids });
-        }
-      )
-      .do(async ({ ordersWithUuids }) => {
-        // Dispatch action to track cancellation request
-        this.store.dispatch(
-          cancelAllSubmitted({
-            marketId,
-            cancels: ordersWithUuids.map((o) => ({
-              order: o.order,
-              orderId: o.order.id,
-              uuid: o.uuid,
-            })),
-          })
-        );
-
-        // Execute all cancel operations and collect results
-        const results = await Promise.all(
-          ordersWithUuids.map(async (orderAndId) => {
-            const { order, uuid } = orderAndId;
-            const result = await this.executeCancelOrder(order.id);
-
-            if (isOperationFailure(result)) {
-              this.store.dispatch(
-                cancelOrderFailed({
-                  uuid,
-                  errorParams: operationFailureToErrorParams(result),
-                })
-              );
-            }
-            return result;
-          })
-        );
-
-        const allSuccess = results.every(isOperationSuccess);
-        if (allSuccess) {
-          return wrapOperationSuccess({
-            results,
-          });
-        }
-        return results.find(isOperationFailure)!;
-      });
-  }
-
-  public async placeCompoundOrder(order: TradeFormPayload, source: TradeMetadataSource) {
-    const isMainOrderStateful =
-      order.orderPayload != null && !isShortTermOrderPayload(order.orderPayload);
-
-    // If main order is short-term, handle it separately
-    if (order.orderPayload != null && !isMainOrderStateful) {
-      const res = await this.placeOrder(order.orderPayload, source);
-      if (isOperationFailure(res)) {
-        return res;
-      }
-      // we continue and execute the trigger orders, if any, as a batch
-    } else if (
-      // if order is not compound, just do placeOrder so metrics are clean
-      order.orderPayload != null &&
-      (order.orderPayload.transferToSubaccountAmount ?? 0) <= 0 &&
-      (order.triggersPayloads ?? []).length === 0 &&
-      isEmpty(order.scaleOrderPayloads)
-    ) {
-      return this.placeOrder(order.orderPayload, source);
+  }): Promise<OperationResult<any>> {
+    const uuid = crypto.randomUUID();
+    const resolved = this.resolveOrderMarket(orderId);
+    if (!resolved) {
+      return failure('Order not found', STRING_KEYS.NO_ORDERS_TO_CANCEL);
     }
+    if (withNotification && resolved.order) {
+      this.store.dispatch(cancelOrderSubmitted({ order: resolved.order, orderId, uuid }));
+    }
+    track(AnalyticsEvents.TradeCancelOrder({ orderId }));
+    const result = await this.cancelIds({ [resolved.marketId]: [orderId] });
+    if (isOperationFailure(result)) {
+      if (withNotification) {
+        this.store.dispatch(
+          cancelOrderFailed({ uuid, errorParams: operationFailureToErrorParams(result) })
+        );
+      }
+    } else if (withNotification) {
+      this.store.dispatch(cancelOrderConfirmed({ uuid }));
+    }
+    return result;
+  }
 
-    // Handle stateful main order + trigger orders + scale orders together in bulk
-    const hasStatefulOperations =
-      isMainOrderStateful ||
-      (order.triggersPayloads?.length ?? 0) > 0 ||
-      !isEmpty(order.scaleOrderPayloads);
+  private async cancelIds(
+    byMarket: Record<string, string[]>
+  ): Promise<OperationResult<{ canceled: string[] }>> {
+    const ctx = await this.context();
+    if (isOperationFailure(ctx)) return ctx;
+    const ids: Record<string, bigint[]> = {};
+    try {
+      Object.entries(byMarket).forEach(([marketId, list]) => {
+        ids[marketId] = list.map((id) => BigInt(id));
+      });
+    } catch {
+      return failure('Order id is not a native order id', STRING_KEYS.NO_ORDERS_TO_CANCEL);
+    }
+    try {
+      const tx = ctx.payload.builder.cancelOrdersAcrossMarkets({
+        ref: { account: ctx.payload.account.account, cap: ctx.payload.account.cap },
+        byMarket: ids,
+      });
+      const result = await signAndExecute(tx);
+      const canceled = eventsOf(result.events, '::events::CanceledOrder').map((e) =>
+        String(e.order_id)
+      );
+      canceled.forEach((id) => this.orderMarkets.delete(id));
+      logBonsaiInfo(FN, 'orders canceled', { digest: result.digest, canceled });
+      return wrapOperationSuccess({ canceled });
+    } catch (error) {
+      return this.toFailure(error);
+    }
+  }
 
-    if (hasStatefulOperations) {
-      const maybeDydxLocalWallet = await this.getCosmosLocalWallet();
-
-      return (
-        taskBuilder({
-          payload: {
-            mainOrderPayload: isMainOrderStateful ? order.orderPayload : undefined,
-            triggersPayloads: order.triggersPayloads ?? [],
-            scaleOrderPayloads: order.scaleOrderPayloads ?? [],
-            source,
-          },
-        })
-          .with<AddSharedContextMiddlewareProps>(
-            addSharedContextMiddleware('AccountTransactionSupervisor/executeBulkStatefulOrders', {
-              ...this.shared,
-              maybeDydxLocalWallet,
-            })
-          )
-          .with<ValidateLocalWalletMiddlewareProps>(validateLocalWalletMiddleware())
-          // Prepare payloads with current height and collect cancel/place operations
-          .with<{
-            cancelPayloads: CancelOrderPayload[];
-            placePayloads: PlaceOrderPayload[];
-            transferPayload:
-              | { fromSubaccount: number; toSubaccount: number; amount: number; address: string }
-              | undefined;
-            currentHeight: number;
-          }>(async (context, next) => {
-            // Get current height for orders that need it
-            const currentHeight = estimateLiveValidatorHeight(
-              this.store.getState(),
-              BLOCK_TIME_BIAS_FOR_SHORT_TERM_ESTIMATION
-            );
-
-            if (currentHeight == null) {
-              return createMiddlewareFailureResult(
-                wrapSimpleError(
-                  context.fnName,
-                  'validator height unknown',
-                  STRING_KEYS.UNKNOWN_VALIDATOR_HEIGHT
-                ),
-                context
-              );
-            }
-
-            const cancelPayloads: CancelOrderPayload[] = [];
-            const placePayloads: PlaceOrderPayload[] = [];
-            let transferPayload:
-              | { fromSubaccount: number; toSubaccount: number; amount: number; address: string }
-              | undefined;
-
-            // Add main order if it's stateful
-            if (context.payload.mainOrderPayload) {
-              const mainPayload = context.payload.mainOrderPayload;
-
-              const sourceSubaccount = getSubaccountId(this.store.getState());
-              const sourceAddress = getUserWalletAddress(this.store.getState());
-              const mainTransfer = getIsolatedMarginTransfer(
-                mainPayload,
-                sourceSubaccount,
-                sourceAddress
-              );
-              // Check if we need a transfer for isolated margin
-              if (
-                mainPayload.transferToSubaccountAmount != null &&
-                mainPayload.transferToSubaccountAmount > 0 &&
-                mainTransfer == null
-              ) {
-                return createMiddlewareFailureResult(
-                  wrapSimpleError(
-                    context.fnName,
-                    'unknown parent subaccount number or address',
-                    STRING_KEYS.SOMETHING_WENT_WRONG
-                  ),
-                  context
-                );
-              }
-              transferPayload = mainTransfer ?? transferPayload;
-
-              placePayloads.push({
-                ...mainPayload,
-                currentHeight,
-              });
-            }
-
-            // Process scale order payloads
-            context.payload.scaleOrderPayloads.forEach((scalePayload) => {
-              if (transferPayload == null) {
-                transferPayload = getIsolatedMarginTransfer(
-                  scalePayload,
-                  getSubaccountId(this.store.getState()),
-                  getUserWalletAddress(this.store.getState())
-                );
-              }
-
-              placePayloads.push({
-                ...scalePayload,
-                currentHeight,
-              });
-            });
-
-            // Process trigger payloads
-            context.payload.triggersPayloads.forEach((operationPayload) => {
-              if (operationPayload.cancelPayload?.orderId) {
-                const cancelPayload = this.createCancelOrderPayload(
-                  operationPayload.cancelPayload.orderId
-                );
-                if (cancelPayload != null) {
-                  cancelPayloads.push(cancelPayload);
-                }
-              }
-              if (operationPayload.placePayload != null) {
-                placePayloads.push({
-                  ...operationPayload.placePayload,
-                  currentHeight,
-                });
-              }
-            });
-
-            return next({
-              ...context,
-              cancelPayloads,
-              placePayloads,
-              transferPayload,
-              currentHeight,
-            });
-          })
-          // Dispatch store updates for submissions
-          .with<{}>(async (context, next) => {
-            // Dispatch place order submissions and set timeouts
-            context.placePayloads.forEach((placePayload) => {
-              this.store.dispatch(
-                placeOrderSubmitted({
-                  marketId: placePayload.marketId,
-                  clientId: `${placePayload.clientId}`,
-                  orderType: placePayload.type,
-                  subaccountNumber: placePayload.subaccountNumber,
-                })
-              );
-
-              // Set timeout for order to be considered failed if not committed
-              setTimeout(() => {
-                this.store.dispatch(placeOrderTimeout(placePayload.clientId.toString()));
-              }, UNCOMMITTED_ORDER_TIMEOUT_MS);
-            });
-
-            const result = await next(context);
-            const unpackedResult = result.result;
-
-            // Handle failures
-            if (isOperationFailure(unpackedResult)) {
-              // Dispatch place order failures
-              context.placePayloads.forEach((placePayload) => {
-                this.store.dispatch(
-                  placeOrderFailed({
-                    clientId: `${placePayload.clientId}`,
-                    errorParams: operationFailureToErrorParams(unpackedResult),
-                  })
-                );
-              });
-            }
-
-            return result;
-          })
-          // Analytics tracking with confirmation events
-          .with<{
-            placeConfirmEvent: SimpleEvent<{}>;
-          }>(async (context, next) => {
-            const { placePayloads, payload } = context;
-
-            const submitTime = createTimer();
-            const confirmEvent = new SimpleEvent<{}>();
-
-            // Track each place order
-            placePayloads.forEach((placePayload) => {
-              const trackingData = {
-                ...placePayload,
-                source: payload.source,
-                volume: placePayload.size * placePayload.price,
-              };
-
-              track(AnalyticsEvents.TradePlaceOrder(trackingData));
-
-              confirmEvent.addListener(() => {
-                track(
-                  AnalyticsEvents.TradePlaceOrderConfirmed({
-                    ...trackingData,
-                    roundtripMs: startTime.elapsed(),
-                    sinceSubmissionMs: submitTime.elapsed(),
-                  })
-                );
-              });
-            });
-
-            const startTime = startTimer();
-            const result = await next({ ...context, placeConfirmEvent: confirmEvent });
-            submitTime.start();
-            const unpackedResult = result.result;
-
-            if (isOperationFailure(unpackedResult)) {
-              placePayloads.forEach((placePayload) => {
-                track(
-                  AnalyticsEvents.TradePlaceOrderSubmissionFailed({
-                    ...placePayload,
-                    error: unpackedResult.errorString,
-                    durationMs: startTime.elapsed(),
-                    source: payload.source,
-                    volume: placePayload.size * placePayload.price,
-                  })
-                );
-              });
-            } else {
-              placePayloads.forEach((placePayload) => {
-                track(
-                  AnalyticsEvents.TradePlaceOrderSubmissionConfirmed({
-                    ...placePayload,
-                    durationMs: startTime.elapsed(),
-                    source: payload.source,
-                    volume: placePayload.size * placePayload.price,
-                  })
-                );
-              });
-            }
-
-            return result;
-          })
-          .do(async (context) => {
-            const { cancelPayloads, placePayloads, transferPayload, placeConfirmEvent } = context;
-
-            const result = await this.wrapOperation(
-              context.fnName,
-              { cancelPayloads, placePayloads, transferPayload },
-              async ({ compositeClient, localWallet, payload }) => {
-                const state = this.store.getState();
-                const subaccountId = getSubaccountId(state);
-                if (subaccountId == null) {
-                  throw new Error('No subaccount ID found');
-                }
-
-                const subaccountInfo = SubaccountClient.forLocalWallet(localWallet, subaccountId);
-
-                const cancelRawOrderPayloads = payload.cancelPayloads.map((cancel) => ({
-                  subaccountNumber: cancel.subaccountNumber,
-                  clientId: cancel.clientId,
-                  orderFlags: cancel.orderFlags,
-                  clobPairId: cancel.clobPairId,
-                  goodTilBlock: cancel.goodTilBlock,
-                  goodTilBlockTime: cancel.goodTilBlockTime,
-                }));
-
-                const transferToSubaccountPayload = payload.transferPayload
-                  ? {
-                      sourceSubaccountNumber: payload.transferPayload.fromSubaccount,
-                      recipientSubaccountNumber: payload.transferPayload.toSubaccount,
-                      transferAmount: MustBigNumber(payload.transferPayload.amount).toFixed(6),
-                    }
-                  : undefined;
-
-                if (
-                  cancelRawOrderPayloads.length === 0 &&
-                  transferToSubaccountPayload == null &&
-                  payload.placePayloads.length === 0
-                ) {
-                  return true;
-                }
-
-                const tx = await compositeClient.bulkCancelAndTransferAndPlaceStatefulOrders(
-                  subaccountInfo,
-                  cancelRawOrderPayloads,
-                  transferToSubaccountPayload,
-                  payload.placePayloads,
-                  TransactionMemo.placeOrder,
-                  Method.BroadcastTxSync
-                );
-
-                if ((tx as IndexedTx | undefined)?.code !== 0) {
-                  throw new StatefulOrderError(
-                    'Bulk stateful order operation failed to commit.',
-                    tx
-                  );
-                }
-
-                return tx;
-              },
-              {
-                selector: BonsaiCore.account.allOrders.data,
-                validator: (orders) => {
-                  // Check if all placed orders are confirmed
-                  const allPlacedConfirmed = placePayloads.every((payload) =>
-                    orders.find((o) => o.clientId === `${payload.clientId}`)
-                  );
-
-                  // Check if all canceled orders are confirmed canceled
-                  const allCanceledConfirmed = cancelPayloads.every((payload) => {
-                    if (!payload.originalOrder) return true;
-                    const confirmedOrder = orders.find((o) => o.id === payload.originalOrder!.id);
-                    return (
-                      confirmedOrder?.status != null &&
-                      getSimpleOrderStatus(confirmedOrder.status) === OrderStatus.Canceled
-                    );
-                  });
-
-                  if (allPlacedConfirmed && allCanceledConfirmed) {
-                    return { allConfirmed: true };
-                  }
-                  return undefined;
-                },
-                onTrigger: (success) => {
-                  if (success) {
-                    placeConfirmEvent.trigger({});
-                  }
-                },
-              }
-            )();
-
-            return result;
-          })
+  public async cancelAllOrders({ marketId }: { marketId?: string }): Promise<OperationResult<any>> {
+    track(AnalyticsEvents.TradeCancelAllOrdersClick({ marketId }));
+    const state = this.store.getState();
+    const openOrders = BonsaiCore.account.allOrders
+      .data(state)
+      .filter(
+        (o) => o.status === OrderStatus.Open && (marketId == null || o.marketId === marketId)
+      );
+    const byMarket: Record<string, string[]> = {};
+    openOrders.forEach((o) => {
+      (byMarket[o.marketId] ??= []).push(o.id);
+    });
+    this.orderMarkets.forEach((m, id) => {
+      if (marketId != null && m !== marketId) return;
+      if (!(byMarket[m] ?? []).includes(id)) (byMarket[m] ??= []).push(id);
+    });
+    if (Object.values(byMarket).every((l) => l.length === 0)) {
+      return failure('No orders to cancel', STRING_KEYS.NO_ORDERS_TO_CANCEL);
+    }
+    const cancels = openOrders.map((order) => ({
+      uuid: crypto.randomUUID(),
+      orderId: order.id,
+      order,
+    }));
+    if (cancels.length > 0) {
+      this.store.dispatch(cancelAllSubmitted({ marketId, cancels }));
+    }
+    const result = await this.cancelIds(byMarket);
+    if (isOperationSuccess(result)) {
+      cancels.forEach((c) => this.store.dispatch(cancelOrderConfirmed({ uuid: c.uuid })));
+    } else {
+      cancels.forEach((c) =>
+        this.store.dispatch(
+          cancelOrderFailed({ uuid: c.uuid, errorParams: operationFailureToErrorParams(result) })
+        )
       );
     }
+    return result;
+  }
 
-    return wrapOperationSuccess(true);
+  /** Closes every open position with reduce-only market orders, one session per market. */
+  public async closeAllPositions(): Promise<OperationResult<any>> {
+    track(AnalyticsEvents.TradeCloseAllPositionsClick({}));
+    const positions =
+      BonsaiCore.account.parentSubaccountPositions.data(this.store.getState()) ?? [];
+    const open = positions.filter((p) => p.status === 'OPEN' && !p.unsignedSize.isZero());
+    if (open.length === 0) {
+      return failure('No positions to close', STRING_KEYS.NO_POSITIONS_TO_CLOSE);
+    }
+    const payloads: PlaceOrderPayload[] = open.map((p) => ({
+      subaccountNumber: p.subaccountNumber,
+      transferToSubaccountAmount: undefined,
+      marketId: p.market,
+      clobPairId: 0,
+      type: OrderType.MARKET,
+      side: p.side === 'LONG' ? OrderSide.SELL : OrderSide.BUY,
+      price: 0,
+      size: p.unsignedSize.toNumber(),
+      clientId: Math.floor(Math.random() * 2 ** 31),
+      timeInForce: undefined,
+      goodTilTimeInSeconds: undefined,
+      execution: OrderExecution.IOC,
+      postOnly: false,
+      reduceOnly: true,
+      triggerPrice: undefined,
+      marketInfo: undefined,
+      currentHeight: undefined,
+      goodTilBlock: undefined,
+      memo: undefined,
+      twapParameters: undefined,
+    }));
+    this.store.dispatch(
+      closeAllPositionsSubmitted(
+        payloads.map((p) => ({
+          marketId: p.marketId,
+          clientId: `${p.clientId}`,
+          orderType: p.type,
+          subaccountNumber: p.subaccountNumber,
+        }))
+      )
+    );
+    const ctx = await this.context();
+    if (isOperationFailure(ctx)) {
+      this.settlePlacements(ctx, payloads);
+      return ctx;
+    }
+    // Sessions are one transaction each; run them in order so a failure stops the rest.
+    const results = await payloads.reduce<Promise<OperationResult<PlacedOrder[]>[]>>(
+      async (previous, payload) => {
+        const done = await previous;
+        if (done.some(isOperationFailure)) return done;
+        const r = await this.executeSession(
+          ctx.payload,
+          payload.marketId,
+          [payload],
+          'CloseAllPositionsButton'
+        );
+        this.settlePlacements(r, [payload]);
+        return [...done, r];
+      },
+      Promise.resolve([])
+    );
+    const failed = results.find(isOperationFailure);
+    return failed ?? wrapOperationSuccess({ results });
   }
 
   public tearDown(): void {
-    this.shared.stateNotifier.tearDown();
+    this.forgetAccount();
+    this.orderMarkets.clear();
   }
 }
 
-const createAccountTransactionSupervisor = (
-  store: RootStore,
-  compositeClientManager: typeof CompositeClientManager
-): AccountTransactionSupervisor => {
-  return new AccountTransactionSupervisor(store, compositeClientManager);
-};
+export const accountTransactionManager = new AccountTransactionSupervisor(reduxStore);
 
-export const accountTransactionManager = createAccountTransactionSupervisor(
-  reduxStore,
-  CompositeClientManager
-);
-
-function chainOperationEngine<Payload extends AddLoggingNameMiddlewareProps, T>(
-  fn: (payload: Payload) => Promise<T>
-): (payload: Payload) => Promise<OperationResult<ToPrimitives<T>>> {
-  return async (context: Payload) => {
-    try {
-      const tx = await fn(context);
-      const parsedTx = parseToPrimitives(tx);
-      return wrapOperationSuccess(parsedTx);
-    } catch (error) {
-      if (isWrappedOperationFailureError(error)) {
-        return error.getFailure();
-      }
-      const errorString = stringifyTransactionError(error);
-      const parsed = parseTransactionError(context.fnName, errorString);
-      return wrapOperationFailure(errorString, parsed);
-    }
+if (isDev && typeof window !== 'undefined') {
+  // Lets the localnet browser suite connect the dev wallet and drive the write path directly.
+  (window as unknown as { haneulPerp: unknown }).haneulPerp = {
+    supervisor: accountTransactionManager,
+    dAppKit,
   };
-}
-
-type AddLoggingNameMiddlewareProps = { fnName: string };
-type AddSharedContextMiddlewareProps = {
-  shared: TransactionSupervisorShared;
-} & AddLoggingNameMiddlewareProps;
-function addSharedContextMiddleware(fnName: string, shared: TransactionSupervisorShared) {
-  return createMiddleware<AddSharedContextMiddlewareProps>((context, next) => {
-    return next({ ...context, shared, fnName });
-  });
-}
-
-type ValidateLocalWalletMiddlewareProps = {};
-function validateLocalWalletMiddleware() {
-  return createMiddleware<{}, AddSharedContextMiddlewareProps>(async (context, next) => {
-    const state = context.shared.store.getState();
-    const localWalletNonce = getLocalWalletNonce(state);
-
-    if (context.shared.maybeDydxLocalWallet) {
-      return next(context);
-    }
-
-    if (localWalletNonce == null) {
-      const errorMsg = 'No valid local wallet available';
-      const errSource = context.fnName;
-      logBonsaiError(errSource, errorMsg);
-      return createMiddlewareFailureResult(
-        wrapSimpleError(errSource, errorMsg, STRING_KEYS.NO_LOCAL_WALLET),
-        context
-      );
-    }
-
-    return next(context);
-  });
-}
-
-type AddClientAndWalletMiddlewareProps = {
-  compositeClient: CompositeClient;
-  localWallet: LocalWallet;
-};
-function addClientAndWalletMiddleware(store: RootStore) {
-  const nonceBefore = getLocalWalletNonce(store.getState());
-  const networkBefore = getSelectedNetwork(store.getState());
-
-  return createMiddleware<AddClientAndWalletMiddlewareProps, AddSharedContextMiddlewareProps>(
-    async (context, next) => {
-      const state = context.shared.store.getState();
-      const network = getSelectedNetwork(state);
-      const localWalletNonce = getLocalWalletNonce(state);
-
-      const clientConfig = {
-        network,
-        dispatch: context.shared.store.dispatch,
-      };
-      const clientWrapper = context.shared.compositeClientManager.use(clientConfig);
-      const maybeDydxLocalWallet = context.shared.maybeDydxLocalWallet;
-
-      try {
-        if (network !== networkBefore) {
-          throw new Error('Network changed before operation execution');
-        }
-        if (localWalletNonce !== nonceBefore) {
-          throw new Error('Local wallet changed before operation execution');
-        }
-
-        const localWallet = calc(() => {
-          if (maybeDydxLocalWallet) {
-            return maybeDydxLocalWallet;
-          }
-
-          if (localWalletNonce == null) {
-            throw new Error('No valid local wallet nonce found');
-          }
-
-          return localWalletManager.getLocalWallet(localWalletNonce);
-        });
-
-        if (localWallet == null) {
-          throw new Error('Local wallet not initialized or nonce was incorrect.');
-        }
-
-        // Wait for the composite client to be available
-        const compositeClient = await clientWrapper.compositeClient.deferred.promise;
-
-        // Execute the next middleware with the client wallet pair
-        return await next({ ...context, compositeClient, localWallet });
-      } catch (error) {
-        const errorString = stringifyTransactionError(error);
-        const parsed = parseTransactionError(context.fnName, errorString);
-        return createMiddlewareFailureResult(wrapOperationFailure(errorString, parsed), context);
-      } finally {
-        // Always mark the client as done to prevent memory leaks
-        context.shared.compositeClientManager.markDone(clientConfig);
-      }
-    }
-  );
-}
-
-type BonsaiLoggingMiddlewareProps = {};
-function bonsaiLoggingMiddleware() {
-  return createMiddleware<
-    BonsaiLoggingMiddlewareProps,
-    AddSharedContextMiddlewareProps & StateTrackingProps<any> & { payload: any }
-  >(async (context, next) => {
-    const startTime = startTimer();
-    const submittedTime = createTimer();
-
-    const { payload } = context;
-
-    logBonsaiInfo(context.fnName, 'Attempting operation', { payload });
-
-    const result = await next(context);
-
-    context.stateTracker.addListener(
-      () => {
-        submittedTime.start();
-      },
-      (resultOrNull) => {
-        if (!isOperationSuccess(result.result)) {
-          return;
-        }
-        if (resultOrNull != null) {
-          logBonsaiInfo(context.fnName, 'Successfully confirmed operation', {
-            payload,
-            parsedTx: result.result.payload,
-            result: purgeBigNumbers(resultOrNull),
-            totalTimeToConfirm: startTime.elapsed(),
-            timeToConfirmAfterSubmitted: submittedTime.elapsed(),
-            source: context.fnName,
-          });
-        } else {
-          logBonsaiError(context.fnName, 'Failed to confirm operation', {
-            payload,
-            parsedTx: result.result.payload,
-            result: resultOrNull,
-            source: context.fnName,
-          });
-        }
-      }
-    );
-
-    if (isOperationSuccess(result.result)) {
-      logBonsaiInfo(context.fnName, 'Successful operation', {
-        payload,
-        parsedTx: result.result.payload,
-        timeToSubmit: startTime.elapsed(),
-        source: context.fnName,
-      });
-    } else {
-      logBonsaiError(context.fnName, 'Failed operation', {
-        payload,
-        parsed: result.result.displayInfo,
-        errorString: result.result.errorString,
-        error: new Error(result.result.errorString),
-        source: context.fnName,
-        timeToSubmit: startTime.elapsed(),
-      });
-    }
-
-    return result;
-  });
-}
-
-type StateTrackingProps<T> = {
-  stateTracker: {
-    addListener: (onStart: () => void, onComplete: (result: T | null) => void) => void;
-  };
-};
-
-function stateTrackingMiddleware<P, Q>(tracking?: Tracker<P, Q>) {
-  return createMiddleware<StateTrackingProps<Q>, AddSharedContextMiddlewareProps>(
-    async (context, next) => {
-      let hasStarted = false;
-      let hasFinished = false;
-      let finishedResult: Q | null | undefined;
-
-      const listeners: Array<{
-        onStart: () => void;
-        onComplete: (result: Q | null) => void;
-      }> = [];
-
-      const stateTracker = {
-        addListener: (onStart: () => void, onComplete: (result: Q | null) => void) => {
-          listeners.push({ onStart, onComplete });
-          if (hasStarted) {
-            onStart();
-          }
-          if (hasFinished) {
-            // eslint-disable-next-line no-console
-            console.warn('Warning: a state tracker added a listener after operation was complete');
-            onComplete(finishedResult ?? null);
-          }
-        },
-      };
-
-      const result = await next({ ...context, stateTracker });
-
-      // Only start tracking if the operation succeeded and tracking is provided
-      if (isOperationSuccess(result.result) && tracking != null) {
-        hasStarted = true;
-
-        // Notify all listeners that tracking is starting
-        listeners.forEach((listener) => {
-          try {
-            listener.onStart();
-          } catch (e) {
-            // ignore listener errors
-          }
-        });
-
-        context.shared.stateNotifier.notifyWhenTrue(
-          tracking.selector,
-          tracking.validator,
-          (resultOrNull) => {
-            hasFinished = true;
-            finishedResult = resultOrNull;
-
-            listeners.forEach((listener) => {
-              try {
-                listener.onComplete(resultOrNull);
-              } catch (e) {
-                // ignore listener errors
-              }
-            });
-
-            // Call the original onTrigger if it exists
-            tracking.onTrigger?.(resultOrNull != null);
-          }
-        );
-      }
-
-      return result;
-    }
-  );
-}
-
-class SimpleEvent<T> {
-  private listeners: Array<(data: T) => void> = [];
-
-  addListener(listener: (data: T) => void): void {
-    this.listeners.push(listener);
-  }
-
-  trigger(data: T): void {
-    this.listeners.forEach((listener) => listener(data));
-  }
-}
-
-type IsolatedMarginTransferPayload = {
-  fromSubaccount: number;
-  toSubaccount: number;
-  amount: number;
-  address: string;
-};
-
-function getIsolatedMarginTransfer(
-  payload: PlaceOrderPayload,
-  sourceSubaccount: number | undefined,
-  sourceAddress: string | undefined
-): IsolatedMarginTransferPayload | undefined {
-  if (payload.transferToSubaccountAmount == null || payload.transferToSubaccountAmount <= 0) {
-    return undefined;
-  }
-  if (sourceSubaccount == null || sourceAddress == null) {
-    return undefined;
-  }
-  return {
-    fromSubaccount: sourceSubaccount,
-    toSubaccount: payload.subaccountNumber,
-    amount: payload.transferToSubaccountAmount,
-    address: sourceAddress,
-  };
-}
-
-function isShortTermOrderPayload(payload: PlaceOrderPayload) {
-  if (payload.type === OrderType.MARKET) {
-    return true;
-  }
-  if (payload.type === OrderType.LIMIT && payload.timeInForce === OrderTimeInForce.IOC) {
-    return true;
-  }
-  return false;
 }

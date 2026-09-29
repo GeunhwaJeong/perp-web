@@ -154,6 +154,30 @@ export const localOrdersSlice = createSlice({
         errorParams: DEFAULT_SOMETHING_WENT_WRONG_ERROR_PARAMS,
       };
     },
+    // On-chain finality is the confirmation for native orders: no indexer round trip is needed
+    // to move a submission out of the pending state.
+    placeOrderConfirmed: (
+      state,
+      action: PayloadAction<{ clientId: string; orderId?: string; status: PlaceOrderStatuses }>
+    ) => {
+      const { clientId, orderId, status } = action.payload;
+      const existing = state.localPlaceOrders[clientId];
+      if (existing == null) {
+        return;
+      }
+      state.localPlaceOrders[clientId] = {
+        ...existing,
+        orderId: orderId ?? existing.orderId,
+        submissionStatus: status,
+      };
+    },
+    cancelOrderConfirmed: (state, action: PayloadAction<{ uuid: string }>) => {
+      const existing = state.localCancelOrders[action.payload.uuid];
+      if (existing == null) {
+        return;
+      }
+      existing.submissionStatus = CancelOrderStatuses.Canceled;
+    },
     cancelOrderSubmitted: (
       state,
       action: PayloadAction<{ uuid: string; orderId: string; order: SubaccountOrder }>
@@ -248,9 +272,11 @@ export const {
   placeOrderSubmitted,
   placeOrderFailed,
   placeOrderTimeout,
+  placeOrderConfirmed,
 
   cancelOrderSubmitted,
   cancelOrderFailed,
+  cancelOrderConfirmed,
 
   cancelAllSubmitted,
 
