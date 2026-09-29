@@ -1,37 +1,32 @@
-import { datadogLogs } from '@datadog/browser-logs';
-
-import { CURRENT_MODE } from '@/constants/networks';
-
-const CLIENT_TOKEN = import.meta.env.VITE_DATADOG_CLIENT_TOKEN;
-const PROXY_URL = import.meta.env.VITE_DATADOG_PROXY_URL;
-const SERVICE_NAME = 'v4-web';
-const LOGGER_NAME = 'v4-web';
-const SITE_NAME = 'datadoghq.com';
-const instanceId = crypto.randomUUID();
-
-const LOG_ENDPOINT_PATH = (PROXY_URL ?? '').endsWith('/') ? 'api/v2/logs' : '/api/v2/logs';
-
-if (CLIENT_TOKEN) {
-  datadogLogs.init({
-    clientToken: CLIENT_TOKEN,
-    site: SITE_NAME,
-    service: SERVICE_NAME,
-    forwardErrorsToLogs: true,
-    sessionSampleRate: 100,
-    env: CURRENT_MODE,
-    proxy: PROXY_URL ? `${PROXY_URL}${LOG_ENDPOINT_PATH}` : undefined,
-    sendLogsAfterSessionExpiration: true,
-  });
-}
-
-datadogLogs.createLogger(LOGGER_NAME);
-
-const datadogLogger = datadogLogs.getLogger(LOGGER_NAME)!;
-datadogLogger.setContextProperty('dd-client-token', CLIENT_TOKEN);
-datadogLogger.setContextProperty('instance-id', instanceId);
+import { isDev } from '@/constants/networks';
 
 /**
- * TODO: make a logger wrapper that enables us also log to the console
- * https://linear.app/dydx/issue/OTE-718/[web]-default-to-console-methods-if-no-client-token-available
+ * Console-backed logger with the same surface the app used for its
+ * hosted log sink. Context properties are kept so log lines can carry them.
  */
-export const dd = datadogLogger;
+type LogContext = Record<string, unknown>;
+
+const context: LogContext = { 'instance-id': crypto.randomUUID() };
+
+const emit = (
+  level: 'info' | 'warn' | 'error',
+  message: string,
+  metadata?: object,
+  error?: Error
+) => {
+  if (!isDev && level === 'info') return;
+  // eslint-disable-next-line no-console
+  console[level](message, { ...context, ...(metadata ?? {}) }, error ?? '');
+};
+
+export const dd = {
+  setContextProperty: (key: string, value: unknown) => {
+    context[key] = value;
+  },
+  getContext: (): LogContext => ({ ...context }),
+  info: (message: string, metadata?: object) => emit('info', message, metadata),
+  warn: (message: string, metadata?: object, error?: Error) =>
+    emit('warn', message, metadata, error),
+  error: (message: string, metadata?: object, error?: Error) =>
+    emit('error', message, metadata, error),
+};

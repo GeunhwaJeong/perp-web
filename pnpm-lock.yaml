@@ -26,9 +26,6 @@ dependencies:
   '@cosmjs/tendermint-rpc':
     specifier: ^0.32.1
     version: 0.32.4
-  '@datadog/browser-logs':
-    specifier: ^5.23.3
-    version: 5.35.1
   '@dydxprotocol/v4-client-js':
     specifier: 3.6.0
     version: 3.6.0
@@ -1654,21 +1651,6 @@ packages:
       '@cosmjs/amino': 0.32.4
       '@cosmjs/proto-signing': 0.32.4
       uuid: 9.0.1
-    dev: false
-
-  /@datadog/browser-core@5.35.1:
-    resolution: {integrity: sha512-zjmw3WkF5syMq5+2jneSgSILxO3DTS+hKw270tzk/yQUfJIGInyGrkHUYYGLmZaVuVp+6F7iO3tUAwIqQYGBFw==}
-    dev: false
-
-  /@datadog/browser-logs@5.35.1:
-    resolution: {integrity: sha512-UghvsmCy1dTBVTicdDSXxk3l+xMdKKWLbyrwdoQJaqId3qAJ3vMez1UdOL2XulQTw1cy28DTzYy2EHK+ngfahA==}
-    peerDependencies:
-      '@datadog/browser-rum': 5.35.1
-    peerDependenciesMeta:
-      '@datadog/browser-rum':
-        optional: true
-    dependencies:
-      '@datadog/browser-core': 5.35.1
     dev: false
 
   /@dydxprotocol/v4-client-js@3.6.0:

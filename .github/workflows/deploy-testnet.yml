@@ -36,13 +36,6 @@ jobs:
           IOS_APP_ID: ${{ secrets.IOS_APP_ID }}
         run: |
           pnpm run build
-          pnpm run build:inject-amplitude
-          pnpm run build:inject-google-tag-manager
-          pnpm run build:inject-hotjar
-          pnpm run build:inject-bugsnag
-          pnpm run build:inject-statuspage
-          pnpm run build:inject-smartbanner
-          sh scripts/inject-app-deeplinks.sh
 
       - name: Upload to IPFS via web3.storage
         uses: dydxprotocol/add-to-web3@59774ff5ca3e7fd57fbd25ad62557a408a6122fc # v1

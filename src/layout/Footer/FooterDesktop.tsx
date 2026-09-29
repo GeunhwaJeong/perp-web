@@ -13,7 +13,7 @@ import { useStatsigGateValue } from '@/hooks/useStatsig';
 import { useStringGetter } from '@/hooks/useStringGetter';
 import { useURLConfigs } from '@/hooks/useURLConfigs';
 
-import { ChatIcon, LinkOutIcon } from '@/icons';
+import { LinkOutIcon } from '@/icons';
 import { layoutMixins } from '@/styles/layoutMixins';
 
 import { Button } from '@/components/Button';
@@ -98,15 +98,6 @@ export const FooterDesktop = () => {
           </$FooterButton>
         )}
 
-        {globalThis.Intercom && (
-          <$FooterButton
-            slotLeft={<ChatIcon />}
-            size={ButtonSize.XSmall}
-            onClick={() => globalThis.Intercom('show')}
-          >
-            {stringGetter({ key: STRING_KEYS.HELP_AND_SUPPORT })}
-          </$FooterButton>
-        )}
         <$FooterItem>
           {stringGetter({
             key: STRING_KEYS.SITE_OPERATED_BY_SHORT,
