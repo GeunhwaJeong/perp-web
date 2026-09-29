@@ -23,8 +23,6 @@ import { DisplaySettingsDialog } from '@/views/dialogs/DisplaySettingsDialog';
 import { EmailSignInStatusDialog } from '@/views/dialogs/EmailSignInStatusDialog';
 import { ExchangeOfflineDialog } from '@/views/dialogs/ExchangeOfflineDialog';
 import { ExternalLinkDialog } from '@/views/dialogs/ExternalLinkDialog';
-import { ExternalNavKeplrDialog } from '@/views/dialogs/ExternalNavKeplrDialog';
-import { ExternalNavStrideDialog } from '@/views/dialogs/ExternalNavStrideDialog';
 import { GlobalCommandDialog } from '@/views/dialogs/GlobalCommandDialog';
 import { HelpDialog } from '@/views/dialogs/HelpDialog';
 import { ManageAccountDialog } from '@/views/dialogs/ManageAccountDialog/ManageAccountDialog';
@@ -112,11 +110,9 @@ export const DialogManager = React.memo(() => {
     EmailSignInStatus: (args) => <EmailSignInStatusDialog {...args} {...modalProps} />,
     ExchangeOffline: (args) => <ExchangeOfflineDialog {...args} {...modalProps} />,
     ExternalLink: (args) => <ExternalLinkDialog {...args} {...modalProps} />,
-    ExternalNavStride: (args) => <ExternalNavStrideDialog {...args} {...modalProps} />,
     FillDetails: (args) => <FillDetailsDialog {...args} {...modalProps} />,
     GlobalCommand: (args) => <GlobalCommandDialog {...args} {...modalProps} />,
     Help: (args) => <HelpDialog {...args} {...modalProps} />,
-    ExternalNavKeplr: (args) => <ExternalNavKeplrDialog {...args} {...modalProps} />,
     ManageAccount: (args) => <ManageAccountDialog {...args} {...modalProps} />,
     MnemonicExport: (args) => <MnemonicExportDialog {...args} {...modalProps} />,
     MobileDownload: (args) => <MobileDownloadDialog {...args} {...modalProps} />,

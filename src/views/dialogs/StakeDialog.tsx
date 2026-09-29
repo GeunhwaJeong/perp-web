@@ -2,7 +2,7 @@ import { useState } from 'react';
 
 import styled from 'styled-components';
 
-import { DialogProps, DialogTypes, StakeDialogProps } from '@/constants/dialogs';
+import { DialogProps, StakeDialogProps } from '@/constants/dialogs';
 import { STRING_KEYS } from '@/constants/localization';
 import { StakeFormSteps } from '@/constants/stakingForms';
 
@@ -14,13 +14,9 @@ import { layoutMixins } from '@/styles/layoutMixins';
 
 import { AssetIcon } from '@/components/AssetIcon';
 import { Dialog } from '@/components/Dialog';
-import { Link } from '@/components/Link';
 import { Output, OutputType } from '@/components/Output';
 import { Tag, TagSign } from '@/components/Tag';
 import { StakeForm } from '@/views/forms/StakingForms/StakeForm';
-
-import { useAppDispatch } from '@/state/appTypes';
-import { forceOpenDialog } from '@/state/dialogs';
 
 export const StakeDialog = ({ setIsOpen }: DialogProps<StakeDialogProps>) => {
   const stringGetter = useStringGetter();
@@ -80,29 +76,11 @@ export const StakeDialog = ({ setIsOpen }: DialogProps<StakeDialogProps>) => {
 };
 
 const LegalDisclaimer = () => {
-  const dispatch = useAppDispatch();
   const stringGetter = useStringGetter();
-
-  const openKeplrDialog = () => dispatch(forceOpenDialog(DialogTypes.ExternalNavKeplr()));
-  const openStrideDialog = () => dispatch(forceOpenDialog(DialogTypes.ExternalNavStride()));
 
   return (
     <div tw="text-center text-color-text-0 font-mini-book">
-      {stringGetter({
-        key: STRING_KEYS.STAKING_LEGAL_DISCLAIMER_WITH_DEFAULT,
-        params: {
-          KEPLR_DASHBOARD_LINK: (
-            <Link withIcon onClick={openKeplrDialog} isInline>
-              {stringGetter({ key: STRING_KEYS.KEPLR_DASHBOARD })}
-            </Link>
-          ),
-          STRIDE_LINK: (
-            <Link withIcon onClick={openStrideDialog} isInline>
-              Stride
-            </Link>
-          ),
-        },
-      })}
+      {stringGetter({ key: STRING_KEYS.STAKING_LEGAL_DISCLAIMER })}
     </div>
   );
 };
