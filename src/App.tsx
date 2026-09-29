@@ -54,6 +54,7 @@ import { useCommandMenu } from './hooks/useCommandMenu';
 import { useComplianceState } from './hooks/useComplianceState';
 import { useInitializePage } from './hooks/useInitializePage';
 import { useLocalStorage } from './hooks/useLocalStorage';
+import { useMobileWebEnabled } from './hooks/useMobileWebEnabled';
 import { useReferralCode } from './hooks/useReferralCode';
 import { useShouldShowFooter } from './hooks/useShouldShowFooter';
 import { useSimpleUiEnabled } from './hooks/useSimpleUiEnabled';
@@ -78,7 +79,6 @@ import breakpoints from './styles/breakpoints';
 const MarketsPage = lazy(() => import('@/pages/markets/Markets'));
 const PortfolioPage = lazy(() => import('@/pages/portfolio/Portfolio'));
 const AlertsPage = lazy(() => import('@/pages/AlertsPage'));
-const ProfilePage = lazy(() => import('@/pages/Profile'));
 const SettingsPage = lazy(() => import('@/pages/settings/Settings'));
 const TradePage = lazy(() => import('@/pages/trade/Trade'));
 const SpotPage = lazy(() => import('@/pages/spot/Spot'));
@@ -90,6 +90,10 @@ const VaultPage = lazy(() => import('@/pages/vaults/VaultPage'));
 // Simple UI
 const SimpleMarketsPage = lazy(() => import('@/pages/markets/simple-ui/MarketsMobile'));
 const SimpleAssetPage = lazy(() => import('@/pages/trade/simple-ui/AssetPage'));
+
+// Mobile Web
+const MobileWebTradePage = lazy(() => import('@/pages/trade/mobile-web/Trade'));
+const MobileWebTradeFormPage = lazy(() => import('@/pages/trade/mobile-web/TradeForm'));
 
 const Content = () => {
   useInitializePage();
@@ -109,6 +113,7 @@ const Content = () => {
   const isShowingFooter = useShouldShowFooter();
   const abDefaultToMarkets = useCustomFlagValue(CustomFlags.abDefaultToMarkets);
   const isSimpleUi = useSimpleUiEnabled();
+  const isMobileWebEnabled = useMobileWebEnabled();
   const { showComplianceBanner } = useComplianceState();
   const isSimpleUiUserMenuOpen = useAppSelector(getIsUserMenuOpen);
 
@@ -126,7 +131,9 @@ const Content = () => {
 
   const { dialogAreaRef } = useDialogArea() ?? {};
 
-  if (isSimpleUi) {
+  const showMobileWeb = isMobileWebEnabled && isTablet;
+
+  if (isSimpleUi && !showMobileWeb) {
     const matchMarkets = matchPath(AppRoute.Markets, location.pathname);
     const backgroundColor =
       matchMarkets && isSimpleUiUserMenuOpen ? 'var(--color-layer-1)' : 'transparent';
@@ -201,13 +208,24 @@ const Content = () => {
               <Route path={`${AppRoute.Referrals}/*`} element={<AffiliatesPage />} />
 
               <Route path={AppRoute.Trade}>
-                <Route path=":market" element={<TradePage />} />
-                <Route path={AppRoute.Trade} element={<TradePage />} />
+                <Route
+                  path=":market"
+                  element={showMobileWeb ? <MobileWebTradePage /> : <TradePage />}
+                />
+                <Route
+                  path={AppRoute.Trade}
+                  element={showMobileWeb ? <MobileWebTradePage /> : <TradePage />}
+                />
               </Route>
 
               <Route path={AppRoute.Spot}>
                 <Route path=":tokenMint" element={<SpotPage />} />
                 <Route index element={<SpotPage />} />
+              </Route>
+
+              <Route path={AppRoute.TradeForm}>
+                <Route path=":market" element={<MobileWebTradeFormPage />} />
+                <Route path={AppRoute.TradeForm} element={<MobileWebTradeFormPage />} />
               </Route>
 
               <Route path={AppRoute.Markets}>
@@ -216,18 +234,11 @@ const Content = () => {
 
               <Route path={`/${chainTokenLabel}/*`} element={<RewardsPage />} />
 
-              {isTablet && (
-                <>
-                  <Route path={AppRoute.Alerts} element={<AlertsPage />} />
-                  <Route path={AppRoute.Profile} element={<ProfilePage />} />
-                  <Route path={`${AppRoute.Settings}/*`} element={<SettingsPage />} />
-                </>
-              )}
-
               <Route element={<GuardedMobileRoute />}>
                 <Route path={`${AppRoute.Portfolio}/*`} element={<PortfolioPage />} />
               </Route>
 
+              <Route path={AppRoute.Alerts} element={<AlertsPage />} />
               <Route path={AppRoute.Vault}>
                 <Route path={AppRoute.Vault} element={<VaultPage />} />
               </Route>
@@ -248,9 +259,10 @@ const Content = () => {
           </Suspense>
         </$Main>
 
-        {isTablet ? <FooterMobile /> : <FooterDesktop />}
+        {showMobileWeb ? <FooterMobile /> : <FooterDesktop />}
 
-        <NotificationsToastArea tw="z-[2] [grid-area:Main]" />
+        {/* Extremely large z-index to ensure the notifications always show on user's screen */}
+        <NotificationsToastArea tw="z-[2000] [grid-area:Main]" />
 
         <$DialogArea ref={dialogAreaRef}>
           <DialogManager />

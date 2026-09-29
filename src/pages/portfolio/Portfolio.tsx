@@ -16,6 +16,7 @@ import { useAccountBalance } from '@/hooks/useAccountBalance';
 import { useBreakpoints } from '@/hooks/useBreakpoints';
 import { useComplianceState } from '@/hooks/useComplianceState';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
+import { useMobileWebEnabled } from '@/hooks/useMobileWebEnabled';
 import { useSimpleUiEnabled } from '@/hooks/useSimpleUiEnabled';
 import { useStringGetter } from '@/hooks/useStringGetter';
 
@@ -31,6 +32,7 @@ import { TradeHistoryList } from '@/views/Lists/Trade/TradeHistoryList';
 import { AccountHistoryList } from '@/views/Lists/Transfers/AccountHistoryList';
 import { FundingHistoryList } from '@/views/Lists/Transfers/FundingHistoryList';
 import { VaultTransferList } from '@/views/Lists/Transfers/VaultTransferList';
+import { UserMenuDialog } from '@/views/dialogs/MobileUserMenuDialog';
 import { FillsTable, FillsTableColumnKey } from '@/views/tables/FillsTable';
 import { TradeHistoryTable, TradeHistoryTableColumnKey } from '@/views/tables/TradeHistoryTable';
 import { TransferHistoryTable } from '@/views/tables/TransferHistoryTable';
@@ -68,6 +70,7 @@ const PortfolioPage = () => {
 
   const initialPageSize = 20;
   const isSimpleUi = useSimpleUiEnabled();
+  const isMobileWebEnabled = useMobileWebEnabled();
 
   const onboardingState = useAppSelector(getOnboardingState);
   const freeCollateral = useAppSelector(getSubaccountFreeCollateral);
@@ -93,134 +96,138 @@ const PortfolioPage = () => {
 
   useDocumentTitle(stringGetter({ key: STRING_KEYS.PORTFOLIO }));
 
-  const routesComponent = isSimpleUi ? (
-    <Suspense fallback={<LoadingSpace id="portfolio" />}>
-      <Routes>
-        <Route path={PortfolioRoute.History} element={<SimpleUiHistory />}>
-          <Route index path="*" element={<Navigate to={HistoryRoute.Trades} />} />
-          <Route path={HistoryRoute.Trades} element={<TradeHistoryList />} />
-          <Route path={HistoryRoute.Transfers} element={<AccountHistoryList />} />
-          <Route path={HistoryRoute.VaultTransfers} element={<VaultTransferList />} />
-          <Route path={HistoryRoute.Payments} element={<FundingHistoryList />} />
-        </Route>
-        <Route
-          path="*"
-          element={<Navigate to={`${PortfolioRoute.History}/${HistoryRoute.Trades}`} replace />}
-        />
-      </Routes>
-    </Suspense>
-  ) : (
-    <Suspense fallback={<LoadingSpace id="portfolio" />}>
-      <Routes>
-        <Route path={PortfolioRoute.Overview} element={<Overview />} />
-        <Route path={PortfolioRoute.Positions} element={<Positions />} />
-        <Route path={PortfolioRoute.Orders} element={<Orders />} />
-        <Route path={PortfolioRoute.Fees} element={<Fees />} />
-        <Route path={PortfolioRoute.EquityTiers} element={<EquityTiers />} />
-        <Route path={PortfolioRoute.History} element={<History />}>
-          <Route index path="*" element={<Navigate to={HistoryRoute.Trades} />} />
+  const routesComponent =
+    isSimpleUi && !isMobileWebEnabled ? (
+      <Suspense fallback={<LoadingSpace id="portfolio" />}>
+        <Routes>
+          <Route path={PortfolioRoute.History} element={<SimpleUiHistory />}>
+            <Route index path="*" element={<Navigate to={HistoryRoute.Trades} />} />
+            <Route path={HistoryRoute.Trades} element={<TradeHistoryList />} />
+            <Route path={HistoryRoute.Transfers} element={<AccountHistoryList />} />
+            <Route path={HistoryRoute.VaultTransfers} element={<VaultTransferList />} />
+            <Route path={HistoryRoute.Payments} element={<FundingHistoryList />} />
+          </Route>
           <Route
-            path={HistoryRoute.Trades}
-            element={
-              showFills ? (
-                <FillsTable
+            path="*"
+            element={<Navigate to={`${PortfolioRoute.History}/${HistoryRoute.Trades}`} replace />}
+          />
+        </Routes>
+      </Suspense>
+    ) : (
+      <Suspense fallback={<LoadingSpace id="portfolio" />}>
+        <Routes>
+          <Route path={PortfolioRoute.Overview} element={<Overview />} />
+          <Route path={PortfolioRoute.Positions} element={<Positions />} />
+          <Route path={PortfolioRoute.Orders} element={<Orders />} />
+          <Route path={PortfolioRoute.Fees} element={<Fees />} />
+          <Route path={PortfolioRoute.EquityTiers} element={<EquityTiers />} />
+          <Route path={PortfolioRoute.History} element={<History />}>
+            <Route index path="*" element={<Navigate to={HistoryRoute.Trades} />} />
+            <Route
+              path={HistoryRoute.Trades}
+              element={
+                showFills ? (
+                  <FillsTable
+                    initialPageSize={initialPageSize}
+                    columnKeys={
+                      isTablet
+                        ? [
+                            FillsTableColumnKey.Time,
+                            FillsTableColumnKey.TypeAmount,
+                            FillsTableColumnKey.PriceFee,
+                          ]
+                        : [
+                            FillsTableColumnKey.Market,
+                            FillsTableColumnKey.Time,
+                            FillsTableColumnKey.Type,
+                            FillsTableColumnKey.Side,
+                            FillsTableColumnKey.AmountTag,
+                            FillsTableColumnKey.Price,
+                            FillsTableColumnKey.Total,
+                            FillsTableColumnKey.Fee,
+                            FillsTableColumnKey.ClosedPnl,
+                            FillsTableColumnKey.Liquidity,
+                          ]
+                    }
+                    withOuterBorder={isNotTablet}
+                  />
+                ) : (
+                  <TradeHistoryTable
+                    initialPageSize={initialPageSize}
+                    columnKeys={
+                      isTablet
+                        ? [
+                            TradeHistoryTableColumnKey.Time,
+                            TradeHistoryTableColumnKey.Market,
+                            TradeHistoryTableColumnKey.Action,
+                            TradeHistoryTableColumnKey.Size,
+                            TradeHistoryTableColumnKey.Value,
+                            TradeHistoryTableColumnKey.ClosedPnl,
+                          ]
+                        : [
+                            TradeHistoryTableColumnKey.Market,
+                            TradeHistoryTableColumnKey.Type,
+                            TradeHistoryTableColumnKey.Action,
+                            TradeHistoryTableColumnKey.Price,
+                            TradeHistoryTableColumnKey.Size,
+                            TradeHistoryTableColumnKey.Value,
+                            TradeHistoryTableColumnKey.Fee,
+                            TradeHistoryTableColumnKey.ClosedPnl,
+                            TradeHistoryTableColumnKey.Time,
+                            TradeHistoryTableColumnKey.Actions,
+                          ]
+                    }
+                    withOuterBorder={isNotTablet}
+                  />
+                )
+              }
+            />
+            <Route
+              path={HistoryRoute.Transfers}
+              element={
+                <TransferHistoryTable
                   initialPageSize={initialPageSize}
-                  columnKeys={
-                    isTablet
-                      ? [
-                          FillsTableColumnKey.Time,
-                          FillsTableColumnKey.TypeAmount,
-                          FillsTableColumnKey.PriceFee,
-                        ]
-                      : [
-                          FillsTableColumnKey.Market,
-                          FillsTableColumnKey.Time,
-                          FillsTableColumnKey.Type,
-                          FillsTableColumnKey.Side,
-                          FillsTableColumnKey.AmountTag,
-                          FillsTableColumnKey.Price,
-                          FillsTableColumnKey.Total,
-                          FillsTableColumnKey.Fee,
-                          FillsTableColumnKey.ClosedPnl,
-                          FillsTableColumnKey.Liquidity,
-                        ]
-                  }
                   withOuterBorder={isNotTablet}
                 />
-              ) : (
-                <TradeHistoryTable
+              }
+            />
+            <Route
+              path={HistoryRoute.VaultTransfers}
+              element={
+                <VaultTransactionsTable
+                  withOuterBorders
+                  withTxHashLink
+                  emptyString={stringGetter({ key: STRING_KEYS.YOU_HAVE_NO_VAULT_BALANCE })}
+                />
+              }
+            />
+            <Route
+              path={HistoryRoute.Payments}
+              element={
+                <FundingPaymentsTable
                   initialPageSize={initialPageSize}
-                  columnKeys={
-                    isTablet
-                      ? [
-                          TradeHistoryTableColumnKey.Time,
-                          TradeHistoryTableColumnKey.Market,
-                          TradeHistoryTableColumnKey.Action,
-                          TradeHistoryTableColumnKey.Size,
-                          TradeHistoryTableColumnKey.Value,
-                          TradeHistoryTableColumnKey.ClosedPnl,
-                        ]
-                      : [
-                          TradeHistoryTableColumnKey.Market,
-                          TradeHistoryTableColumnKey.Type,
-                          TradeHistoryTableColumnKey.Action,
-                          TradeHistoryTableColumnKey.Price,
-                          TradeHistoryTableColumnKey.Size,
-                          TradeHistoryTableColumnKey.Value,
-                          TradeHistoryTableColumnKey.Fee,
-                          TradeHistoryTableColumnKey.ClosedPnl,
-                          TradeHistoryTableColumnKey.Time,
-                          TradeHistoryTableColumnKey.Actions,
-                        ]
-                  }
                   withOuterBorder={isNotTablet}
                 />
-              )
-            }
-          />
-          <Route
-            path={HistoryRoute.Transfers}
-            element={
-              <TransferHistoryTable
-                initialPageSize={initialPageSize}
-                withOuterBorder={isNotTablet}
-              />
-            }
-          />
-          <Route
-            path={HistoryRoute.VaultTransfers}
-            element={
-              <VaultTransactionsTable
-                withOuterBorders
-                withTxHashLink
-                emptyString={stringGetter({ key: STRING_KEYS.YOU_HAVE_NO_VAULT_BALANCE })}
-              />
-            }
-          />
-          <Route
-            path={HistoryRoute.Payments}
-            element={
-              <FundingPaymentsTable
-                initialPageSize={initialPageSize}
-                withOuterBorder={isNotTablet}
-              />
-            }
-          />
-        </Route>
-        <Route path="*" element={<Navigate to={PortfolioRoute.Overview} replace />} />
-      </Routes>
-    </Suspense>
-  );
+              }
+            />
+          </Route>
+          <Route path="*" element={<Navigate to={PortfolioRoute.Overview} replace />} />
+        </Routes>
+      </Suspense>
+    );
 
-  if (isSimpleUi) {
+  if (isSimpleUi && !isMobileWebEnabled) {
     return routesComponent;
   }
 
   return isTablet ? (
-    <$PortfolioMobile>
-      <PortfolioNavMobile />
-      <$MobileContent>{routesComponent}</$MobileContent>
-    </$PortfolioMobile>
+    <>
+      <$PortfolioMobile>
+        <PortfolioNavMobile />
+        <$MobileContent>{routesComponent}</$MobileContent>
+      </$PortfolioMobile>
+      <UserMenuDialog />
+    </>
   ) : (
     <WithSidebar
       sidebar={

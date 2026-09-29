@@ -133,6 +133,7 @@ export type TradeForm = {
   scaleEndPrice: string | undefined;
   scaleTotalOrders: string | undefined;
   scaleSkew: string | undefined;
+  isClosingPosition?: boolean;
 };
 
 // Define the FieldState type with conditional properties

@@ -39,6 +39,7 @@ const getMinimumRequiredFields = (
     scaleEndPrice: undefined,
     scaleTotalOrders: undefined,
     scaleSkew: undefined,
+    isClosingPosition: undefined,
   };
 
   // Add marketId if provided
@@ -91,6 +92,11 @@ export const tradeFormReducer = createVanillaReducer({
     setMarginMode: (state, marginMode: MarginMode) => ({
       ...state,
       marginMode,
+    }),
+
+    setIsClosingPosition: (state, isClosingPosition: boolean) => ({
+      ...state,
+      isClosingPosition,
     }),
 
     // Size related actions
