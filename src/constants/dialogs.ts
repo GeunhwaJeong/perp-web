@@ -42,11 +42,9 @@ export type ExternalLinkDialogProps = {
   title?: ReactNode;
   slotContent?: ReactNode;
 };
-export type ExternalNavStrideDialogProps = {};
 export type FillDetailsDialogProps = { fillId: string };
 export type GlobalCommandDialogProps = {};
 export type HelpDialogProps = {};
-export type ExternalNavKeplrDialogProps = {};
 export type ManageAccountDialogProps = {};
 export type MnemonicExportDialogProps = {};
 export type MobileDownloadDialogProps = { mobileAppUrl: string };
@@ -148,8 +146,6 @@ export const DialogTypes = unionize(
     EmailSignInStatus: ofType<EmailSignInStatusDialogProps>(),
     ExchangeOffline: ofType<ExchangeOfflineDialogProps>(),
     ExternalLink: ofType<ExternalLinkDialogProps>(),
-    ExternalNavKeplr: ofType<ExternalNavKeplrDialogProps>(),
-    ExternalNavStride: ofType<ExternalNavStrideDialogProps>(),
     FillDetails: ofType<FillDetailsDialogProps>(),
     GlobalCommand: ofType<GlobalCommandDialogProps>(),
     Help: ofType<HelpDialogProps>(),
