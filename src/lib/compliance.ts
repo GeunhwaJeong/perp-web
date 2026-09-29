@@ -8,9 +8,12 @@ import { stringifyTransactionError } from './errors';
 import { hdKeyManager } from './hdKeyManager';
 import { log } from './telemetry';
 
+// Addresses are hex, so the template key keeps them apart from the `version` field.
+type AddressKey = `0x${string}`;
+
 type KeplrComplianceStorage = {
   version?: string;
-  [address: DydxAddress]: {
+  [address: AddressKey]: {
     pubKey?: string;
     signature?: string;
   };
@@ -56,8 +59,9 @@ const signComplianceSignatureKeplr = async (
     defaultValue: {},
   });
 
-  const storedSignature = stored[signer]?.signature;
-  const storedPubKey = stored[signer]?.pubKey;
+  const signerKey = signer as AddressKey;
+  const storedSignature = stored[signerKey]?.signature;
+  const storedPubKey = stored[signerKey]?.pubKey;
 
   if (storedPubKey && storedSignature) {
     return {
@@ -72,7 +76,7 @@ const signComplianceSignatureKeplr = async (
     key: LocalStorageKey.KeplrCompliance,
     value: {
       version: LOCAL_STORAGE_VERSIONS[LocalStorageKey.KeplrCompliance],
-      [signer]: {
+      [signerKey]: {
         pubKey: pubKey.value,
         signature,
       },

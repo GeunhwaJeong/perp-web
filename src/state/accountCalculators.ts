@@ -19,14 +19,11 @@ import { getCurrentMarketId } from './currentMarketSelectors';
 import { getSourceAccount } from './walletSelectors';
 
 export const calculateOnboardingStep = createAppSelector(
-  [getOnboardingState, getDisplayChooseWallet, (s, isTurnkeyEnabled: boolean) => isTurnkeyEnabled],
-  (onboardingState: OnboardingState, displayChooseWallet: boolean, isTurnkeyEnabled: boolean) => {
+  [getOnboardingState, getDisplayChooseWallet],
+  (onboardingState: OnboardingState, _displayChooseWallet: boolean) => {
     return {
-      [OnboardingState.Disconnected]:
-        displayChooseWallet || !isTurnkeyEnabled
-          ? OnboardingSteps.ChooseWallet
-          : OnboardingSteps.SignIn,
-      [OnboardingState.WalletConnected]: OnboardingSteps.KeyDerivation,
+      [OnboardingState.Disconnected]: OnboardingSteps.ChooseWallet,
+      [OnboardingState.WalletConnected]: OnboardingSteps.ChooseWallet,
       [OnboardingState.AccountConnected]: undefined,
     }[onboardingState];
   }

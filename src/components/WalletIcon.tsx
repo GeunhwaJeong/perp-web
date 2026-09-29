@@ -11,6 +11,14 @@ const isWalletType = (walletName: string): walletName is keyof typeof wallets =>
 };
 
 export const WalletIcon = ({ wallet, size = '1em' }: { wallet: WalletInfo; size?: string }) => {
+  if (wallet.connectorType === ConnectorType.WalletStandard) {
+    return wallet.icon ? (
+      <$Image src={wallet.icon} alt={wallet.name} size={size} />
+    ) : (
+      <Icon iconName={IconName.Wallet} size={size} />
+    );
+  }
+
   if (wallet.connectorType === ConnectorType.Injected) {
     return <$Image src={wallet.icon} alt={wallet.name} size={size} />;
   }

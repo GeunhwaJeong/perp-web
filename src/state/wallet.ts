@@ -2,7 +2,6 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 
 import { WalletInfo, WalletNetworkType } from '@/constants/wallets';
-import { TurnkeyEmailOnboardingData, TurnkeyWallet } from '@/types/turnkey';
 
 export type SourceAccount = {
   address?: string;
@@ -19,8 +18,6 @@ export interface WalletState {
     solanaAddress?: string;
     subaccountNumber?: number;
   };
-  turnkeyEmailOnboardingData?: TurnkeyEmailOnboardingData;
-  turnkeyPrimaryWallet?: TurnkeyWallet;
 }
 
 const initialState: WalletState = {
@@ -34,8 +31,6 @@ const initialState: WalletState = {
     address: undefined,
     subaccountNumber: 0,
   },
-  turnkeyEmailOnboardingData: undefined,
-  turnkeyPrimaryWallet: undefined,
 };
 
 export const walletSlice = createSlice({
@@ -80,18 +75,6 @@ export const walletSlice = createSlice({
     ) => {
       state.localWallet = payload;
     },
-    setTurnkeyEmailOnboardingData: (state, action: PayloadAction<TurnkeyEmailOnboardingData>) => {
-      state.turnkeyEmailOnboardingData = action.payload;
-    },
-    clearTurnkeyEmailOnboardingData: (state) => {
-      state.turnkeyEmailOnboardingData = undefined;
-    },
-    setTurnkeyPrimaryWallet: (state, action: PayloadAction<TurnkeyWallet>) => {
-      state.turnkeyPrimaryWallet = action.payload;
-    },
-    clearTurnkeyPrimaryWallet: (state) => {
-      state.turnkeyPrimaryWallet = undefined;
-    },
     clearSourceAccount: (state) => {
       state.sourceAccount = {
         address: undefined,
@@ -99,7 +82,6 @@ export const walletSlice = createSlice({
         encryptedSignature: undefined,
         walletInfo: undefined,
       };
-      state.turnkeyPrimaryWallet = undefined;
     },
   },
 });
@@ -134,10 +116,6 @@ export const {
   clearSavedEncryptedSignature,
   clearSourceAccount,
   setLocalWallet,
-  setTurnkeyEmailOnboardingData,
-  clearTurnkeyEmailOnboardingData,
-  setTurnkeyPrimaryWallet,
-  clearTurnkeyPrimaryWallet,
 } = walletSlice.actions;
 
 export const { setLocalWalletNonce, setHdKeyNonce } = walletEphemeralSlice.actions;

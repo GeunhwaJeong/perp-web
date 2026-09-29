@@ -18,6 +18,9 @@ export function convertBech32Address({
   address: string;
   bech32Prefix: string;
 }): string {
+  // Haneul accounts are hex addresses with no bech32 form; hand them back untouched so the
+  // remaining cosmos-era call sites degrade to the same address instead of throwing.
+  if (address.startsWith('0x')) return address;
   return toBech32(bech32Prefix, fromHex(toHex(fromBech32(address).data)));
 }
 

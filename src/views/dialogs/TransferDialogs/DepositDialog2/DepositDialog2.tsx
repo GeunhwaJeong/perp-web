@@ -5,12 +5,12 @@ import { mainnet } from 'viem/chains';
 
 import { AnalyticsEvents } from '@/constants/analytics';
 import { ComplianceStates } from '@/constants/compliance';
-import { DepositDialog2Props, DialogProps, DialogTypes } from '@/constants/dialogs';
+import { DepositDialog2Props, DialogProps } from '@/constants/dialogs';
 import { CosmosChainId } from '@/constants/graz';
 import { STRING_KEYS } from '@/constants/localization';
 import { SOLANA_MAINNET_ID } from '@/constants/solana';
 import { TokenBalance, TokenForTransfer, USDC_ADDRESSES, USDC_DECIMALS } from '@/constants/tokens';
-import { ConnectorType, WalletNetworkType } from '@/constants/wallets';
+import { WalletNetworkType } from '@/constants/wallets';
 
 import { useAccounts } from '@/hooks/useAccounts';
 import { useBreakpoints } from '@/hooks/useBreakpoints';
@@ -22,8 +22,6 @@ import { Dialog, DialogPlacement } from '@/components/Dialog';
 import { LoadingSpace } from '@/components/Loading/LoadingSpinner';
 import { SpotTabItem, SpotTabs } from '@/pages/spot/SpotTabs';
 
-import { useAppDispatch } from '@/state/appTypes';
-import { openDialog } from '@/state/dialogs';
 import { SourceAccount } from '@/state/wallet';
 
 import { track } from '@/lib/analytics/analytics';
@@ -71,7 +69,6 @@ function getDefaultToken(
 }
 
 export const DepositDialog2 = ({ setIsOpen }: DialogProps<DepositDialog2Props>) => {
-  const dispatch = useAppDispatch();
   const { sourceAccount, solanaAddress } = useAccounts();
   const { complianceState } = useComplianceState();
   const { isLoading: isLoadingBalances, withBalances } = useDepositTokenBalances();
@@ -125,13 +122,6 @@ export const DepositDialog2 = ({ setIsOpen }: DialogProps<DepositDialog2Props>) 
       track(AnalyticsEvents.SpotDepositInitiated({}));
     }
   }, [currentDepositType]);
-
-  useLayoutEffect(() => {
-    if (sourceAccount.walletInfo?.connectorType === ConnectorType.Privy) {
-      setIsOpen(false);
-      dispatch(openDialog(DialogTypes.CoinbaseDepositDialog({})));
-    }
-  }, [sourceAccount, dispatch, setIsOpen]);
 
   useLayoutEffect(() => {
     if (complianceState === ComplianceStates.READ_ONLY) {

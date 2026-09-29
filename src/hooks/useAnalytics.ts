@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 
-import { SHA256 } from 'crypto-js';
 import { useLocation } from 'react-router-dom';
 
 import {
@@ -25,8 +24,6 @@ import { useAccounts } from './useAccounts';
 import { useApiState } from './useApiState';
 import { useBreakpoints } from './useBreakpoints';
 import { useDydxClient } from './useDydxClient';
-import { useEnableTurnkey } from './useEnableTurnkey';
-import { useAppSelectorWithArgs } from './useParameterizedSelector';
 import { useReferredBy } from './useReferredBy';
 import { useSelectedNetwork } from './useSelectedNetwork';
 import { useSimpleUiEnabled } from './useSimpleUiEnabled';
@@ -110,15 +107,6 @@ export const useAnalytics = () => {
   useEffect(() => {
     if (sourceAccount.walletInfo?.connectorType === ConnectorType.Test) {
       setAnalyticsUserId(null);
-    }
-
-    if (sourceAccount.walletInfo?.connectorType === ConnectorType.Turnkey) {
-      if (sourceAccount.walletInfo.userEmail) {
-        const normalizedEmail = sourceAccount.walletInfo.userEmail.trim().toLowerCase();
-        const hashedEmail = SHA256(normalizedEmail).toString();
-        setAnalyticsUserId(hashedEmail);
-        return;
-      }
     }
 
     setAnalyticsUserId(sourceAccount.address ?? null);
@@ -259,8 +247,7 @@ export const useAnalytics = () => {
   }, []);
 
   // AnalyticsEvent.OnboardingStepChanged
-  const isTurnkeyEnabled = useEnableTurnkey();
-  const currentOnboardingStep = useAppSelectorWithArgs(calculateOnboardingStep, isTurnkeyEnabled);
+  const currentOnboardingStep = useAppSelector(calculateOnboardingStep);
   const onboardingState = useAppSelector(getOnboardingState);
   const [hasOnboardingStateChanged, setHasOnboardingStateChanged] = useState(false);
 

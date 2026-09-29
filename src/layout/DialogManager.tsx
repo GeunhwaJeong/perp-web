@@ -10,7 +10,6 @@ import { AdjustIsolatedMarginDialog } from '@/views/dialogs/AdjustIsolatedMargin
 import { CancelAllOrdersConfirmationDialog } from '@/views/dialogs/CancelAllOrdersConfirmationDialog';
 import { CancelOrphanedTriggerOrdersDialog } from '@/views/dialogs/CancelOrphanedTriggerOrdersDialog';
 import { CancelPendingOrdersDialog } from '@/views/dialogs/CancelPendingOrdersDialog';
-import { CheckEmailDialog } from '@/views/dialogs/CheckEmailDialog';
 import { CloseAllPositionsConfirmationDialog } from '@/views/dialogs/CloseAllPositionsConfirmationDialog';
 import { ClosePositionDialog } from '@/views/dialogs/ClosePositionDialog';
 import { CoinbaseDepositDialog } from '@/views/dialogs/CoinbaseDepositDialog';
@@ -20,15 +19,11 @@ import { FillDetailsDialog } from '@/views/dialogs/DetailsDialog/FillDetailsDial
 import { OrderDetailsDialog } from '@/views/dialogs/DetailsDialog/OrderDetailsDialog';
 import { DisconnectDialog } from '@/views/dialogs/DisconnectDialog';
 import { DisplaySettingsDialog } from '@/views/dialogs/DisplaySettingsDialog';
-import { EmailSignInStatusDialog } from '@/views/dialogs/EmailSignInStatusDialog';
 import { ExchangeOfflineDialog } from '@/views/dialogs/ExchangeOfflineDialog';
 import { ExternalLinkDialog } from '@/views/dialogs/ExternalLinkDialog';
 import { GlobalCommandDialog } from '@/views/dialogs/GlobalCommandDialog';
 import { HelpDialog } from '@/views/dialogs/HelpDialog';
-import { ManageAccountDialog } from '@/views/dialogs/ManageAccountDialog/ManageAccountDialog';
-import { MnemonicExportDialog } from '@/views/dialogs/MnemonicExportDialog';
 import { MobileDownloadDialog } from '@/views/dialogs/MobileDownloadDialog';
-import { MobileSignInDialog } from '@/views/dialogs/MobileSignInDialog';
 import { OnboardingDialog } from '@/views/dialogs/OnboardingDialog';
 import { PredictionMarketIntroDialog } from '@/views/dialogs/PredictionMarketIntroDialog';
 import { PreferencesDialog } from '@/views/dialogs/PreferencesDialog';
@@ -79,7 +74,6 @@ export const DialogManager = React.memo(() => {
   return DialogTypes.match(activeDialog, {
     AcknowledgeTerms: (args) => <AcknowledgeTermsDialog {...args} {...modalProps} />,
     AdjustIsolatedMargin: (args) => <AdjustIsolatedMarginDialog {...args} {...modalProps} />,
-    CheckEmail: (args) => <CheckEmailDialog {...args} {...modalProps} />,
     ClosePosition: (args) => <ClosePositionDialog {...args} {...modalProps} />,
     CloseAllPositionsConfirmation: (args) => (
       <CloseAllPositionsConfirmationDialog {...args} {...modalProps} />
@@ -107,16 +101,12 @@ export const DialogManager = React.memo(() => {
       ),
     DisconnectWallet: (args) => <DisconnectDialog {...args} {...modalProps} />,
     DisplaySettings: (args) => <DisplaySettingsDialog {...args} {...modalProps} />,
-    EmailSignInStatus: (args) => <EmailSignInStatusDialog {...args} {...modalProps} />,
     ExchangeOffline: (args) => <ExchangeOfflineDialog {...args} {...modalProps} />,
     ExternalLink: (args) => <ExternalLinkDialog {...args} {...modalProps} />,
     FillDetails: (args) => <FillDetailsDialog {...args} {...modalProps} />,
     GlobalCommand: (args) => <GlobalCommandDialog {...args} {...modalProps} />,
     Help: (args) => <HelpDialog {...args} {...modalProps} />,
-    ManageAccount: (args) => <ManageAccountDialog {...args} {...modalProps} />,
-    MnemonicExport: (args) => <MnemonicExportDialog {...args} {...modalProps} />,
     MobileDownload: (args) => <MobileDownloadDialog {...args} {...modalProps} />,
-    MobileSignIn: (args) => <MobileSignInDialog {...args} {...modalProps} />,
     Onboarding: (args) => <OnboardingDialog {...args} {...modalProps} />,
     OrderDetails: (args) => <OrderDetailsDialog {...args} {...modalProps} />,
     PredictionMarketIntro: (args) => <PredictionMarketIntroDialog {...args} {...modalProps} />,

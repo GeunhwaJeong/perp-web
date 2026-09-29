@@ -17,10 +17,6 @@ export type AcknowledgeTermsDialogProps = {};
 export type AdjustIsolatedMarginDialogProps = {
   positionId: SubaccountPosition['uniqueId'];
 };
-export type CheckEmailDialogProps = {
-  userEmail: string;
-  onClose?: () => void;
-};
 export type ClosePositionDialogProps = {};
 export type CloseAllPositionsConfirmationDialogProps = {};
 export type CancelAllOrdersConfirmationDialogProps = { marketId?: string };
@@ -33,7 +29,6 @@ export type ConfirmPendingDepositDialogProps = {
 export type DepositAddressDialogProps = {};
 export type DisconnectWalletDialogProps = {};
 export type DisplaySettingsDialogProps = {};
-export type EmailSignInStatusDialogProps = {};
 export type ExchangeOfflineDialogProps = { preventClose?: boolean };
 export type ExternalLinkDialogProps = {
   buttonText?: ReactNode;
@@ -45,10 +40,7 @@ export type ExternalLinkDialogProps = {
 export type FillDetailsDialogProps = { fillId: string };
 export type GlobalCommandDialogProps = {};
 export type HelpDialogProps = {};
-export type ManageAccountDialogProps = {};
-export type MnemonicExportDialogProps = {};
 export type MobileDownloadDialogProps = { mobileAppUrl: string };
-export type MobileSignInDialogProps = { skipWaiting?: boolean };
 export type OnboardingDialogProps = {};
 export type OrderDetailsDialogProps = { orderId: string };
 export type PredictionMarketIntroDialogProps = {};
@@ -131,7 +123,6 @@ export const DialogTypes = unionize(
     CancelAllOrdersConfirmation: ofType<CancelAllOrdersConfirmationDialogProps>(),
     CancelOrphanedTriggers: ofType<CancelOrphanedTriggersDialogProps>(),
     CancelPendingOrders: ofType<CancelPendingOrdersDialogProps>(),
-    CheckEmail: ofType<CheckEmailDialogProps>(),
     CloseAllPositionsConfirmation: ofType<CloseAllPositionsConfirmationDialogProps>(),
     ClosePosition: ofType<ClosePositionDialogProps>(),
     ComplianceConfig: ofType<ComplianceConfigDialogProps>(),
@@ -143,16 +134,12 @@ export const DialogTypes = unionize(
     Deposit2: ofType<DepositDialog2Props>(),
     DisconnectWallet: ofType<DisconnectWalletDialogProps>(),
     DisplaySettings: ofType<DisplaySettingsDialogProps>(),
-    EmailSignInStatus: ofType<EmailSignInStatusDialogProps>(),
     ExchangeOffline: ofType<ExchangeOfflineDialogProps>(),
     ExternalLink: ofType<ExternalLinkDialogProps>(),
     FillDetails: ofType<FillDetailsDialogProps>(),
     GlobalCommand: ofType<GlobalCommandDialogProps>(),
     Help: ofType<HelpDialogProps>(),
-    ManageAccount: ofType<ManageAccountDialogProps>(),
-    MnemonicExport: ofType<MnemonicExportDialogProps>(),
     MobileDownload: ofType<MobileDownloadDialogProps>(),
-    MobileSignIn: ofType<MobileSignInDialogProps>(),
     Onboarding: ofType<OnboardingDialogProps>(),
     OrderDetails: ofType<OrderDetailsDialogProps>(),
     PredictionMarketIntro: ofType<PredictionMarketIntroDialogProps>(),

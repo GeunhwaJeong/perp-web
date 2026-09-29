@@ -28,7 +28,6 @@ import { getOnboardingState } from '@/state/accountSelectors';
 import { useAppDispatch, useAppSelector } from '@/state/appTypes';
 import { openDialog, setIsUserMenuOpen } from '@/state/dialogs';
 import { getIsUserMenuOpen } from '@/state/dialogsSelectors';
-import { selectIsTurnkeyConnected } from '@/state/walletSelectors';
 
 import { isTruthy } from '@/lib/isTruthy';
 import { orEmptyObj } from '@/lib/typeUtils';
@@ -41,7 +40,6 @@ const UserMenuContent = () => {
   const onboardingState = useAppSelector(getOnboardingState);
   const { complianceState } = useComplianceState();
   const canAccountTrade = useAppSelector(calculateCanAccountTrade);
-  const isTurnkeyConnected = useAppSelector(selectIsTurnkeyConnected);
   const { equity, freeCollateral } = orEmptyObj(
     useAppSelector(BonsaiCore.account.parentSubaccountSummary.data)
   );
@@ -97,24 +95,6 @@ const UserMenuContent = () => {
         dispatch(openDialog(DialogTypes.Help()));
       },
     },
-    onboardingState === OnboardingState.AccountConnected &&
-      (isTurnkeyConnected
-        ? {
-            key: 'export-turnkey',
-            label: stringGetter({ key: STRING_KEYS.ACCOUNT_MANAGEMENT }),
-            icon: <Icon iconName={IconName.User} />,
-            onClick: () => {
-              dispatch(openDialog(DialogTypes.ManageAccount()));
-            },
-          }
-        : {
-            key: 'export-keys',
-            label: stringGetter({ key: STRING_KEYS.EXPORT_DYDX_WALLET }),
-            icon: <Icon iconName={IconName.ExportKeys} />,
-            onClick: () => {
-              dispatch(openDialog(DialogTypes.MnemonicExport()));
-            },
-          }),
     onboardingState !== OnboardingState.Disconnected && {
       key: 'disconnect-wallet',
       label: stringGetter({ key: STRING_KEYS.SIGN_OUT }),

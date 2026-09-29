@@ -1,4 +1,4 @@
-import { ConnectorType, WalletType } from '@/constants/wallets';
+import { ConnectorType } from '@/constants/wallets';
 
 import type { RootState } from './_store';
 import { createAppSelector } from './appTypes';
@@ -8,33 +8,20 @@ import { createAppSelector } from './appTypes';
  */
 export const getSourceAccount = (state: RootState) => state.wallet.sourceAccount;
 
-export const selectIsKeplrConnected = createAppSelector(
-  [getSourceAccount],
-  (sourceAccount) => sourceAccount.walletInfo?.name === WalletType.Keplr
-);
-
-export const selectIsTurnkeyConnected = createAppSelector(
-  [getSourceAccount],
-  (sourceAccount) => sourceAccount.walletInfo?.name === WalletType.Turnkey
-);
-
 export const selectWalletInfo = createAppSelector(
   [getSourceAccount],
   (sourceAccount) => sourceAccount.walletInfo
 );
 
-export const selectTurnkeyWalletInfo = createAppSelector([selectWalletInfo], (walletInfo) => {
-  if (walletInfo?.connectorType === ConnectorType.Turnkey) {
-    return walletInfo;
-  }
-
-  return undefined;
-});
+export const selectIsWalletStandardConnected = createAppSelector(
+  [selectWalletInfo],
+  (walletInfo) => walletInfo?.connectorType === ConnectorType.WalletStandard
+);
 
 export const getLocalWalletNonce = (state: RootState) => state.walletEphemeral.localWalletNonce;
 export const getHdKeyNonce = (state: RootState) => state.walletEphemeral.hdKeyNonce;
 
-export const getTurnkeyEmailOnboardingData = (state: RootState) =>
-  state.wallet.turnkeyEmailOnboardingData;
-
-export const getTurnkeyPrimaryWallet = (state: RootState) => state.wallet.turnkeyPrimaryWallet;
+// Cosmos and embedded-wallet connectors no longer exist; call sites that branch on them
+// keep compiling and take the default path.
+export const selectIsKeplrConnected = (_state: RootState) => false;
+export const selectIsTurnkeyConnected = (_state: RootState) => false;

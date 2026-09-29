@@ -7,7 +7,7 @@ import { DepositDialog2Props, DialogProps } from '@/constants/dialogs';
 import { CosmosChainId } from '@/constants/graz';
 import { STRING_KEYS } from '@/constants/localization';
 import { SOLANA_MAINNET_ID } from '@/constants/solana';
-import { WalletNetworkType, WalletType } from '@/constants/wallets';
+import { WalletNetworkType } from '@/constants/wallets';
 
 import { useAccounts } from '@/hooks/useAccounts';
 import { useBreakpoints } from '@/hooks/useBreakpoints';
@@ -32,11 +32,7 @@ import { WithdrawStatus } from './WithdrawStatus';
 
 export const WithdrawDialog2 = ({ setIsOpen }: DialogProps<DepositDialog2Props>) => {
   const { dydxAddress, sourceAccount, solanaAddress } = useAccounts();
-  const isPrivy = sourceAccount.walletInfo?.name === WalletType.Privy;
-  const isTurnkey = sourceAccount.walletInfo?.name === WalletType.Turnkey;
-  const [destinationAddress, setDestinationAddress] = useState(
-    isPrivy || isTurnkey ? '' : (sourceAccount.address ?? '')
-  );
+  const [destinationAddress, setDestinationAddress] = useState(sourceAccount.address ?? '');
 
   const { isMobile } = useBreakpoints();
   const [destinationChain, setDestinationChain] = useState(
@@ -60,7 +56,7 @@ export const WithdrawDialog2 = ({ setIsOpen }: DialogProps<DepositDialog2Props>)
   const handleTabChange = (newTab: 'perps' | 'spot') => {
     setCurrentWithdrawType(newTab);
     setAmount('');
-    setDestinationAddress(isPrivy || isTurnkey ? '' : (sourceAccount.address ?? ''));
+    setDestinationAddress(sourceAccount.address ?? '');
     setSpotDestinationAddress('');
     setFormState('form');
   };
