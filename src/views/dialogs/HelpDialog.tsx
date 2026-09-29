@@ -39,7 +39,7 @@ export const HelpDialog = ({ setIsOpen }: DialogProps<HelpDialogProps>) => {
       {
         group: 'help-items',
         items: [
-          helpCenter && {
+          !!helpCenter && {
             value: 'help-center',
             label: stringGetter({ key: STRING_KEYS.HELP_CENTER }),
             description: stringGetter({ key: STRING_KEYS.HELP_CENTER_DESCRIPTION }),
@@ -51,17 +51,7 @@ export const HelpDialog = ({ setIsOpen }: DialogProps<HelpDialogProps>) => {
             },
             slotBefore: <Icon iconName={IconName.File} />,
           },
-          globalThis.Intercom && {
-            value: 'live-chat',
-            label: stringGetter({ key: STRING_KEYS.LIVE_CHAT }),
-            description: stringGetter({ key: STRING_KEYS.LIVE_CHAT_DESCRIPTION }),
-            onSelect: () => {
-              globalThis.Intercom('show');
-              setIsOpen(false);
-            },
-            slotBefore: <Icon iconName={IconName.Chat} />,
-          },
-          community && {
+          !!community && {
             value: 'community',
             label: stringGetter({ key: STRING_KEYS.COMMUNITY }),
             description: stringGetter({ key: STRING_KEYS.COMMUNITY_DESCRIPTION }),

@@ -11,5 +11,4 @@ declare global {
     'dydx:identify': CustomEvent;
   }
 
-  var Intercom: any;
 }
