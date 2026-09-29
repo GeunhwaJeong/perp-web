@@ -86,6 +86,7 @@ export function getTradeFormFieldStates(
     scaleEndPrice: '',
     scaleTotalOrders: '5',
     scaleSkew: '1',
+    isClosingPosition: false,
   };
 
   // Initialize all fields as not visible
@@ -113,7 +114,7 @@ export function getTradeFormFieldStates(
       states[key] = {
         ...(states[key] as any),
         state: 'enabled',
-        effectiveValue: states[key].effectiveValue ?? states[key].rawValue ?? defaults[key],
+        effectiveValue: states[key]?.effectiveValue ?? states[key]?.rawValue ?? defaults[key],
       };
     });
   }
@@ -161,7 +162,14 @@ export function getTradeFormFieldStates(
     makeTriggersVisibleIfPossible(result);
     switch (type) {
       case TradeFormType.MARKET:
-        makeVisible(result, ['marketId', 'side', 'size', 'marginMode', 'reduceOnly']);
+        makeVisible(result, [
+          'marketId',
+          'side',
+          'size',
+          'marginMode',
+          'reduceOnly',
+          'isClosingPosition',
+        ]);
         setMarginMode(result);
         disableReduceOnlyIfIncreasingMarketOrder(result);
 
@@ -176,6 +184,7 @@ export function getTradeFormFieldStates(
           'marginMode',
           'reduceOnly',
           'postOnly',
+          'isClosingPosition',
         ]);
         defaultSizeIfSizeInputIsInvalid(result);
         setMarginMode(result);
