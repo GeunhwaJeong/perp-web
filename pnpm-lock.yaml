@@ -56,6 +56,9 @@ dependencies:
   '@keplr-wallet/types':
     specifier: ^0.12.188
     version: 0.12.279
+  '@noble/hashes':
+    specifier: ^2.2.0
+    version: 2.4.0
   '@radix-ui/react-accordion':
     specifier: ^1.1.2
     version: 1.2.12(@types/react-dom@18.3.7)(@types/react@18.3.26)(react-dom@18.3.1)(react@18.3.1)
@@ -3442,7 +3445,7 @@ packages:
     dependencies:
       '@libp2p/interface': 3.0.2
       '@noble/curves': 2.0.1
-      '@noble/hashes': 2.0.1
+      '@noble/hashes': 2.4.0
       multiformats: 13.4.1
       protons-runtime: 5.6.0
       uint8arraylist: 2.4.8
@@ -4093,7 +4096,6 @@ packages:
   /@noble/hashes@2.4.0:
     resolution: {integrity: sha512-X5XaVWZIBCT7HHZGm5I7ZQXDwLG+bGXuSrMQAW+7Zvl87h1kmc1ZB1VSRJcpUfoUrGQp4Fkoxm5kZ+Ms+aW+eA==}
     engines: {node: '>= 20.19.0'}
-    dev: false
 
   /@noble/secp256k1@1.7.1:
     resolution: {integrity: sha512-hOUk6AyBFmqVrv7k5WAw/LpszxVbj9gGN4JRkIX52fdFAj1UA61KXmZDvqVEm+pOyec3+fIeZB02LYa/pWOArw==}
