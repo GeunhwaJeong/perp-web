@@ -223,6 +223,9 @@ export class AccountTransactionSupervisor {
       case '64':
         orderFlags = OrderFlags.LONG_TERM;
         break;
+      case '128':
+        orderFlags = OrderFlags.TWAP;
+        break;
       default:
         logBonsaiError(fnName, 'Unsupported order flags', {
           orderId,
@@ -398,6 +401,7 @@ export class AccountTransactionSupervisor {
           transferToSubaccountAmount: undefined,
           marketInfo,
           currentHeight,
+          twapParameters: undefined,
         };
       })
       .filter(isPresent);
@@ -479,6 +483,7 @@ export class AccountTransactionSupervisor {
           marketInfo,
           currentHeight,
           memo,
+          twapParameters,
         } = innerPayload;
 
         // Set timeout for order to be considered failed if not committed
@@ -510,7 +515,8 @@ export class AccountTransactionSupervisor {
           currentHeight ?? undefined,
           goodTilBlock ?? undefined,
           memo,
-          Method.BroadcastTxSync
+          Method.BroadcastTxSync,
+          twapParameters ?? undefined
         );
 
         if ((tx as IndexedTx | undefined)?.code !== 0) {

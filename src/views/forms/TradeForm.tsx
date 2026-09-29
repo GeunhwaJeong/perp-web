@@ -124,6 +124,9 @@ export const TradeForm = ({
       rawInput.scaleEndPrice,
       rawInput.scaleTotalOrders,
       rawInput.scaleSkew,
+      rawInput.durationHours,
+      rawInput.durationMinutes,
+      rawInput.frequencySeconds,
     ].some((v) => v != null && v !== '') || (rawInput.size?.value.value.trim() ?? '') !== '';
 
   const orderSideAction = {
