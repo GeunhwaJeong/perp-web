@@ -292,17 +292,7 @@ export class PerpTransactionBuilder {
       }
     });
 
-    const clearingHouse = tx.moveCall({
-      target: target(this.perp, 'clearing_house', 'end_session'),
-      typeArguments: [this.coinType, this.types.admin],
-      arguments: [
-        session[0]!,
-        tx.object(ref.cap),
-        tx.object(ref.account),
-        tx.pure.bool(options.allocateMissingMargin ?? true),
-        tx.pure.bool(options.deallocateFreeCollateral ?? false),
-      ],
-    });
+    const clearingHouse = this.addEndSession(tx, session[0]!, ref, options);
     tx.moveCall({
       target: target(this.perp, 'clearing_house', 'share'),
       typeArguments: [this.coinType],
@@ -554,6 +544,45 @@ export class PerpTransactionBuilder {
   }
 
   // ---------------------------------------------------------------- pieces
+
+  /**
+   * Ends a session. With the fee-tier extension configured it ends through
+   * `perpetuals_fees::fees::end_session`, which records the session's taker and maker volume
+   * and caches the account's fee multipliers on the market for the sessions that follow; the
+   * core `end_session` would leave the account at the market's base rates forever.
+   */
+  private addEndSession(
+    tx: Transaction,
+    hotPotato: TransactionObjectArgument,
+    ref: PerpAccountRef,
+    options: SessionOptions
+  ) {
+    const allocate = tx.pure.bool(options.allocateMissingMargin ?? true);
+    const deallocate = tx.pure.bool(options.deallocateFreeCollateral ?? false);
+    const { fees } = this.deployment;
+    if (fees) {
+      return tx.moveCall({
+        target: target(this.deployment.packages.perpetualsFees, 'fees', 'end_session'),
+        typeArguments: [this.coinType, this.types.admin],
+        arguments: [
+          hotPotato,
+          tx.object(ref.cap),
+          tx.object(ref.account),
+          tx.object(this.deployment.registry),
+          tx.object(fees.schedule),
+          tx.object(fees.tierRegistry),
+          allocate,
+          deallocate,
+          tx.object(CLOCK_OBJECT_ID),
+        ],
+      });
+    }
+    return tx.moveCall({
+      target: target(this.perp, 'clearing_house', 'end_session'),
+      typeArguments: [this.coinType, this.types.admin],
+      arguments: [hotPotato, tx.object(ref.cap), tx.object(ref.account), allocate, deallocate],
+    });
+  }
 
   private ticketTx(
     ref: PerpAccountRef,
