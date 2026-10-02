@@ -2,10 +2,12 @@
 
 /**
  * Drives the in-app transaction supervisor through the dev wallet against a running
- * localnet. Requires the fixture (`fixture.mjs setup` + `push`) and `pnpm dev`.
+ * localnet. Requires the fixture (`fixture.mjs setup` + `push`) and `pnpm dev`, and runs in
+ * the fixture's environment because it re-seeds the maker ladder first.
  *
  *   PLAYWRIGHT=/path/to/node_modules/playwright node scripts/haneul-localnet/browser.mjs
  */
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
@@ -24,6 +26,14 @@ const check = (name, ok, detail = '') => {
   passed += 1;
   console.log(`  ok  ${name}${detail ? ` (${detail})` : ''}`);
 };
+
+// The partial-fill check takes every ask inside its limit, so each run starts from a fresh ladder.
+const seeded = spawnSync(
+  process.execPath,
+  [join(ROOT, 'scripts', 'haneul-localnet', 'fixture.mjs'), 'seed'],
+  { stdio: 'inherit' }
+);
+if (seeded.status !== 0) throw new Error('fixture.mjs seed failed');
 
 const browser = await chromium.launch();
 const page = await browser.newPage();
@@ -102,8 +112,13 @@ const cancel = await page.evaluate(async (id) => {
 check('cancel succeeded', cancel.type === 'success', JSON.stringify(cancel).slice(0, 100));
 check('CanceledOrder event carried the id', cancel.payload.canceled.includes(orderId));
 
+// Market orders carry the form's worst acceptable price (the summary's average fill price
+// ±5%); the ladder sits at $10 steps around $100,000 with 0.5 BTC per level.
+const market = (over) =>
+  place({ type: 'MARKET', timeInForce: undefined, execution: 'IOC', ...over });
+
 // 3. market buy fills against the maker ladder
-const buy = await place({ type: 'MARKET', price: 0, timeInForce: undefined, execution: 'IOC' });
+const buy = await market({ price: 105_000 });
 check(
   'market buy filled',
   buy.r.type === 'success' && buy.local.submissionStatus === 2,
@@ -111,18 +126,47 @@ check(
 );
 
 // 4. reduce-only market sell closes it
-const sell = await place({
-  type: 'MARKET',
-  side: 'SELL',
-  price: 0,
-  timeInForce: undefined,
-  execution: 'IOC',
-  reduceOnly: true,
-});
+const sell = await market({ side: 'SELL', price: 95_000, reduceOnly: true });
 check(
   'reduce-only market sell filled',
   sell.r.type === 'success',
   JSON.stringify(sell.r).slice(0, 100)
+);
+
+// 4a. the worst price reaches the engine: a buy limited below the best ask fills nothing
+const bounded = await market({ price: 100_005 });
+check(
+  'market buy limited below the best ask is not filled',
+  bounded.r.type === 'failure' && /price limit/.test(bounded.r.errorString ?? ''),
+  JSON.stringify(bounded.r).slice(0, 140)
+);
+check(
+  'unfilled market order marked FailedSubmission',
+  bounded.local.submissionStatus === 4,
+  `status=${bounded.local.submissionStatus}`
+);
+
+// 4b. a market order without a worst price is refused before signing
+const unbounded = await market({ price: 0 });
+check(
+  'market order without a worst price refused',
+  unbounded.r.type === 'failure' && /worst-price/.test(unbounded.r.errorString ?? ''),
+  JSON.stringify(unbounded.r).slice(0, 140)
+);
+
+// 4c. more size than the book holds inside the limit fills what it can and drops the rest
+// (the engine's market order would have aborted: the whole ladder is under 3 BTC)
+const partial = await market({ size: 3, price: 100_020 });
+check(
+  'oversized market buy fills inside its limit',
+  partial.r.type === 'success' && partial.local.submissionStatus === 2,
+  JSON.stringify(partial.r).slice(0, 140)
+);
+const flatten = await market({ side: 'SELL', size: 3, price: 95_000, reduceOnly: true });
+check(
+  'reduce-only market sell flattens the partial fill',
+  flatten.r.type === 'success',
+  JSON.stringify(flatten.r).slice(0, 140)
 );
 
 // 5. off-tick prices are snapped to the tick before submission (the form already rounds)
@@ -139,14 +183,7 @@ const snappedCancel = await page.evaluate(
 check('snapped order canceled', snappedCancel.type === 'success');
 
 // 6. engine rejection surfaces as a mapped failure: reduce-only with no position
-const bad = await place({
-  type: 'MARKET',
-  side: 'SELL',
-  price: 0,
-  timeInForce: undefined,
-  execution: 'IOC',
-  reduceOnly: true,
-});
+const bad = await market({ side: 'SELL', price: 95_000, reduceOnly: true });
 check(
   'reduce-only without a position rejected',
   bad.r.type === 'failure' && typeof bad.r.errorString === 'string' && bad.r.errorString.length > 0,

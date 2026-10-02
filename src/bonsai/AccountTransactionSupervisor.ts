@@ -11,6 +11,7 @@ import {
   PerpTransactionBuilder,
   SIDE,
   collateralToUnits,
+  limitPriceToUnits,
   priceToUnits,
   sizeToUnits,
   type OrderSpec,
@@ -55,6 +56,8 @@ import { logBonsaiError, logBonsaiInfo } from './logs';
 
 const FN = 'AccountTransactionSupervisor';
 
+const NO_FILL_WITHIN_LIMIT = 'No orders on the book within the price limit';
+
 type Context = {
   deployment: PerpDeployment;
   builder: PerpTransactionBuilder;
@@ -93,7 +96,19 @@ const toOrderSpec = (
   const isAsk = payload.side === OrderSide.SELL ? SIDE.ASK : SIDE.BID;
   const size = sizeToUnits(payload.size, market.lotSize);
   if (isMarketOrder(payload)) {
-    return { kind: 'market', isAsk, size, reduceOnly: payload.reduceOnly ?? false };
+    // The engine's market order fills at any price and aborts unless fully filled. Sending an
+    // immediate-or-cancel limit at the form's worst price instead keeps the fill within the
+    // slippage the trade summary showed, and drops the unfilled rest without reverting the
+    // matching work (expired makers it cleared stay cleared).
+    return {
+      kind: 'limit',
+      isAsk,
+      size,
+      price: limitPriceToUnits(payload.price, isAsk, market.tickSize),
+      orderType: ORDER_TYPE.IOC,
+      clientOrderId: BigInt(payload.clientId),
+      reduceOnly: payload.reduceOnly ?? false,
+    };
   }
   return {
     kind: 'limit',
@@ -212,6 +227,9 @@ export class AccountTransactionSupervisor {
   ): Promise<OperationResult<PlacedOrder[]>> {
     const market = ctx.deployment.markets[marketId];
     if (!market) return failure(`Market ${marketId} is not available on ${ctx.deployment.network}`);
+    if (payloads.some((p) => isMarketOrder(p) && !(p.price > 0))) {
+      return failure('Market order has no worst-price limit');
+    }
     const createPosition = await this.ensurePosition(ctx, marketId);
     const allocate = payloads.reduce((sum, p) => sum + (p.transferToSubaccountAmount ?? 0), 0);
     const tx = ctx.builder.session({
@@ -232,6 +250,18 @@ export class AccountTransactionSupervisor {
     try {
       const result = await signAndExecute(tx);
       this.markPosition(ctx, marketId);
+      // The engine emits a taker fill event only when the session filled something. A market
+      // order that matched nothing inside its limit can still succeed (it may have cleared
+      // expired makers on the way), so report it as not filled rather than filled.
+      const takerFilled = eventsOf(result.events, '::events::FilledTakerOrder').length > 0;
+      if (payloads.some(isMarketOrder) && !takerFilled) {
+        logBonsaiInfo(FN, 'market order not filled within its limit', {
+          digest: result.digest,
+          marketId,
+          source,
+        });
+        return failure(NO_FILL_WITHIN_LIMIT);
+      }
       const posted = eventsOf(result.events, '::events::PostedOrder');
       const placed: PlacedOrder[] = payloads.map((p) => {
         const match = posted.find((e) => String(e.client_order_id ?? '') === String(p.clientId));
