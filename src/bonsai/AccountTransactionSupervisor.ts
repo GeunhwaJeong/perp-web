@@ -7,6 +7,9 @@ import {
   findPerpAccount,
   hasMarketPosition,
   HaneulTransactionError,
+  imrToLeverage,
+  leverageToImr,
+  listCollateralCoins,
   loadPerpDeployment,
   ORDER_TYPE,
   PerpTransactionBuilder,
@@ -14,8 +17,11 @@ import {
   collateralToUnits,
   limitPriceToUnits,
   priceToUnits,
+  readAccount,
+  readPosition,
   selectPriceUpdates,
   sizeToUnits,
+  unitsToCollateral,
   type OrderSpec,
   type PerpAccount,
   type PerpDeployment,
@@ -159,7 +165,8 @@ export class AccountTransactionSupervisor {
     this.positions.clear();
   }
 
-  private async context(): Promise<OperationResult<Context>> {
+  /** Deployment and connected wallet, without requiring a trading account yet. */
+  private async walletContext(): Promise<OperationResult<Omit<Context, 'account'>>> {
     const network = dAppKit.stores.$currentNetwork.get();
     const deployment = await loadPerpDeployment(network);
     if (!deployment) {
@@ -169,20 +176,32 @@ export class AccountTransactionSupervisor {
     if (!address) {
       return failure('No wallet connected', STRING_KEYS.NO_LOCAL_WALLET);
     }
-    let account = this.accounts.get(`${network}:${address}`);
+    return wrapOperationSuccess({
+      deployment,
+      builder: new PerpTransactionBuilder(deployment),
+      address,
+    });
+  }
+
+  private async context(): Promise<OperationResult<Context>> {
+    const wallet = await this.walletContext();
+    if (isOperationFailure(wallet)) return wallet;
+    const { deployment, address } = wallet.payload;
+    const key = `${deployment.network}:${address}`;
+    let account = this.accounts.get(key);
     if (!account) {
       account = await findPerpAccount(dAppKit.getClient(), deployment, address);
       if (!account) {
         return failure('Deposit collateral to open a trading account first');
       }
-      this.accounts.set(`${network}:${address}`, account);
+      this.accounts.set(key, account);
     }
-    return wrapOperationSuccess({
-      deployment,
-      builder: new PerpTransactionBuilder(deployment),
-      address,
-      account,
-    });
+    return wrapOperationSuccess({ ...wallet.payload, account });
+  }
+
+  /** Drops the cached account so the next operation reads its balance and caps again. */
+  private forgetWalletAccount(deployment: PerpDeployment, address: string) {
+    this.accounts.delete(`${deployment.network}:${address}`);
   }
 
   private async ensurePosition(ctx: Context, marketId: string) {
@@ -574,6 +593,231 @@ export class AccountTransactionSupervisor {
     );
     const failed = results.find(isOperationFailure);
     return failed ?? wrapOperationSuccess({ results });
+  }
+
+  // ---------------------------------------------------------------- funds and leverage
+
+  /** Engine market of a dYdX clob pair id; the indexer numbers markets by clob pair. */
+  public marketIdForClobPair(clobPairId: number | string): string | undefined {
+    const markets = BonsaiCore.markets.markets.data(this.store.getState()) ?? {};
+    return Object.values(markets).find((m) => String(m.clobPairId) === String(clobPairId))?.ticker;
+  }
+
+  /**
+   * Engine market of a child subaccount. The indexer presents the account balance as parent
+   * subaccount 0 and the account's collateral in market number `i` as child `128 * (i + 1)`,
+   * the numbering dYdX gives isolated positions.
+   */
+  public marketIdForSubaccount(subaccountNumber: number): string | undefined {
+    if (subaccountNumber < 128) return undefined;
+    return this.marketIdForClobPair(Math.floor(subaccountNumber / 128) - 1);
+  }
+
+  /**
+   * The collateral the connected wallet holds and the trading account's unallocated balance
+   * (what can be withdrawn), both read from chain, in collateral units (e.g. 12.5 TUSD).
+   */
+  public async collateralBalances(): Promise<
+    OperationResult<{ wallet: number; account: number | undefined; symbol: string }>
+  > {
+    const wallet = await this.walletContext();
+    if (isOperationFailure(wallet)) return wallet;
+    const { deployment, address } = wallet.payload;
+    const { decimals, coinType } = deployment.collateral;
+    try {
+      const client = dAppKit.getClient();
+      const [coins, account] = await Promise.all([
+        listCollateralCoins(client, deployment, address),
+        findPerpAccount(client, deployment, address),
+      ]);
+      const held = coins.reduce((sum, c) => sum + c.balance, 0n);
+      return wrapOperationSuccess({
+        wallet: unitsToCollateral(held, decimals).toNumber(),
+        account: account ? unitsToCollateral(account.collateral, decimals).toNumber() : undefined,
+        symbol: coinType.split('::').pop() ?? 'USD',
+      });
+    } catch (error) {
+      return this.toFailure(error);
+    }
+  }
+
+  /**
+   * Deposits collateral from the wallet into the trading account, opening the account in the
+   * same transaction if the wallet has none yet.
+   */
+  public async depositCollateral(
+    amount: number
+  ): Promise<OperationResult<{ digest: string; createdAccount: boolean }>> {
+    const wallet = await this.walletContext();
+    if (isOperationFailure(wallet)) return wallet;
+    const { deployment, builder, address } = wallet.payload;
+    const units = collateralToUnits(amount, deployment.collateral.decimals);
+    if (units <= 0n) return failure('Enter an amount to deposit', STRING_KEYS.ENTER_AMOUNT);
+    try {
+      const client = dAppKit.getClient();
+      const coins = await listCollateralCoins(client, deployment, address);
+      const balance = coins.reduce((sum, c) => sum + c.balance, 0n);
+      if (balance < units) {
+        return failure('Not enough collateral in the wallet', STRING_KEYS.INSUFFICIENT_BALANCE);
+      }
+      const account = await findPerpAccount(client, deployment, address);
+      const ids = coins.map((c) => c.objectId);
+      const tx = account
+        ? builder.deposit({
+            ref: { account: account.account, cap: account.cap },
+            coins: ids,
+            amount: units,
+          })
+        : builder.createAccount({ sender: address, coins: ids, amount: units });
+      const result = await signAndExecute(tx);
+      this.forgetWalletAccount(deployment, address);
+      logBonsaiInfo(FN, 'collateral deposited', {
+        digest: result.digest,
+        amount,
+        createdAccount: !account,
+      });
+      return wrapOperationSuccess({ digest: result.digest, createdAccount: !account });
+    } catch (error) {
+      return this.toFailure(error);
+    }
+  }
+
+  /**
+   * Withdraws collateral from the account balance (parent subaccount) to the wallet.
+   * Collateral allocated to a market has to be moved back to the balance first.
+   */
+  public async withdrawCollateral(amount: number): Promise<OperationResult<{ digest: string }>> {
+    const ctx = await this.context();
+    if (isOperationFailure(ctx)) return ctx;
+    const { deployment, builder, address, account } = ctx.payload;
+    const units = collateralToUnits(amount, deployment.collateral.decimals);
+    if (units <= 0n) return failure('Enter an amount to withdraw', STRING_KEYS.ENTER_AMOUNT);
+    try {
+      const { collateral } = await readAccount(dAppKit.getClient(), account.account);
+      if (collateral < units) {
+        return failure(
+          'Not enough free collateral on the account balance',
+          STRING_KEYS.INSUFFICIENT_BALANCE
+        );
+      }
+      const tx = builder.withdraw({
+        ref: { account: account.account, cap: account.cap },
+        amount: units,
+        recipient: address,
+      });
+      const result = await signAndExecute(tx);
+      this.forgetWalletAccount(deployment, address);
+      logBonsaiInfo(FN, 'collateral withdrawn', { digest: result.digest, amount });
+      return wrapOperationSuccess({ digest: result.digest });
+    } catch (error) {
+      return this.toFailure(error);
+    }
+  }
+
+  /**
+   * Moves collateral between the account balance and a market: into the market is
+   * `allocate_collateral` (creating the position object on a first visit), out of it is
+   * `deallocate_collateral`, whose margin check reads the feeds and so carries signed prices.
+   */
+  public async transferMargin({
+    marketId,
+    amount,
+    toMarket,
+  }: {
+    marketId: string;
+    amount: number;
+    toMarket: boolean;
+  }): Promise<OperationResult<{ digest: string }>> {
+    const ctx = await this.context();
+    if (isOperationFailure(ctx)) return ctx;
+    const { deployment, builder, account } = ctx.payload;
+    const market = deployment.markets[marketId];
+    if (!market) return failure(`Market ${marketId} is not available on ${deployment.network}`);
+    const units = collateralToUnits(amount, deployment.collateral.decimals);
+    if (units <= 0n) return failure('Enter an amount', STRING_KEYS.ENTER_AMOUNT);
+    const ref = { account: account.account, cap: account.cap };
+    try {
+      let tx;
+      if (toMarket) {
+        const createPosition = await this.ensurePosition(ctx.payload, marketId);
+        tx = builder.allocateCollateral({ ref, marketId, amount: units, createPosition });
+      } else {
+        const priceUpdates = await this.priceUpdatesFor(ctx.payload, marketId);
+        tx = builder.deallocateCollateral({ ref, marketId, amount: units, priceUpdates });
+      }
+      const result = await signAndExecute(tx);
+      this.markPosition(ctx.payload, marketId);
+      this.forgetWalletAccount(deployment, ctx.payload.address);
+      logBonsaiInfo(FN, 'margin transferred', {
+        digest: result.digest,
+        marketId,
+        amount,
+        toMarket,
+      });
+      return wrapOperationSuccess({ digest: result.digest });
+    } catch (error) {
+      return this.toFailure(error);
+    }
+  }
+
+  /**
+   * Sets the leverage of the account's position on a market, as the position's initial margin
+   * ratio. A market the account has not traded yet gets its position object in the same
+   * transaction, so the leverage holds from the first order on.
+   */
+  public async setMarketLeverage({
+    marketId,
+    leverage,
+  }: {
+    marketId: string;
+    leverage: number;
+  }): Promise<OperationResult<{ digest: string; leverage: number }>> {
+    const ctx = await this.context();
+    if (isOperationFailure(ctx)) return ctx;
+    const { deployment, builder, account } = ctx.payload;
+    const market = deployment.markets[marketId];
+    if (!market) return failure(`Market ${marketId} is not available on ${deployment.network}`);
+    if (!(leverage >= 1)) return failure('Leverage must be at least 1x');
+    const maxLeverage = imrToLeverage(market.initialMarginRatio);
+    if (leverage > maxLeverage) {
+      return failure(`Leverage above the market maximum of ${maxLeverage}x`);
+    }
+    try {
+      const createPosition = await this.ensurePosition(ctx.payload, marketId);
+      const tx = builder.setPositionInitialMarginRatio({
+        ref: { account: account.account, cap: account.cap },
+        marketId,
+        initialMarginRatio: leverageToImr(leverage),
+        createPosition,
+      });
+      const result = await signAndExecute(tx);
+      this.markPosition(ctx.payload, marketId);
+      logBonsaiInfo(FN, 'leverage set', { digest: result.digest, marketId, leverage });
+      return wrapOperationSuccess({ digest: result.digest, leverage });
+    } catch (error) {
+      return this.toFailure(error);
+    }
+  }
+
+  /**
+   * The leverage each of the account's positions trades at, read from the position objects
+   * (1 / their initial margin ratio). Markets without a position are left out; a new position
+   * opens at its market's ratio.
+   */
+  public async readMarketLeverages(): Promise<Record<string, number>> {
+    const ctx = await this.context();
+    if (isOperationFailure(ctx)) return {};
+    const { deployment, account } = ctx.payload;
+    const client = dAppKit.getClient();
+    const entries = await Promise.all(
+      Object.keys(deployment.markets).map(async (marketId) => {
+        const position = await readPosition(client, deployment, marketId, account.accountId);
+        return position && position.initialMarginRatio > 0n
+          ? ([marketId, imrToLeverage(position.initialMarginRatio)] as const)
+          : undefined;
+      })
+    );
+    return Object.fromEntries(entries.filter((e): e is readonly [string, number] => e != null));
   }
 
   public tearDown(): void {

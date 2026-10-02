@@ -2,7 +2,6 @@
 import React from 'react';
 
 import { DialogTypes } from '@/constants/dialogs';
-import { isMainnet } from '@/constants/networks';
 
 import { CriteriaDialog } from '@/views/Affiliates/CriteriaDialog';
 import { AcknowledgeTermsDialog } from '@/views/dialogs/AcknowledgeTermsDialog';
@@ -13,6 +12,10 @@ import { CancelPendingOrdersDialog } from '@/views/dialogs/CancelPendingOrdersDi
 import { CloseAllPositionsConfirmationDialog } from '@/views/dialogs/CloseAllPositionsConfirmationDialog';
 import { ClosePositionDialog } from '@/views/dialogs/ClosePositionDialog';
 import { CoinbaseDepositDialog } from '@/views/dialogs/CoinbaseDepositDialog';
+import {
+  CollateralDepositDialog,
+  CollateralWithdrawDialog,
+} from '@/views/dialogs/CollateralDialog';
 import { ComplianceConfigDialog } from '@/views/dialogs/ComplianceConfigDialog';
 import { ConfirmPendingDepositDialog } from '@/views/dialogs/ConfirmPendingDepositDialog';
 import { FillDetailsDialog } from '@/views/dialogs/DetailsDialog/FillDetailsDialog';
@@ -39,14 +42,11 @@ import { SharePNLAnalyticsDialog } from '@/views/dialogs/SharePNLAnalyticsDialog
 import { SimpleUiTradeDialog } from '@/views/dialogs/SimpleUiTradeDialog/SimpleUiTradeDialog';
 import { StakeDialog } from '@/views/dialogs/StakeDialog';
 import { StakingRewardDialog } from '@/views/dialogs/StakingRewardDialog';
-import { TestnetFaucetDialog } from '@/views/dialogs/TestnetFaucetDialog';
 import { TradeDialog } from '@/views/dialogs/TradeDialog';
 import { TradingKeysDialog } from '@/views/dialogs/TradingKeysDialog';
 import { TransferDialog } from '@/views/dialogs/TransferDialog';
 import { DepositAddressDialog } from '@/views/dialogs/TransferDialogs/DepositAddressDialog';
-import { DepositDialog2 } from '@/views/dialogs/TransferDialogs/DepositDialog2/DepositDialog2';
 import { TransferStatusDialog } from '@/views/dialogs/TransferDialogs/TransferStatusDialog';
-import { WithdrawDialog2 } from '@/views/dialogs/TransferDialogs/WithdrawDialog2/WithdrawDialog2';
 import { TriggersDialog } from '@/views/dialogs/TriggersDialog';
 import { UnstakeDialog } from '@/views/dialogs/UnstakeDialog';
 import { VaultDepositWithdrawDialog } from '@/views/dialogs/VaultDepositWithdrawDialog';
@@ -56,12 +56,10 @@ import { WithdrawalGateDialog } from '@/views/dialogs/WithdrawalGateDialog';
 import { useAppDispatch, useAppSelector } from '@/state/appTypes';
 import { closeDialog, openDialog } from '@/state/dialogs';
 import { getActiveDialog } from '@/state/dialogsSelectors';
-import { selectIsTurnkeyConnected } from '@/state/walletSelectors';
 
 export const DialogManager = React.memo(() => {
   const dispatch = useAppDispatch();
   const activeDialog = useAppSelector(getActiveDialog);
-  const isTurnkey = useAppSelector(selectIsTurnkeyConnected);
 
   if (!activeDialog) return null;
 
@@ -89,16 +87,8 @@ export const DialogManager = React.memo(() => {
     ComplianceConfig: (args) => <ComplianceConfigDialog {...args} {...modalProps} />,
     ConfirmPendingDeposit: (args) => <ConfirmPendingDepositDialog {...args} {...modalProps} />,
     DepositAddresses: (args) => <DepositAddressDialog {...args} {...modalProps} />,
-    Deposit2: (args) =>
-      isMainnet ? (
-        isTurnkey ? (
-          <DepositAddressDialog {...args} {...modalProps} />
-        ) : (
-          <DepositDialog2 {...args} {...modalProps} />
-        )
-      ) : (
-        <TestnetFaucetDialog {...modalProps} />
-      ),
+    // Collateral moves straight between the wallet and the trading account on the engine.
+    Deposit2: (args) => <CollateralDepositDialog {...args} {...modalProps} />,
     DisconnectWallet: (args) => <DisconnectDialog {...args} {...modalProps} />,
     DisplaySettings: (args) => <DisplaySettingsDialog {...args} {...modalProps} />,
     ExchangeOffline: (args) => <ExchangeOfflineDialog {...args} {...modalProps} />,
@@ -132,7 +122,7 @@ export const DialogManager = React.memo(() => {
     TransferStatus: (args) => <TransferStatusDialog {...args} {...modalProps} />,
     Unstake: (args) => <UnstakeDialog {...args} {...modalProps} />,
     VaultDepositWithdraw: (args) => <VaultDepositWithdrawDialog {...args} {...modalProps} />,
-    Withdraw2: (args) => <WithdrawDialog2 {...args} {...modalProps} />,
+    Withdraw2: (args) => <CollateralWithdrawDialog {...args} {...modalProps} />,
     WithdrawalGated: (args) => <WithdrawalGateDialog {...args} {...modalProps} />,
     WithdrawFromSubaccount: (args) => <WithdrawFromSubaccountDialog {...args} {...modalProps} />,
     Criteria: (args) => <CriteriaDialog {...args} {...modalProps} />,
