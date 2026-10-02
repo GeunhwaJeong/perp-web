@@ -28,6 +28,19 @@ const toBigInt = (
 export const priceToUnits = (price: number | string, tickSize?: string) =>
   toBigInt(new BigNumber(price), B9, tickSize ? BigInt(tickSize) : undefined);
 
+/**
+ * Worst acceptable price of an immediate order, snapped to the tick on the side that keeps the
+ * limit inside the given price: bids round down, asks round up.
+ */
+export const limitPriceToUnits = (price: number | string, isAsk: boolean, tickSize?: string) => {
+  const mode = isAsk ? BigNumber.ROUND_UP : BigNumber.ROUND_DOWN;
+  const out = toBigInt(new BigNumber(price), B9, undefined, mode);
+  const step = tickSize ? BigInt(tickSize) : 0n;
+  const remainder = step > 0n ? out % step : 0n;
+  if (remainder === 0n) return out;
+  return isAsk ? out - remainder + step : out - remainder;
+};
+
 /** Human size (base asset) to the u64 order size, snapped down to the lot. */
 export const sizeToUnits = (size: number | string, lotSize?: string) =>
   toBigInt(new BigNumber(size), B9, lotSize ? BigInt(lotSize) : undefined);
