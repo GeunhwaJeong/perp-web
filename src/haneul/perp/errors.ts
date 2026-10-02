@@ -7,7 +7,9 @@ const CLEARING_HOUSE: Record<number, string> = {
   1: 'Size must be greater than zero',
   3: 'Order value is below the market minimum',
   9: 'Reduce-only order would increase the position',
-  11: 'Session contained no orders',
+  // In this app a session only ends empty when a market order, sent as immediate-or-cancel,
+  // found nothing to match inside its worst-price limit.
+  11: 'No orders on the book within the price limit',
   14: 'Invalid expiration timestamp',
   15: 'Market open interest cap reached',
   19: 'Size is not a multiple of the lot size',
