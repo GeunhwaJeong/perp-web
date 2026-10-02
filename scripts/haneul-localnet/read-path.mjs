@@ -220,6 +220,27 @@ const fills = await eventually(
 );
 check('and its fill is a market fill', /Market\s+Buy\s+0\.100/.test(fills));
 
+// "Close all" reads the positions and the market price from the indexer and bounds each
+// reduce-only market order at the app's maximum slippage from that price.
+const closed = await page.evaluate(() => window.haneulPerp.supervisor.closeAllPositions());
+check(
+  'close all positions succeeds',
+  closed.type === 'success',
+  JSON.stringify(closed).slice(0, 120)
+);
+const flat = await eventually(
+  () =>
+    state(
+      "s.raw.account.parentSubaccount.data?.childSubaccounts?.[128]?.openPerpetualPositions?.['BTC-USD']?.size"
+    ),
+  (v) => v == null || Number(v) === 0
+);
+check(
+  'the position is closed, pushed by the indexer',
+  flat == null || Number(flat) === 0,
+  `${flat}`
+);
+
 await page.goto(`${APP}/#/portfolio`, { waitUntil: 'domcontentloaded' });
 await eventually(() => [...indexer.keys()].some((k) => k.includes('/v4/pnl/')), Boolean);
 await page.waitForTimeout(2_000);
