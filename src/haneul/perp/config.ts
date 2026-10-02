@@ -16,6 +16,8 @@ export type PerpMarketConfig = {
   tickSize: string;
   /** Market initial margin ratio as an ifixed (1e18 scale) string. */
   initialMarginRatio: string;
+  /** Market maintenance margin ratio as an ifixed (1e18 scale) string. */
+  maintenanceMarginRatio?: string;
 };
 
 export type PerpDeployment = {
@@ -35,6 +37,22 @@ export type PerpDeployment = {
     coinType: string;
     decimals: number;
     priceFeedStorage: string;
+  };
+  /**
+   * The signed-price source the markets read (`oracle_haneul`) and the price service that
+   * serves its updates. When present, trades put the served updates in front of themselves.
+   */
+  oracle?: {
+    /** `oracle_haneul` package. */
+    package: string;
+    /** Shared `Source<HANEUL>` object. */
+    source: string;
+    /** The source's id in the aggregator, the key of its feed in every price feed storage. */
+    sourceId: number;
+    /** `oracle_aggregator` config object. */
+    aggregatorConfig: string;
+    /** The price service's `GET /v1/updates`. */
+    updatesUrl: string;
   };
   /** Present once the fee-tier extension is configured; sessions end through it when set. */
   fees?: {

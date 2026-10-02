@@ -203,5 +203,39 @@ check(
   JSON.stringify(po.r).slice(0, 140)
 );
 
+// 8. with the price service's relay off (`fixture.mjs push --no-relay`) nothing but the trades
+// themselves writes prices: after the market's 10 s tolerance the chain's prices are stale, and
+// an order still goes through because the supervisor puts the served updates in front of it.
+const deployment = JSON.parse(
+  readFileSync(join(ROOT, 'public/configs/haneul/perp.localnet.json'), 'utf8')
+);
+const health = deployment.oracle
+  ? await fetch(deployment.oracle.updatesUrl.replace('/v1/updates', '/healthz'))
+      .then((res) => res.json())
+      .catch(() => ({}))
+  : {};
+if (health.relay === false) {
+  console.log('  waiting 12 s without relays so the chain price goes stale...');
+  await new Promise((r) => {
+    setTimeout(r, 12_000);
+  });
+  const late = await place({ price: 99_800 });
+  check(
+    'with the chain price stale, an order carries its own signed prices',
+    late.r.type === 'success' && late.r.payload[0]?.orderId != null,
+    JSON.stringify(late.r).slice(0, 140)
+  );
+  const lateCancel = await page.evaluate(
+    async (id) =>
+      window.haneulPerp.supervisor.cancelOrder({ orderId: id, withNotification: false }),
+    late.r.payload[0].orderId
+  );
+  check('and is canceled', lateCancel.type === 'success');
+} else {
+  console.log(
+    '  (relay on: run `fixture.mjs push --no-relay` to check orders carry their own prices)'
+  );
+}
+
 await browser.close();
 console.log(`\n${passed} browser checks passed`);

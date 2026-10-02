@@ -3,6 +3,7 @@ import { OrderStatus, SubaccountOrder } from '@/bonsai/types/summaryTypes';
 import { dAppKit } from '@/haneul/dAppKit';
 import {
   eventsOf,
+  fetchPriceUpdates,
   findPerpAccount,
   hasMarketPosition,
   HaneulTransactionError,
@@ -13,6 +14,7 @@ import {
   collateralToUnits,
   limitPriceToUnits,
   priceToUnits,
+  selectPriceUpdates,
   sizeToUnits,
   type OrderSpec,
   type PerpAccount,
@@ -200,6 +202,27 @@ export class AccountTransactionSupervisor {
     return true;
   }
 
+  /**
+   * Signed prices for a trade on `marketId`, fetched from the price service right before
+   * signing so the trade does not depend on the relayer having landed its last round. Empty
+   * when the service is unreachable; the trade then reads whatever the chain holds.
+   */
+  private async priceUpdatesFor(ctx: Context, marketId: string) {
+    const market = ctx.deployment.markets[marketId];
+    if (!market || !ctx.deployment.oracle) return [];
+    const served = await fetchPriceUpdates(ctx.deployment);
+    const selected = await selectPriceUpdates({
+      client: dAppKit.getClient(),
+      deployment: ctx.deployment,
+      market,
+      updates: served,
+    });
+    if (served.length === 0) {
+      logBonsaiInfo(FN, 'no signed prices from the price service', { marketId });
+    }
+    return selected;
+  }
+
   private markPosition(ctx: Context, marketId: string) {
     this.positions.add(`${ctx.deployment.network}:${ctx.account.account}:${marketId}`);
   }
@@ -230,7 +253,10 @@ export class AccountTransactionSupervisor {
     if (payloads.some((p) => isMarketOrder(p) && !(p.price > 0))) {
       return failure('Market order has no worst-price limit');
     }
-    const createPosition = await this.ensurePosition(ctx, marketId);
+    const [createPosition, priceUpdates] = await Promise.all([
+      this.ensurePosition(ctx, marketId),
+      this.priceUpdatesFor(ctx, marketId),
+    ]);
     const allocate = payloads.reduce((sum, p) => sum + (p.transferToSubaccountAmount ?? 0), 0);
     const tx = ctx.builder.session({
       ref: { account: ctx.account.account, cap: ctx.account.cap },
@@ -246,6 +272,7 @@ export class AccountTransactionSupervisor {
         allocateMissingMargin: true,
         deallocateFreeCollateral: false,
       },
+      priceUpdates,
     });
     try {
       const result = await signAndExecute(tx);
@@ -269,7 +296,13 @@ export class AccountTransactionSupervisor {
         if (orderId) this.orderMarkets.set(orderId, marketId);
         return { clientId: `${p.clientId}`, orderId, filled: isMarketOrder(p) || !orderId };
       });
-      logBonsaiInfo(FN, 'session executed', { digest: result.digest, marketId, placed, source });
+      logBonsaiInfo(FN, 'session executed', {
+        digest: result.digest,
+        marketId,
+        placed,
+        source,
+        relayedPrices: priceUpdates.map((u) => u.symbol),
+      });
       return wrapOperationSuccess(placed);
     } catch (error) {
       return this.toFailure(error);

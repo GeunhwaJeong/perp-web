@@ -1,6 +1,7 @@
 import { Transaction, type TransactionObjectArgument } from '@haneullabs/haneul/transactions';
 
 import { CLOCK_OBJECT_ID, type PerpDeployment, type PerpMarketConfig, perpTypes } from './config';
+import { addPriceUpdates, type SignedPriceUpdate } from './prices';
 import {
   randomSalt,
   standaloneStopCommitment,
@@ -167,13 +168,17 @@ export class PerpTransactionBuilder {
     ref,
     marketId,
     amount,
+    priceUpdates = [],
   }: {
     ref: PerpAccountRef;
     marketId: string;
     amount: bigint;
+    /** Signed prices written before the margin check reads the feeds. */
+    priceUpdates?: SignedPriceUpdate[];
   }) {
     const tx = new Transaction();
     const market = this.market(marketId);
+    addPriceUpdates(tx, this.deployment, priceUpdates);
     tx.moveCall({
       target: target(this.perp, 'clearing_house', 'deallocate_collateral'),
       typeArguments: [this.coinType, this.types.admin],
@@ -211,24 +216,28 @@ export class PerpTransactionBuilder {
   }
 
   /**
-   * One trading session: optional position setup, then every order inside a single
-   * hot-potato session so the margin check happens once, then the clearing house is
-   * shared again.
+   * One trading session: signed prices first, optional position setup, then every order
+   * inside a single hot-potato session so the margin check happens once, then the clearing
+   * house is shared again.
    */
   session({
     ref,
     marketId,
     orders,
     options = {},
+    priceUpdates = [],
   }: {
     ref: PerpAccountRef;
     marketId: string;
     orders: OrderSpec[];
     options?: SessionOptions;
+    /** Signed prices written into the feeds before the session reads them. */
+    priceUpdates?: SignedPriceUpdate[];
   }) {
     if (orders.length === 0) throw new Error('A session needs at least one order');
     const tx = new Transaction();
     const market = this.market(marketId);
+    addPriceUpdates(tx, this.deployment, priceUpdates);
     if (options.createPosition) this.addCreatePosition(tx, ref, market);
     if (options.initialMarginRatio != null)
       this.addSetImr(tx, ref, market, options.initialMarginRatio);

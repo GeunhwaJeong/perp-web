@@ -71,6 +71,18 @@ const TWAP_ORDERS: Record<number, string> = {
   6312: 'TWAP chunk size is not a multiple of the lot size',
 };
 
+// `oracle_haneul` and `oracle_aggregator` both have a `price_feed_storage` module. Codes 0 and
+// 1 mean an untrusted or unauthorized signer or source in either, so one wording covers both.
+const PRICE_FEED_STORAGE: Record<number, string> = {
+  0: 'The price update is not from a trusted oracle signer or source',
+  1: 'The oracle signer or source is no longer authorized',
+  2: 'The price update signature is invalid',
+  3: 'The price update has a zero price',
+  4: 'The price update is timestamped ahead of the chain clock',
+  5: 'The price update is too uncertain to be accepted',
+  6: 'The price moved further than one update may move it; retry in a few seconds',
+};
+
 const BY_MODULE: Record<string, Record<number, string>> = {
   clearing_house: CLEARING_HOUSE,
   position: POSITION,
@@ -79,6 +91,7 @@ const BY_MODULE: Record<string, Record<number, string>> = {
   orderbook: ORDERBOOK,
   stop_orders: STOP_ORDERS,
   twap_orders: TWAP_ORDERS,
+  price_feed_storage: PRICE_FEED_STORAGE,
 };
 
 export type HaneulAbort = { module: string; code: number; function?: string };
