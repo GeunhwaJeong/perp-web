@@ -1,9 +1,13 @@
-import { CompositeClient, IndexerClient } from '@dydxprotocol/v4-client-js';
+import { dAppKit } from '@/haneul/dAppKit';
+import { IndexerClient } from '@dydxprotocol/v4-client-js';
+import { QueryObserver } from '@tanstack/react-query';
 import { omit } from 'lodash';
 
 import { timeUnits } from '@/constants/time';
 
 import { type RootStore } from '@/state/_store';
+import { appQueryClient } from '@/state/appQueryClient';
+import { getSelectedNetwork } from '@/state/appSelectors';
 import {
   GeoHeaders,
   HeightEntry,
@@ -16,6 +20,7 @@ import { assertNever } from '@/lib/assertNever';
 import { promiseWithTimeout, withRetry } from '@/lib/asyncUtils';
 import { MustBigNumber } from '@/lib/numbers';
 
+import { createStoreEffect } from '../lib/createStoreEffect';
 import {
   Loadable,
   loadableError,
@@ -25,11 +30,9 @@ import {
 } from '../lib/loadable';
 import { SharedLogIds } from '../logIds';
 import { wrapAndLogBonsaiError } from '../logs';
-import {
-  createIndexerQueryStoreEffect,
-  createValidatorQueryStoreEffect,
-} from './lib/indexerQueryStoreEffect';
+import { createIndexerQueryStoreEffect } from './lib/indexerQueryStoreEffect';
 import { queryResultToLoadable } from './lib/queryResultToLoadable';
+import { safeSubscribeObserver } from './lib/safeSubscribe';
 
 const requestFrequency = timeUnits.second * 10;
 // fail request if it takes longer than this
@@ -151,28 +154,35 @@ export function setUpIndexerHeightQuery(store: RootStore) {
   };
 }
 
-const doValidatorHeightQuery = async (
-  compositeClient: CompositeClient
-): Promise<Loadable<HeightEntry>> => {
+/**
+ * The chain's own height, read from the Haneul node the app transacts with. It is what the
+ * indexer's height is held against: a node that answers while the indexer trails or has
+ * stopped is an indexer problem, and a node that does not answer is a chain problem.
+ */
+const doNodeHeightQuery = async (): Promise<Loadable<HeightEntry>> => {
   const requestTime = new Date().toISOString();
   try {
-    const result = await promiseWithTimeout(
+    const { response } = await promiseWithTimeout(
       withRetry(
         () =>
           wrapAndLogBonsaiError(
-            () => compositeClient.validatorClient.get.latestBlock(),
+            () => dAppKit.getClient().ledgerService.getServiceInfo({}),
             SharedLogIds.VALIDATOR_HEIGHT_INNER
           )(),
         manualHeightRetryConfig
       ),
       requestTimeout
     );
+    if (response.checkpointHeight == null || response.timestamp == null) {
+      throw new Error('The node reported no checkpoint');
+    }
+    const { seconds, nanos } = response.timestamp;
     return loadableLoaded({
       requestTime,
       receivedTime: new Date().toISOString(),
       response: {
-        time: result.header.time,
-        height: result.header.height,
+        time: new Date(Number(seconds) * 1000 + Math.floor(nanos / 1_000_000)).toISOString(),
+        height: Number(response.checkpointHeight),
       },
     });
   } catch (e) {
@@ -184,17 +194,17 @@ const doValidatorHeightQuery = async (
 };
 
 export function setUpValidatorHeightQuery(store: RootStore) {
-  const cleanupEffect = createValidatorQueryStoreEffect(store, {
-    name: SharedLogIds.VALIDATOR_HEIGHT,
-    selector: () => true,
-    getQueryFn: (compositeClient) => {
-      return () => doValidatorHeightQuery(compositeClient);
-    },
-    onNoQuery: () => store.dispatch(setValidatorHeightRaw(loadableIdle())),
-    onResult: (res) =>
-      store.dispatch(setValidatorHeightRaw(collapseLoadables(queryResultToLoadable(res)))),
-    getQueryKey: () => ['validatorHeight'],
-    ...heightPollingOptions,
+  // Keyed by the selected network only: unlike the queries that go through the dYdX client,
+  // this one needs nothing but the node.
+  const cleanupEffect = createStoreEffect(store, getSelectedNetwork, (network) => {
+    const observer = new QueryObserver(appQueryClient, {
+      queryKey: ['haneulNode', 'height', network],
+      queryFn: wrapAndLogBonsaiError(doNodeHeightQuery, SharedLogIds.VALIDATOR_HEIGHT),
+      ...heightPollingOptions,
+    });
+    return safeSubscribeObserver(observer, (res) =>
+      store.dispatch(setValidatorHeightRaw(collapseLoadables(queryResultToLoadable(res))))
+    );
   });
 
   return () => {
