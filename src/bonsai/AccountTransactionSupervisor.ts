@@ -23,7 +23,7 @@ import { OrderExecution, OrderSide, OrderTimeInForce, OrderType } from '@dydxpro
 import { AnalyticsEvents, TradeMetadataSource } from '@/constants/analytics';
 import { STRING_KEYS } from '@/constants/localization';
 import { isDev } from '@/constants/networks';
-import { PlaceOrderStatuses } from '@/constants/trade';
+import { MARKET_ORDER_MAX_SLIPPAGE, PlaceOrderStatuses } from '@/constants/trade';
 
 import type { RootStore } from '@/state/_store';
 import { store as reduxStore } from '@/state/_store';
@@ -448,6 +448,11 @@ export class AccountTransactionSupervisor {
     if (open.length === 0) {
       return failure('No positions to close', STRING_KEYS.NO_POSITIONS_TO_CLOSE);
     }
+    const markets = BonsaiCore.markets.markets.data(this.store.getState());
+    const unpriced = open.find((p) => !(Number(markets?.[p.market]?.oraclePrice) > 0));
+    if (unpriced) {
+      return failure(`No market price for ${unpriced.market} to bound the close`);
+    }
     const payloads: PlaceOrderPayload[] = open.map((p) => ({
       subaccountNumber: p.subaccountNumber,
       transferToSubaccountAmount: undefined,
@@ -455,7 +460,10 @@ export class AccountTransactionSupervisor {
       clobPairId: 0,
       type: OrderType.MARKET,
       side: p.side === 'LONG' ? OrderSide.SELL : OrderSide.BUY,
-      price: 0,
+      // Closing a long sells, so its worst price sits below the market price; a short buys above.
+      price:
+        Number(markets![p.market]!.oraclePrice) *
+        (p.side === 'LONG' ? 1 - MARKET_ORDER_MAX_SLIPPAGE : 1 + MARKET_ORDER_MAX_SLIPPAGE),
       size: p.unsignedSize.toNumber(),
       clientId: Math.floor(Math.random() * 2 ** 31),
       timeInForce: undefined,
