@@ -3,6 +3,7 @@ import { groupBy, map, mapValues, orderBy, pickBy } from 'lodash';
 import { weakMapMemoize } from 'reselect';
 
 import {
+  IndexerOrderSide,
   IndexerPerpetualPositionResponseObject,
   IndexerPerpetualPositionStatus,
   IndexerPositionSide,
@@ -383,6 +384,45 @@ export function calculateChildSubaccountSummaries(
     ),
     isTruthy
   );
+}
+
+/**
+ * The engine liquidates an isolated position when its margin falls under the maintenance ratio
+ * of the largest size it could reach if all of its resting bids or all of its resting asks
+ * filled (`position::margin_requirement`), not of its current size. Resting orders on the side
+ * that grows the position therefore move the liquidation price toward the mark.
+ *
+ * With margin `M = C + size * P - Q` and requirement `R = net * P * mmf`, where `net` is that
+ * largest size, liquidation is at `M = R`, i.e. `P = (C - Q) / (net * mmf - size)`. `C - Q` is the
+ * position's equity less its value at any one price, so the price the summary used cancels
+ * out. Without resting orders `net = |size|` and this is the formula the summary already used.
+ */
+export function applyRestingOrdersToLiquidationPrices(
+  positions: SubaccountPosition[],
+  openOrders: SubaccountOrder[]
+): SubaccountPosition[] {
+  const resting = groupBy(
+    openOrders.filter((o) => o.remainingSize?.gt(0)),
+    (o) => `${o.marketId}:${o.subaccountNumber}`
+  );
+  return positions.map((position) => {
+    const orders = resting[`${position.market}:${position.subaccountNumber}`];
+    if (position.marginMode !== 'ISOLATED' || orders == null || orders.length === 0) {
+      return position;
+    }
+    const sum = (side: IndexerOrderSide) =>
+      orders
+        .filter((o) => o.side === side)
+        .reduce((total, o) => total.plus(o.remainingSize ?? 0), BIG_NUMBERS.ZERO);
+    const bids = sum(IndexerOrderSide.BUY);
+    const asks = sum(IndexerOrderSide.SELL);
+    const size = position.signedSize;
+    const net = BigNumber.max(size.plus(bids).abs(), size.minus(asks).abs());
+    const denominator = net.times(position.adjustedMmf).minus(size);
+    if (denominator.isZero()) return { ...position, liquidationPrice: null };
+    const price = position.marginValueMaintenance.minus(position.value).div(denominator);
+    return { ...position, liquidationPrice: price.lt(0) ? null : price };
+  });
 }
 
 /**
