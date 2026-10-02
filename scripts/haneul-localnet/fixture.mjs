@@ -15,6 +15,8 @@
  *   node scripts/haneul-localnet/fixture.mjs price <usd>
  *                                                    move the BTC price the service signs
  *   node scripts/haneul-localnet/fixture.mjs seed    (re)post the maker ladder around that price
+ *   node scripts/haneul-localnet/fixture.mjs fund <address> [tusd]
+ *                                                    gas and test dollars for another wallet
  *   node scripts/haneul-localnet/fixture.mjs oracle-v2-config
  *                                                    write .localnet/oracle-v2.json and print how to run
  *                                                    the real price service (~/oracle-v2) on this
@@ -622,12 +624,27 @@ const oracleV2Config = () => {
   );
 };
 
+/** Gas from the faucet and freshly minted TUSD for a wallet, e.g. a first-time user in a check. */
+const fund = () => {
+  const address = process.argv[3];
+  if (!address?.startsWith('0x')) throw new Error('usage: fixture.mjs fund <address> [tusd]');
+  const tusd = BigInt(process.argv[4] ?? 10_000);
+  const s = readState();
+  faucet(address);
+  ptb(
+    `mint ${tusd} TUSD to ${address.slice(0, 10)}`,
+    [...call('0x2::coin::mint', [s.TUSD], obj(s.tusdTreasury), u64(tusd * TUSD_UNIT)), ...assign('coin'), '--transfer-objects', '[coin]', obj(address)]
+  );
+  log(`funded ${address} with gas and ${tusd} TUSD`);
+};
+
 const mode = process.argv[2] ?? 'setup';
 if (mode === 'setup') setup();
 else if (mode === 'seed') seed();
 else if (mode === 'push') await push();
 else if (mode === 'price') setPrice();
 else if (mode === 'oracle-v2-config') oracleV2Config();
+else if (mode === 'fund') fund();
 else {
   console.error(`unknown mode ${mode}`);
   process.exit(2);

@@ -120,3 +120,54 @@ export const hasMarketPosition = async (
   const bytes = first?.[0];
   return bytes != null && bytes.length > 0 && bytes[0] === 1;
 };
+
+const PositionKeyBcs = bcs.struct('PositionKey', { account_id: bcs.u64() });
+
+/** The engine's `position::Position`; amounts are ifixed (1e18, two's complement). */
+const PositionBcs = bcs.struct('Position', {
+  collateral: bcs.u256(),
+  base_asset_amount: bcs.u256(),
+  quote_asset_notional_amount: bcs.u256(),
+  cum_funding_rate_long: bcs.u256(),
+  cum_funding_rate_short: bcs.u256(),
+  asks_quantity: bcs.u256(),
+  bids_quantity: bcs.u256(),
+  pending_orders: bcs.u64(),
+  initial_margin_ratio: bcs.u256(),
+});
+
+export type PerpPositionState = {
+  /** The position's own initial margin ratio (ifixed), i.e. 1 / the leverage it trades at. */
+  initialMarginRatio: bigint;
+  pendingOrders: bigint;
+};
+
+/**
+ * Reads the account's position object on a market, a dynamic field of the clearing house keyed
+ * by the account number. Undefined when the account has no position there yet.
+ */
+export const readPosition = async (
+  client: ClientWithCoreApi,
+  deployment: PerpDeployment,
+  marketId: string,
+  accountId: bigint
+): Promise<PerpPositionState | undefined> => {
+  const market = deployment.markets[marketId];
+  if (!market) return undefined;
+  try {
+    const { dynamicField } = await client.core.getDynamicField({
+      parentId: market.clearingHouse,
+      name: {
+        type: `${deployment.packages.perpetuals}::keys::PositionKey`,
+        bcs: PositionKeyBcs.serialize({ account_id: accountId }).toBytes(),
+      },
+    });
+    const position = PositionBcs.parse(dynamicField.value.bcs);
+    return {
+      initialMarginRatio: BigInt(position.initial_margin_ratio),
+      pendingOrders: BigInt(position.pending_orders),
+    };
+  } catch {
+    return undefined;
+  }
+};

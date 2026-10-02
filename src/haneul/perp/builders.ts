@@ -150,17 +150,30 @@ export class PerpTransactionBuilder {
     return tx;
   }
 
+  /**
+   * Moves collateral from the account balance into a market. A market the account has never
+   * traded needs its position object first; `createPosition` adds it at `initialMarginRatio`.
+   */
   allocateCollateral({
     ref,
     marketId,
     amount,
+    createPosition = false,
+    initialMarginRatio,
   }: {
     ref: PerpAccountRef;
     marketId: string;
     amount: bigint;
+    createPosition?: boolean;
+    initialMarginRatio?: bigint;
   }) {
     const tx = new Transaction();
-    this.addAllocate(tx, ref, this.market(marketId), amount);
+    const market = this.market(marketId);
+    if (createPosition) {
+      this.addCreatePosition(tx, ref, market);
+      this.addSetImr(tx, ref, market, initialMarginRatio ?? BigInt(market.initialMarginRatio));
+    }
+    this.addAllocate(tx, ref, market, amount);
     return tx;
   }
 
@@ -195,17 +208,26 @@ export class PerpTransactionBuilder {
     return tx;
   }
 
+  /**
+   * Sets the leverage a position trades at, as its initial margin ratio (1 / leverage). The
+   * engine refuses a ratio under the market's. `createPosition` opens the position object first,
+   * so a leverage can be chosen before the first trade on a market.
+   */
   setPositionInitialMarginRatio({
     ref,
     marketId,
     initialMarginRatio,
+    createPosition = false,
   }: {
     ref: PerpAccountRef;
     marketId: string;
     initialMarginRatio: bigint;
+    createPosition?: boolean;
   }) {
     const tx = new Transaction();
-    this.addSetImr(tx, ref, this.market(marketId), initialMarginRatio);
+    const market = this.market(marketId);
+    if (createPosition) this.addCreatePosition(tx, ref, market);
+    this.addSetImr(tx, ref, market, initialMarginRatio);
     return tx;
   }
 

@@ -8,23 +8,24 @@ import {
 import { TransferPayload, TransferToken } from '@/bonsai/forms/transfers';
 import { TriggerOrdersPayload } from '@/bonsai/forms/triggers/types';
 import { getLazyTradingKeyUtils } from '@/bonsai/lib/lazyDynamicLibs';
-import { wrapOperationFailure, wrapOperationSuccess } from '@/bonsai/lib/operationResult';
+import {
+  isOperationFailure,
+  wrapOperationFailure,
+  wrapOperationSuccess,
+} from '@/bonsai/lib/operationResult';
 import { logBonsaiError, logBonsaiInfo } from '@/bonsai/logs';
 import { BonsaiCore } from '@/bonsai/ontology';
-import type { EncodeObject } from '@cosmjs/proto-signing';
 import { IndexedTx } from '@cosmjs/stargate';
 import { Method } from '@cosmjs/tendermint-rpc';
 import { SubaccountClient, type LocalWallet } from '@dydxprotocol/v4-client-js';
 import { useMutation } from '@tanstack/react-query';
 import Long from 'long';
-import { formatUnits, parseUnits } from 'viem';
+import { parseUnits } from 'viem';
 
 import { AMOUNT_RESERVED_FOR_GAS_USDC, AMOUNT_USDC_BEFORE_REBALANCE } from '@/constants/account';
 import { AnalyticsEvents, DEFAULT_TRANSACTION_MEMO, TransactionMemo } from '@/constants/analytics';
 import { DialogTypes } from '@/constants/dialogs';
-import { DEFAULT_LEVERAGE_PPM } from '@/constants/leverage';
 import { QUANTUM_MULTIPLIER } from '@/constants/numbers';
-import { USDC_DECIMALS } from '@/constants/tokens';
 import { DydxAddress, WalletType } from '@/constants/wallets';
 
 import { removeLatestReferrer } from '@/state/affiliates';
@@ -65,7 +66,7 @@ export const useSubaccount = () => useContext(SubaccountContext);
 
 const useSubaccountContext = ({ localDydxWallet }: { localDydxWallet?: LocalWallet }) => {
   const dispatch = useAppDispatch();
-  const { usdcDenom, usdcDecimals, chainTokenDecimals } = useTokenConfigs();
+  const { chainTokenDecimals } = useTokenConfigs();
   const { sourceAccount } = useAccounts();
   const { compositeClient, faucetClient } = useDydxClient();
 
@@ -85,96 +86,6 @@ const useSubaccountContext = ({ localDydxWallet }: { localDydxWallet?: LocalWall
         faucetClient?.fillNative(dydxAddress),
     }),
     [faucetClient]
-  );
-
-  const { depositToSubaccount, withdrawFromSubaccount } = useMemo(
-    () => ({
-      depositToSubaccount: async ({
-        subaccountClient,
-        amount,
-      }: {
-        subaccountClient: SubaccountClient;
-        assetId?: number;
-        amount: number;
-      }) => {
-        try {
-          return await compositeClient?.depositToSubaccount(
-            subaccountClient,
-            amount.toFixed(usdcDecimals),
-            TransactionMemo.depositToSubaccount
-          );
-        } catch (error) {
-          log('useSubaccount/depositToSubaccount', error);
-          throw error;
-        }
-      },
-
-      withdrawFromSubaccount: async ({
-        subaccountClient,
-        amount,
-      }: {
-        subaccountClient: SubaccountClient;
-        amount: number;
-      }) => {
-        try {
-          return await compositeClient?.withdrawFromSubaccount(
-            subaccountClient,
-            amount.toFixed(usdcDecimals),
-            undefined,
-            TransactionMemo.withdrawFromSubaccount
-          );
-        } catch (error) {
-          log('useSubaccount/withdrawFromSubaccount', error);
-          throw error;
-        }
-      },
-
-      sendSkipWithdrawFromSubaccount: async ({
-        subaccountClient,
-        amount,
-        payload,
-      }: {
-        subaccountClient: SubaccountClient;
-        amount: number;
-        payload: string;
-      }) => {
-        if (!compositeClient) throw new Error('client not initialized');
-        try {
-          const transaction = JSON.parse(payload);
-
-          const msg = compositeClient.withdrawFromSubaccountMessage(
-            subaccountClient,
-            amount.toFixed(usdcDecimals)
-          );
-          const ibcMsg: EncodeObject = {
-            typeUrl: transaction.msgTypeUrl,
-            value: {
-              ...transaction.msg,
-              timeoutTimestamp: transaction.msg.timeoutTimestamp
-                ? // Signer expects BigInt but the payload types the value as string
-                  BigInt(Long.fromValue(transaction.msg.timeoutTimestamp).toString())
-                : undefined,
-            },
-          };
-
-          return await compositeClient.send(
-            subaccountClient,
-            () => Promise.resolve([msg, ibcMsg]),
-            false,
-            undefined,
-            TransactionMemo.withdrawFromAccount
-          );
-        } catch (error) {
-          // Reset the default options after the tx is sent.
-          if (isKeplr && window.keplr) {
-            window.keplr.defaultOptions = {};
-          }
-          log('useSubaccount/sendSkipWithdrawFromSubaccount', error);
-          throw error;
-        }
-      },
-    }),
-    [compositeClient, isKeplr, usdcDecimals]
   );
 
   const [subaccountNumber] = useState(0);
@@ -219,47 +130,24 @@ const useSubaccountContext = ({ localDydxWallet }: { localDydxWallet?: LocalWall
     }
   }, [isKeplr, usdcCoinBalance, showDepositDialog, dispatch]);
 
-  const deposit = useCallback(
-    async (amount: number) => {
-      if (!subaccountClient) {
-        return undefined;
-      }
+  // Collateral moves through the perpetuals engine: the wallet's coins go into the trading
+  // account (its balance is parent subaccount 0) and come back out of it.
+  const deposit = useCallback(async (amount: number) => {
+    const result = await accountTransactionManager.depositCollateral(amount);
+    if (isOperationFailure(result)) throw new Error(result.errorString);
+    return result.payload;
+  }, []);
 
-      return depositToSubaccount({ subaccountClient, amount });
-    },
-    [subaccountClient, depositToSubaccount]
-  );
+  const depositCurrentBalance = useCallback(async () => {}, []);
 
-  const depositCurrentBalance = useCallback(async () => {
-    const currentBalance = (
-      await compositeClient?.validatorClient.get.getAccountBalance(dydxAddress as string, usdcDenom)
-    )?.amount;
-
-    if (!currentBalance) throw new Error('Failed to get current balance');
-
-    const balanceAmount = formatUnits(BigInt(currentBalance), usdcDecimals);
-
-    const depositAmount = parseFloat(balanceAmount) - AMOUNT_RESERVED_FOR_GAS_USDC;
-
-    if (depositAmount > 0) {
-      await deposit(depositAmount);
+  const withdraw = useCallback(async (amount: number, fromSubaccountNumber: number) => {
+    if (fromSubaccountNumber >= 128) {
+      throw new Error('Move the collateral back to the account balance before withdrawing');
     }
-  }, [usdcDecimals, compositeClient, dydxAddress, usdcDenom, deposit]);
-
-  const withdraw = useCallback(
-    async (amount: number, fromSubaccountNumber: number) => {
-      if (!localDydxWallet) {
-        return undefined;
-      }
-      const subaccountClientForWithdraw = SubaccountClient.forLocalWallet(
-        localDydxWallet,
-        fromSubaccountNumber
-      );
-
-      return withdrawFromSubaccount({ subaccountClient: subaccountClientForWithdraw, amount });
-    },
-    [localDydxWallet, withdrawFromSubaccount]
-  );
+    const result = await accountTransactionManager.withdrawCollateral(amount);
+    if (isOperationFailure(result)) throw new Error(result.errorString);
+    return result.payload;
+  }, []);
 
   // ------ Transfer Methods ------ //
 
@@ -616,138 +504,50 @@ const useSubaccountContext = ({ localDydxWallet }: { localDydxWallet?: LocalWall
     [compositeClient, subaccountClient]
   );
 
+  /**
+   * Between the account balance (parent subaccount) and a market (its child subaccount): into
+   * a market allocates collateral to the position there, out of it deallocates.
+   */
   const transferBetweenSubaccounts = useCallback(
-    async (params: SubaccountTransferPayload, memo?: string) => {
-      try {
-        const subaccount = localDydxWallet
-          ? SubaccountClient.forLocalWallet(localDydxWallet, params.subaccountNumber)
-          : undefined;
-
-        if (subaccount == null) {
-          throw new Error('local wallet client not initialized');
-        }
-
-        if (!compositeClient) {
-          throw new Error('Missing compositeClient or localWallet');
-        }
-
-        if (params.senderAddress !== subaccount.address) {
-          throw new Error('Sender address does not match local wallet');
-        }
-
-        const tx = await compositeClient.transferToSubaccount(
-          subaccount,
-          params.destinationAddress,
-          params.destinationSubaccountNumber,
-          parseFloat(params.amount).toFixed(USDC_DECIMALS),
-          memo ?? DEFAULT_TRANSACTION_MEMO
-        );
-
-        const parsedTx = parseToPrimitives(tx);
-        logBonsaiInfo('useSubaccount/subaccountTransfer', 'Successful subaccount transfer', {
-          parsedTx,
-        });
-        return wrapOperationSuccess(parsedTx);
-      } catch (error) {
-        const parsed = stringifyTransactionError(error);
+    async (params: SubaccountTransferPayload, _memo?: string) => {
+      const toMarket = params.destinationSubaccountNumber >= 128;
+      const child = toMarket ? params.destinationSubaccountNumber : params.subaccountNumber;
+      const marketId = accountTransactionManager.marketIdForSubaccount(child);
+      if (marketId == null) {
+        return wrapOperationFailure(`No market for subaccount ${child}`);
+      }
+      const result = await accountTransactionManager.transferMargin({
+        marketId,
+        amount: parseFloat(params.amount),
+        toMarket,
+      });
+      if (isOperationFailure(result)) {
         logBonsaiError('useSubaccount/subaccountTransfer', 'Failed subaccount transfer', {
-          parsed,
+          error: result.errorString,
         });
-        return wrapOperationFailure(parsed);
       }
+      return result;
     },
-    [compositeClient, localDydxWallet]
+    []
   );
 
-  const updateLeverage = useCallback(
-    async (params: SubaccountUpdateLeveragePayload) => {
-      try {
-        const subaccount = localDydxWallet
-          ? SubaccountClient.forLocalWallet(localDydxWallet, params.subaccountNumber)
-          : undefined;
-
-        if (localDydxWallet === undefined || subaccount == null) {
-          throw new Error('local wallet client not initialized');
-        }
-
-        if (!compositeClient) {
-          throw new Error('Missing compositeClient or localWallet');
-        }
-
-        if (params.senderAddress !== subaccount.address) {
-          throw new Error('Sender address does not match local wallet');
-        }
-
-        const tx = await compositeClient.validatorClient.post.updatePerpetualMarketsLeverage(
-          subaccount,
-          subaccount.address,
-          [
-            {
-              clobPairId: params.clobPairId,
-              customImfPpm: DEFAULT_LEVERAGE_PPM / params.leverage,
-            },
-          ]
-        );
-
-        let parsedTx = parseToPrimitives(tx);
-        logBonsaiInfo(
-          'useSubaccount/updateLeverage',
-          'Successful update leverage for target subaccount',
-          {
-            parsedTx,
-          }
-        );
-        if (subaccount.subaccountNumber !== subaccountNumber) {
-          let attempts = 0;
-          const maxAttempts = 3;
-
-          let crossTx;
-          let txError;
-          while (attempts < maxAttempts && crossTx === undefined) {
-            try {
-              // Always update the leverage on the cross subaccount so it's easier to consolidate all
-              // the user's set leverages. No need to await this
-              const crossSubaccount = SubaccountClient.forLocalWallet(
-                localDydxWallet,
-                subaccountNumber
-              );
-              // eslint-disable-next-line no-await-in-loop
-              crossTx = await compositeClient.validatorClient.post.updatePerpetualMarketsLeverage(
-                crossSubaccount,
-                crossSubaccount.address,
-                [
-                  {
-                    clobPairId: params.clobPairId,
-                    customImfPpm: DEFAULT_LEVERAGE_PPM / params.leverage,
-                  },
-                ]
-              );
-              parsedTx = parseToPrimitives(crossTx);
-            } catch (error) {
-              txError = stringifyTransactionError(error);
-              logBonsaiError('useSubaccount/updateLeverage', 'Failed update cross leverage', {
-                parsed: txError,
-              });
-            }
-            attempts += 1;
-          }
-
-          if (crossTx === undefined && txError !== undefined) {
-            return wrapOperationFailure(txError);
-          }
-        }
-
-        return wrapOperationSuccess(parsedTx);
-      } catch (error) {
-        const parsed = stringifyTransactionError(error);
-        logBonsaiError('useSubaccount/updateLeverage', 'Failed update leverage', {
-          parsed,
-        });
-        return wrapOperationFailure(parsed);
-      }
-    },
-    [compositeClient, localDydxWallet, subaccountNumber]
-  );
+  /** The engine's leverage is each position's initial margin ratio, set per market. */
+  const updateLeverage = useCallback(async (params: SubaccountUpdateLeveragePayload) => {
+    const marketId = accountTransactionManager.marketIdForClobPair(params.clobPairId);
+    if (marketId == null) {
+      return wrapOperationFailure(`No market for clob pair ${params.clobPairId}`);
+    }
+    const result = await accountTransactionManager.setMarketLeverage({
+      marketId,
+      leverage: params.leverage,
+    });
+    if (isOperationFailure(result)) {
+      logBonsaiError('useSubaccount/updateLeverage', 'Failed update leverage', {
+        error: result.errorString,
+      });
+    }
+    return result;
+  }, []);
 
   const createTransferMessage = useCallback(
     (payload: TransferPayload) => {

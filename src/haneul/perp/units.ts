@@ -59,5 +59,9 @@ export const unitsToPrice = (units: bigint | string) =>
 export const leverageToImr = (leverage: number | string) =>
   toBigInt(new BigNumber(1).div(leverage), IFIXED_ONE, undefined, BigNumber.ROUND_UP);
 
+/** A position initial margin ratio (ifixed) to the leverage it allows, e.g. 0.2 -> 5. */
+export const imrToLeverage = (imr: bigint | string) =>
+  new BigNumber(IFIXED_ONE.toString()).div(imr.toString()).toNumber();
+
 /** Human price to a u256 ifixed (stop triggers are compared against the index in ifixed). */
 export const priceToIfixed = (price: number | string) => toBigInt(new BigNumber(price), IFIXED_ONE);
