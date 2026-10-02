@@ -123,6 +123,16 @@ r = await run(
 );
 const taker = eventsOf(r.events, '::events::FilledTakerOrder');
 check('market buy filled', taker.length === 1, `fees ${taker[0]?.taker_fees}`);
+const volumeAfterBuy = BigInt(String(eventsOf(r.events, '::fees::TierApplied')[0]?.volume ?? 0));
+if (deployment.fees) {
+  // Ending through the fee-tier extension records the volume and caches the multipliers.
+  const tier = eventsOf(r.events, '::fees::TierApplied');
+  check(
+    'session ended through the fee tiers',
+    tier.length === 1 && BigInt(String(tier[0]!.volume)) > 0n,
+    `volume ${tier[0]?.volume}, taker x${tier[0]?.taker_multiplier}`
+  );
+}
 
 // 5. close with a reduce-only market sell
 r = await run(
@@ -133,6 +143,16 @@ r = await run(
   })
 );
 check('position closed', eventsOf(r.events, '::events::FilledTakerOrder').length === 1);
+if (deployment.fees) {
+  const volumeAfterClose = BigInt(
+    String(eventsOf(r.events, '::fees::TierApplied')[0]?.volume ?? 0)
+  );
+  check(
+    'the account volume window accumulates across sessions',
+    volumeAfterClose > volumeAfterBuy,
+    `${volumeAfterBuy} -> ${volumeAfterClose}`
+  );
+}
 
 // 6. rejection surfaces as a named abort
 let aborted = '';
