@@ -328,11 +328,14 @@ function initializeClientWrapper(
       );
     },
     refreshConnections: () => {
-      // only composite client can meaningfully update - since it might select a new node
-      compositeClient.load();
+      // The indexer client holds no connection to refresh.
     },
   };
-  clients.forEach((c) => c.load());
+  // Only the indexer client is loaded. The dYdX validator and Noble clients talk to chains
+  // this app does not run on: left unloaded, the queries built on them stay idle instead of
+  // failing, and an unreachable dYdX node is not reported as a problem with this network.
+  // Chain reads and writes go through the Haneul gRPC client (src/haneul).
+  indexer.load();
   return clientWrapper;
 }
 
