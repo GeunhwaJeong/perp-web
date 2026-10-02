@@ -21,6 +21,7 @@ import {
   isTWAPOrder,
 } from '../calculators/orders';
 import {
+  applyRestingOrdersToLiquidationPrices,
   calculateChildSubaccountSummaries,
   calculateMarketsNeededForSubaccount,
   calculateParentSubaccountPositions,
@@ -113,13 +114,37 @@ export const selectParentSubaccountSummaryLoading = createAppSelector(
   mergeLoadableStatus
 );
 
+export const selectAccountOrders = createAppSelector(
+  [
+    selectRawOrdersRestData,
+    selectRawOrdersLiveData,
+    selectLatestValidatorHeight,
+    selectLatestIndexerHeight,
+  ],
+  (rest, live, indexerHeight, validatorHeight) => {
+    return calculateAllOrders(rest, live, validatorHeight ?? indexerHeight ?? BACKUP_BLOCK_HEIGHT);
+  }
+);
+
+export const selectOpenOrders = createAppSelector([selectAccountOrders], (orders) => {
+  return calculateOpenOrders(orders);
+});
+
 export const selectParentSubaccountPositions = createAppSelector(
-  [selectRawParentSubaccountData, selectRelevantMarketsData, selectRawSelectedMarketLeveragesData],
-  (parentSubaccount, markets, selectedMarketLeverages) => {
+  [
+    selectRawParentSubaccountData,
+    selectRelevantMarketsData,
+    selectRawSelectedMarketLeveragesData,
+    selectOpenOrders,
+  ],
+  (parentSubaccount, markets, selectedMarketLeverages, openOrders) => {
     if (parentSubaccount == null || markets == null || selectedMarketLeverages == null) {
       return undefined;
     }
-    return calculateParentSubaccountPositions(parentSubaccount, markets, selectedMarketLeverages);
+    return applyRestingOrdersToLiquidationPrices(
+      calculateParentSubaccountPositions(parentSubaccount, markets, selectedMarketLeverages),
+      openOrders
+    );
   }
 );
 
@@ -148,22 +173,6 @@ export const selectParentSubaccountOpenPositions = createAppSelector(
 );
 
 export const selectParentSubaccountOpenPositionsLoading = selectParentSubaccountSummaryLoading;
-
-export const selectAccountOrders = createAppSelector(
-  [
-    selectRawOrdersRestData,
-    selectRawOrdersLiveData,
-    selectLatestValidatorHeight,
-    selectLatestIndexerHeight,
-  ],
-  (rest, live, indexerHeight, validatorHeight) => {
-    return calculateAllOrders(rest, live, validatorHeight ?? indexerHeight ?? BACKUP_BLOCK_HEIGHT);
-  }
-);
-
-export const selectOpenOrders = createAppSelector([selectAccountOrders], (orders) => {
-  return calculateOpenOrders(orders);
-});
 
 export const selectOrderHistory = createAppSelector([selectAccountOrders], (orders) => {
   return calculateOrderHistory(orders);

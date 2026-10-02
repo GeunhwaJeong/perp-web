@@ -829,9 +829,11 @@ export class AccountTransactionSupervisor {
 export const accountTransactionManager = new AccountTransactionSupervisor(reduxStore);
 
 if (isDev && typeof window !== 'undefined') {
-  // Lets the localnet browser suite connect the dev wallet and drive the write path directly.
+  // Lets the localnet browser suites connect the dev wallet, drive the write path directly and
+  // read what the app derives from the indexer.
   (window as unknown as { haneulPerp: unknown }).haneulPerp = {
     supervisor: accountTransactionManager,
     dAppKit,
+    BonsaiCore,
   };
 }
