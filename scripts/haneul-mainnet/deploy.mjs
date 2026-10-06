@@ -642,6 +642,7 @@ const ladderStep = async (me) => {
     s.makers[me] = maker;
     writeState(s);
   }
+  const wasAllocated = maker.allocated;
   if (!maker.allocated) {
     const allocate = BigInt(argValue('--allocate', '0'));
     if (allocate === 0n) throw new Error('first ladder of this maker needs --allocate <TUSD to the market>');
@@ -658,7 +659,7 @@ const ladderStep = async (me) => {
   // A later run may top the market up: a new position starts at a margin ratio of 1.0, so
   // the allocation must cover the larger side of the ladder in full.
   const topUp = BigInt(argValue('--allocate', '0'));
-  if (maker.allocated && topUp > 0n) {
+  if (wasAllocated && topUp > 0n) {
     cmds.push(...call(`${PERP}::clearing_house::allocate_collateral`, [s.TUSD, s.ADMIN], obj(s.clearingHouse), obj(maker.cap), obj(maker.obj), u64(topUp * TUSD_UNIT)));
   }
   cmds.push(...call('0x1::option::none', [`${PERP}::account::IntegratorInfo`]), ...assign('no_integrator'));
