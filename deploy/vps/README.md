@@ -30,10 +30,14 @@ Then the secrets, all root-owned and mode 600 under `/etc/sigma`:
   `.deploy/oracle-v2.mainnet.json` with `httpHost` 127.0.0.1.
 - `indexer.env`: `DATABASE_URL=postgres://sigma:<password>@127.0.0.1:5432/perp_indexer` and
   `PERP_PACKAGES=perpetuals=0x…,perpetuals_orders=0x…,oracle_aggregator=0x…,market_making_vault=0x…,perpetuals_fees=0x…,oracle_haneul=0x…`
-  from the deployment file.
+  from the deployment file, and `FIRST_CHECKPOINT=<checkpoint of the first publish>` (85767062
+  for the 2026-10-06 deployment), so that a fresh database starts there and not at genesis.
 - `api.env`: the same `DATABASE_URL` with `?application_name=perp-api`.
 - `liquidator.env`: `DATABASE_URL`, `ACCOUNT=<Account object>`, `ACCOUNT_CAP=<assistant cap>`;
   `liquidator.key` and `cranker.key`: the wallets' `haneulprivkey1…` strings, one per file.
+
+The bots take the chain id in the node's base58 form (`BmesG5C6R15WTWTL4feVxmf51fHXDSCMjmrF571aLiKC`
+for mainnet), which the units carry.
 
 The liquidator's account and assistant cap are created with its own key from the admin
 machine (`perp-liquidator` README) before the unit starts; `--check-only` on the server
@@ -41,7 +45,7 @@ verifies everything before the first round.
 
 ## Binaries
 
-The Rust binaries are built by GitHub Actions (x86_64, glibc 2.39) on every push to main of
+The Rust binaries are built by GitHub Actions (x86_64, glibc 2.39, portable blst: the VPS CPU has no ADX) on every push to main of
 `perp-indexer` and `perp-liquidator` and kept as artifacts. On the server:
 
 ```sh

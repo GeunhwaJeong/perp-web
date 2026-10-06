@@ -8,7 +8,7 @@ User=sigma
 WorkingDirectory=/opt/sigma
 # DATABASE_URL, ACCOUNT, ACCOUNT_CAP, ADL_CAP (optional) and the key file path; root-owned, mode 600.
 EnvironmentFile=/etc/sigma/liquidator.env
-ExecStart=/opt/sigma/bin/perp-liquidator --deployment /etc/sigma/perp.mainnet.json --database-url ${DATABASE_URL} --rpc-url http://158.69.54.239:9000 --chain-id a0053d9e --key-file /etc/sigma/liquidator.key --account ${ACCOUNT} --account-cap ${ACCOUNT_CAP} --oracle-updates-url http://127.0.0.1:8787/v1/updates --listen-address 127.0.0.1:9188
+ExecStart=/opt/sigma/bin/perp-liquidator --deployment /etc/sigma/perp.mainnet.json --database-url ${DATABASE_URL} --rpc-url http://158.69.54.239:9000 --chain-id BmesG5C6R15WTWTL4feVxmf51fHXDSCMjmrF571aLiKC --key-file /etc/sigma/liquidator.key --account ${ACCOUNT} --account-cap ${ACCOUNT_CAP} --oracle-updates-url http://127.0.0.1:8787/v1/updates --listen-address 127.0.0.1:9188
 Restart=always
 RestartSec=5
 NoNewPrivileges=true

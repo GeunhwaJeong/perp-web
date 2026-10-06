@@ -6,9 +6,10 @@ Wants=network-online.target
 [Service]
 User=sigma
 WorkingDirectory=/opt/sigma
-# PERP_PACKAGES and DATABASE_URL.
+# PERP_PACKAGES, DATABASE_URL and FIRST_CHECKPOINT (the checkpoint of the first publish, so a
+# fresh database is not backfilled from genesis).
 EnvironmentFile=/etc/sigma/indexer.env
-ExecStart=/opt/sigma/bin/perp-indexer --database-url ${DATABASE_URL} --rpc-api-url http://158.69.54.239:9000 --streaming-url http://158.69.54.239:9000 --metrics-address 127.0.0.1:9184
+ExecStart=/opt/sigma/bin/perp-indexer --database-url ${DATABASE_URL} --rpc-api-url http://158.69.54.239:9000 --streaming-url http://158.69.54.239:9000 --first-checkpoint ${FIRST_CHECKPOINT} --metrics-address 127.0.0.1:9184
 Restart=always
 RestartSec=5
 NoNewPrivileges=true

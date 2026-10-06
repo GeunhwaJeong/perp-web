@@ -25,6 +25,10 @@ sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='sigma'" | grep
 sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='perp_indexer'" | grep -q 1 || \
   sudo -u postgres createdb -O sigma perp_indexer
 
+# Login bots fill sshd's default connection backlog (10) and the box drops our sessions.
+printf 'MaxStartups 50:30:200\nLoginGraceTime 20\n' > /etc/ssh/sshd_config.d/70-sigma.conf
+sshd -t && systemctl reload ssh
+
 install -m 644 "$(dirname "$0")/systemd/"sigma-*.service /etc/systemd/system/
 systemctl daemon-reload
 install -m 644 "$(dirname "$0")/Caddyfile" /etc/caddy/Caddyfile
