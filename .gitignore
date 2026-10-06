@@ -48,4 +48,6 @@ local-client-js-hash
 
 # localnet fixture state (keys, published ids)
 .localnet/
+# deployment state of scripts/haneul-mainnet/deploy.mjs (caps, seeds); back it up, never commit it
+.deploy/
 public/configs/haneul/perp.localnet.json
