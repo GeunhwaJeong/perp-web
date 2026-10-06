@@ -31,6 +31,9 @@ entry_points/
 *.sw?
 
 # Charting Library
+# TradingView's charting library is licensed per site and never committed; a licensee drops
+# its own copy at tradingview/tradingview.tgz and postinstall extracts it.
+tradingview/tradingview.tgz
 public/tradingview/*
 public/datafeed
 # Don't ignore custom styling
