@@ -1,0 +1,24 @@
+[Unit]
+Description=Sigma market maker
+After=network-online.target postgresql.service sigma-oracle.service
+Wants=network-online.target
+
+[Service]
+User=sigma
+WorkingDirectory=/opt/sigma
+# DATABASE_URL, ACCOUNT, ACCOUNT_CAP and, with the flow simulator, FLOW_ACCOUNT and
+# FLOW_ACCOUNT_CAP; the keys in maker.key and flow.key. Root-owned, mode 600.
+EnvironmentFile=/etc/sigma/maker.env
+ExecStart=/opt/sigma/bin/perp-maker --deployment /etc/sigma/perp.mainnet.json --database-url ${DATABASE_URL} --rpc-url http://158.69.54.239:9000 --chain-id BmesG5C6R15WTWTL4feVxmf51fHXDSCMjmrF571aLiKC --key-file /etc/sigma/maker.key --account ${ACCOUNT} --account-cap ${ACCOUNT_CAP} --market BTC-USD --oracle-updates-url http://127.0.0.1:8787/v1/updates --listen-address 127.0.0.1:9190 $MAKER_EXTRA_ARGS
+Restart=always
+RestartSec=5
+# Stopping sends SIGTERM; the maker pulls its quotes before exiting.
+KillSignal=SIGTERM
+TimeoutStopSec=30
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

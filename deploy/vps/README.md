@@ -11,6 +11,7 @@ committed; the secrets are not and go into `/etc/sigma` by hand.
 | API | sigma-api | 127.0.0.1:3002, published as api.sigma.haneul.io | Postgres, `/etc/sigma/perp.mainnet.json` |
 | Liquidator | sigma-liquidator | 127.0.0.1:9188 (health) | Postgres, the price service, its key and account |
 | Cranker | sigma-cranker | 127.0.0.1:9189 (health) | the price service, its key |
+| Maker (and the flow simulator) | sigma-maker | 127.0.0.1:9190 (health) | Postgres, the price service, its key and account; `MAKER_EXTRA_ARGS` in `maker.env` carries `--flow …` and quoting parameters |
 | Site | Caddy | sigma.haneul.io | `/var/www/sigma` (the production build) |
 | gRPC proxy | Caddy | rpc.haneul.io | 158.69.54.239:9000 over h2c |
 
@@ -35,6 +36,9 @@ Then the secrets, all root-owned and mode 600 under `/etc/sigma`:
 - `api.env`: the same `DATABASE_URL` with `?application_name=perp-api`.
 - `liquidator.env`: `DATABASE_URL`, `ACCOUNT=<Account object>`, `ACCOUNT_CAP=<assistant cap>`;
   `liquidator.key` and `cranker.key`: the wallets' `haneulprivkey1…` strings, one per file.
+- `maker.env`: `DATABASE_URL`, `ACCOUNT`, `ACCOUNT_CAP` of the maker's account, and `MAKER_EXTRA_ARGS`
+  (empty, or `--flow --flow-key-file /etc/sigma/flow.key --flow-account … --flow-account-cap …`
+  and any quoting parameter); `maker.key` (and `flow.key`).
 
 The bots take the chain id in the node's base58 form (`BmesG5C6R15WTWTL4feVxmf51fHXDSCMjmrF571aLiKC`
 for mainnet), which the units carry.
@@ -50,7 +54,7 @@ The Rust binaries are built by GitHub Actions (x86_64, glibc 2.39, portable blst
 
 ```sh
 gh run download <run id> -R GeunhwaJeong/perp-indexer -n perp-indexer-linux-x86_64 -D /tmp/bin
-gh run download <run id> -R GeunhwaJeong/perp-liquidator -n perp-bots-linux-x86_64 -D /tmp/bin
+gh run download <run id> -R GeunhwaJeong/perp-liquidator -n perp-bots-linux-x86_64 -D /tmp/bin   # liquidator, cranker, maker
 (cd /tmp/bin && sha256sum -c SHA256SUMS)
 sudo install -o sigma -g sigma -m 755 /tmp/bin/perp-* /opt/sigma/bin/
 ```
@@ -64,6 +68,7 @@ oracle-v2 is a checkout of its repository at `/opt/sigma/oracle-v2` with `npm ci
 sudo systemctl enable --now sigma-oracle      # feeds fresh within a few rounds
 sudo systemctl enable --now sigma-indexer sigma-api
 sudo systemctl enable --now sigma-cranker sigma-liquidator
+sudo systemctl enable --now sigma-maker
 ```
 
 Health: `curl -s localhost:8787/healthz`, `localhost:3002/health`, `localhost:9188/health`,
