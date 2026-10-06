@@ -98,13 +98,26 @@ export const TradeFormInputs = () => {
     if (!midMarketPrice || !showLimitPrice || hasSetMidMarketLimit) {
       return;
     }
+    // A price drafted before the form switched to limit (from the chart or the book) stays.
+    if (limitPrice) {
+      setHasSetMidMarketLimit(true);
+      return;
+    }
     dispatch(
       tradeFormActions.setLimitPrice(
         MustBigNumber(midMarketPrice).toFixed(tickSizeDecimals ?? USD_DECIMALS)
       )
     );
     setHasSetMidMarketLimit(true);
-  }, [dispatch, midMarketPrice, showLimitPrice, tickSizeDecimals, marketId, hasSetMidMarketLimit]);
+  }, [
+    dispatch,
+    midMarketPrice,
+    showLimitPrice,
+    tickSizeDecimals,
+    marketId,
+    hasSetMidMarketLimit,
+    limitPrice,
+  ]);
 
   const onMidMarketPriceClick = () => {
     if (!midMarketPrice) return;
