@@ -20,6 +20,9 @@
  *                `--tusd <deposit>`, then post a bid and ask ladder around the signed price
  *                (`--updates <url>`, `--levels <n>`, `--size <btc per level>`, `--step <usd>`)
  *   signer-seed  write the registered signer's 32-byte seed for ORACLE_SIGNER_SEED to a 600 file
+ *   account      as a bot wallet (`--admin <bot alias>`): open its engine account with
+ *                `--coin <TUSD coin>`, open its position on the market, keep an assistant cap
+ *                and send the account's admin cap to `--admin-to <address>` (the Sigma admin)
  *
  * Options: --env <cli env> (required: `mainnet`, which needs --confirm-mainnet to execute, or a localnet env), --admin <alias> (default sigma-admin),
  * --signer <alias> (default sigma-oracle-signer), --updates-url <url> (the service the front
@@ -676,6 +679,41 @@ const ladderStep = async (me) => {
   log(`maker posted ${events(j, '::events::PostedOrder').length} orders around $${btc}`);
 };
 
+/**
+ * A bot's engine account: created and funded by the bot's own key, which keeps only an
+ * assistant cap (it can trade and liquidate but not withdraw); the admin cap goes to the
+ * deployment's admin.
+ */
+const accountStep = (me) => {
+  const s = readState();
+  need(s, 'clearingHouse', 'market');
+  const coin = argValue('--coin');
+  const adminTo = argValue('--admin-to');
+  if (!coin?.startsWith('0x') || !adminTo?.startsWith('0x')) throw new Error('account needs --coin <TUSD coin> and --admin-to <address>');
+  const PERP = s.P.perpetuals;
+  const cmds = [];
+  cmds.push(...call(`${PERP}::account::create_account`, [s.TUSD], obj(s.registry)), ...assign('acc'));
+  cmds.push(...call(`${PERP}::account::deposit_collateral`, [s.TUSD, s.ADMIN], 'acc.0', 'acc.2', obj(s.registry), obj(coin)));
+  cmds.push(...call(`${PERP}::account::new_assistant_account_cap`, [s.TUSD], 'acc.0', 'acc.2', obj(s.registry)), ...assign('assistant'));
+  cmds.push(...call(`${PERP}::clearing_house::create_market_position`, [s.TUSD, s.ADMIN], obj(s.clearingHouse), 'acc.2', 'acc.0'));
+  cmds.push(...call(`${PERP}::account::consume_policy_and_share_account`, [s.TUSD], 'acc.0', 'acc.1'));
+  cmds.push('--transfer-objects', '[assistant]', obj(me));
+  cmds.push('--transfer-objects', '[acc.2]', obj(adminTo));
+  const j = ptb(`engine account of ${me} (assistant cap kept, admin cap to ${adminTo.slice(0, 10)}…)`, cmds);
+  if (!j) return;
+  // Told apart by owner: the shared account, the cap kept by the bot, the cap sent to the admin.
+  const created = j.objectChanges.filter((c) => c.type === 'created');
+  const account = created.find((c) => c.objectType.includes('::account::Account<') && c.owner?.Shared)?.objectId;
+  const capsOf = (owner) => created.filter((c) => c.objectType.includes('::authority::AuthorityCap<') && c.owner?.AddressOwner === owner);
+  const assistant = capsOf(me)[0]?.objectId;
+  const adminCap = capsOf(adminTo)[0]?.objectId;
+  if (!account || !assistant || !adminCap) throw new Error(`created objects not recognized in ${j.digest}`);
+  s.accounts = s.accounts ?? {};
+  s.accounts[me] = { obj: account, assistantCap: assistant, adminCap, adminCapHolder: adminTo, digest: j.digest };
+  writeState(s);
+  log(`account ${account}; assistant cap ${assistant}; admin cap ${adminCap} → ${adminTo}`);
+};
+
 /** Bech32 `haneulprivkey1…` → the 32-byte seed after the scheme flag, for ORACLE_SIGNER_SEED. */
 const bech32Decode = (text) => {
   const CHARSET = 'qpzry9x8gf2tvdw0s3jn54khce6mua7l';
@@ -719,6 +757,7 @@ const steps = {
   fund: () => (enterCli(), fundStep()),
   config: () => configStep(),
   ladder: () => ladderStep(enterCli()),
+  account: () => accountStep(enterCli()),
   'signer-seed': () => signerSeedStep(),
 };
 if (!steps[step]) {
