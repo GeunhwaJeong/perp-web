@@ -6,12 +6,15 @@ export interface TradingViewState {
   chartConfig?: object;
   launchableMarketsChartConfig?: object;
   spotChartConfig?: object;
+  /** The price chart's resolution, kept across sessions like the charting library's layout was. */
+  resolution?: string;
 }
 
 const initialState: TradingViewState = {
   chartConfig: undefined,
   launchableMarketsChartConfig: undefined,
   spotChartConfig: undefined,
+  resolution: undefined,
 };
 
 export const tradingViewSlice = createSlice({
@@ -27,8 +30,15 @@ export const tradingViewSlice = createSlice({
     updateSpotChartConfig: (state, action: PayloadAction<object>) => {
       state.spotChartConfig = action.payload;
     },
+    updateChartResolution: (state, action: PayloadAction<string>) => {
+      state.resolution = action.payload;
+    },
   },
 });
 
-export const { updateChartConfig, updateLaunchableMarketsChartConfig, updateSpotChartConfig } =
-  tradingViewSlice.actions;
+export const {
+  updateChartConfig,
+  updateLaunchableMarketsChartConfig,
+  updateSpotChartConfig,
+  updateChartResolution,
+} = tradingViewSlice.actions;

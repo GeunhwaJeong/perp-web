@@ -11,10 +11,14 @@ import {
   onboarding,
   type ProposalStatus,
 } from '@dydxprotocol/v4-client-js';
-import type { ResolutionString } from 'public/tradingview/charting_library';
 
 import { RawSubaccountFill, RawSubaccountTransfer } from '@/constants/account';
-import { RESOLUTION_MAP, RESOLUTION_TO_INTERVAL_MS, type Candle } from '@/constants/candles';
+import {
+  RESOLUTION_MAP,
+  RESOLUTION_TO_INTERVAL_MS,
+  type Candle,
+  type ResolutionString,
+} from '@/constants/candles';
 import { LocalStorageKey } from '@/constants/localStorage';
 import { isDev } from '@/constants/networks';
 

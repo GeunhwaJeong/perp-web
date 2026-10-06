@@ -1,10 +1,12 @@
-import { ResolutionString } from 'public/tradingview/charting_library';
-
-import { SpotApiBarsResolution } from '@/clients/spotApi';
-
-import { MetadataServiceCandlesTimeframes } from './assetMetadata';
 import { STRING_KEYS } from './localization';
 import { timeUnits } from './time';
+
+/**
+ * Candle resolutions as the chart names them: minutes, or '1D'. These are the resolution
+ * strings of TradingView's charting library, kept so that its integration can be restored as
+ * it was.
+ */
+export type ResolutionString = '1' | '5' | '15' | '30' | '60' | '240' | '1D';
 
 export interface Candle {
   startedAt: string;
@@ -92,21 +94,6 @@ export const RESOLUTION_MAP = {
   '1D': CandleResolution.ONE_DAY,
 } as Record<ResolutionString, CandleResolution>;
 
-/**
- * @description ResolutionStrings used with TradingView's charting library mapped to MetadataServiceCandlesTimeframes
- */
-export const RESOLUTION_TO_TIMEFRAME_MAP = {
-  '60': '1d',
-  '240': '7d',
-  '1D': '30d',
-} as Record<ResolutionString, MetadataServiceCandlesTimeframes>;
-
-export const LAUNCHABLE_MARKET_RESOLUTION_CONFIGS = {
-  '60': { defaultRange: timeUnits.day },
-  '240': { defaultRange: 7 * timeUnits.day },
-  '1D': { defaultRange: 30 * timeUnits.day },
-} as Record<ResolutionString, { defaultRange: number }>;
-
 export const DEFAULT_RESOLUTION = '1D';
 
 /**
@@ -131,22 +118,3 @@ export const RESOLUTION_STRING_TO_LABEL = {
   '240': { value: '4', unitStringKey: STRING_KEYS.HOURS_ABBREVIATED },
   '1D': { value: '1', unitStringKey: STRING_KEYS.DAYS_ABBREVIATED },
 } as Record<ResolutionString, { value: string; unitStringKey?: string }>;
-
-/**
- * @description ResolutionStrings used with TradingView's charting library mapped to SpotApiBarsResolution
- */
-export const RESOLUTION_TO_SPOT_INTERVAL_MAP = {
-  '1S': '1S',
-  '5S': '5S',
-  '15S': '15S',
-  '30S': '30S',
-  '1': '1',
-  '5': '5',
-  '15': '15',
-  '30': '30',
-  '60': '60',
-  '240': '240',
-  '720': '720',
-  '1D': '1D',
-  '1W': '7D',
-} as Record<ResolutionString, SpotApiBarsResolution>;

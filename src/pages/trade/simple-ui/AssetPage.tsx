@@ -16,8 +16,7 @@ import { LoadingSpace } from '@/components/Loading/LoadingSpinner';
 import { Output, OutputType } from '@/components/Output';
 import { WithTooltip } from '@/components/WithTooltip';
 import { MegaVaultYieldOutput } from '@/views/MegaVaultYieldOutput';
-import { TvChart } from '@/views/charts/TradingView/TvChart';
-import { TvChartLaunchable } from '@/views/charts/TradingView/TvChartLaunchable';
+import { PriceChart } from '@/views/charts/LightweightChart/PriceChart';
 import { OnboardingTriggerButton } from '@/views/dialogs/OnboardingTriggerButton';
 
 import { calculateCanAccountTrade } from '@/state/accountCalculators';
@@ -48,7 +47,7 @@ const AssetPage = () => {
         {stringGetter({ key: STRING_KEYS.LAUNCHABLE_DETAILS })}
       </div>
       <div tw="h-[20rem] font-small-book">
-        <TvChartLaunchable marketId={currentMarketId} />
+        <PriceChart marketId={currentMarketId} />
       </div>
       <div tw="flexColumn gap-2 px-1.25">
         <AssetDetails isLaunchableMarket />
@@ -95,7 +94,7 @@ const AssetPage = () => {
   ) : (
     <>
       <div tw="mb-1.5 h-[20rem] font-small-book">
-        <TvChart />
+        <PriceChart />
       </div>
       <div tw="flexColumn gap-2 px-1.25 pb-[5.25rem]">
         <AssetPosition />

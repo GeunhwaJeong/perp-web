@@ -1,6 +1,7 @@
-import type { ThemeName } from 'public/tradingview/charting_library';
-
 import { AppColorMode, AppTheme } from '@/state/appUiConfigs';
+
+/** Theme names as the charting library knows them. */
+export type ThemeName = 'Classic' | 'Dark' | 'Light';
 
 export const THEME_NAMES: Record<AppTheme, ThemeName> = {
   [AppTheme.Classic]: 'Classic',

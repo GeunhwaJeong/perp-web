@@ -2,17 +2,17 @@ import { createStoreEffect } from '@/bonsai/lib/createStoreEffect';
 import { selectWebsocketUrl } from '@/bonsai/socketSelectors';
 import { CandlesValuesManager } from '@/bonsai/websocket/candles';
 import { subscribeToWsValue } from '@/bonsai/websocket/lib/indexerValueManagerHelpers';
-import type {
-  LibrarySymbolInfo,
-  ResolutionString,
-  SubscribeBarsCallback,
-} from 'public/tradingview/charting_library';
 
-import { CandleResolution, RESOLUTION_MAP } from '@/constants/candles';
+import {
+  CandleResolution,
+  RESOLUTION_MAP,
+  ResolutionString,
+  TradingViewChartBar,
+} from '@/constants/candles';
 
 import { type RootStore } from '@/state/_store';
 
-import { mapCandle } from '../../lib/tradingView/utils';
+import { mapCandle } from '../../lib/candles';
 
 export const subscriptionsByGuid: {
   [guid: string]:
@@ -32,9 +32,9 @@ export const subscribeOnStream = ({
   onResetCacheNeededCallback,
 }: {
   store: RootStore;
-  symbolInfo: LibrarySymbolInfo;
+  symbolInfo: { ticker?: string };
   resolution: ResolutionString;
-  onRealtimeCallback: SubscribeBarsCallback;
+  onRealtimeCallback: (bar: TradingViewChartBar) => void;
   listenerGuid: string;
   onResetCacheNeededCallback: Function;
 }) => {

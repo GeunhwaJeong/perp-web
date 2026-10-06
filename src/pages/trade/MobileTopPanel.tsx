@@ -14,7 +14,7 @@ import { Tabs } from '@/components/Tabs';
 import { ToggleButton } from '@/components/ToggleButton';
 import { DepthChart } from '@/views/charts/DepthChart';
 import { FundingChart } from '@/views/charts/FundingChart';
-import { TvChart } from '@/views/charts/TradingView/TvChart';
+import { PriceChart } from '@/views/charts/LightweightChart/PriceChart';
 import { LiveTrades } from '@/views/tables/LiveTrades';
 
 import { useAppSelector } from '@/state/appTypes';
@@ -60,7 +60,7 @@ export const MobileTopPanel = ({
 
   const items = [
     {
-      content: <TvChart />,
+      content: <PriceChart />,
       forceMount: true,
       label: 'Chart', // TODO: stringGetter({ key: STRING_KEYS.CHART }),
       value: Tab.Price,
