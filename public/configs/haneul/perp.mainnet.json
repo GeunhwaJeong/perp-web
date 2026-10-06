@@ -1,0 +1,43 @@
+{
+  "network": "mainnet",
+  "packages": {
+    "perpetuals": "0x7be0828aefa3143b632c0267146ce441f7a63f745b02eddcf8f2c28687d21f6a",
+    "perpetualsOrders": "0x243b76c3398bf9d41055221edbdc48d08f0d31d3666e3590da87d1fa1a514549",
+    "perpetualsFees": "0xe7bb943310e4608912306cdf61a8d9b386450e6fae9c174e93cb58fa4cf206fa",
+    "stakingTiers": "0x84c002a5c64510b608913e8541221cff64a55b24fbe0bacb999d2ac15c448aa0",
+    "marketMakingVault": "0xed97181ac7598ff9fcb31e12d17d1b90b7cd1756ef7e216185f5e68fbe6e56e6",
+    "oracleAggregator": "0x00143e86f777b11e6b35caa329b14fbb6e2d9a1d07c57fadbbe4dde8e036ecb8",
+    "authorityCap": "0xca3a6bb43fb852fb279187014eeb12745240ed6e7022cf42477d09fdd9239633"
+  },
+  "registry": "0xb580bc35411319b880f094110f6b2766eabb44d79b8f54f9a71c88973cf046c1",
+  "collateral": {
+    "coinType": "0x2b7c48119d04b58e6efd828588afe81de89836023c82be6cffaf0a1f5f299821::tusd::TUSD",
+    "decimals": 6,
+    "priceFeedStorage": "0xd977a4b1866e8834c327846367d7e89d013ae8a72a7ca3f7bcd337edf90d6757"
+  },
+  "oracle": {
+    "package": "0xf0ebf4f61cfb87f0ca05d7fd23033b0d83f884a420debced8d6c1e3f0e16d66e",
+    "source": "0x1f95e3e9fe6ca45bc6f27439f1387f52c540ff05fdf8bc352754bf9d611aa231",
+    "sourceId": 0,
+    "aggregatorConfig": "0xbecfa015affff634ef26089fcb0760b06b0eaf8d69cf8d83c5f14f75c374c350",
+    "updatesUrl": "https://oracle.haneul.io/v1/updates"
+  },
+  "fees": {
+    "schedule": "0x5a6a926921a62aa962d3e34bab9775e363bdd930c60fea0ec7d61c88ce0ab364",
+    "tierRegistry": "0xde0f0effde6472e8ef3fcde45b0a8c866f3791bff98b90beb9e20b11bada83f8"
+  },
+  "ticketExecutors": [],
+  "ticketGas": "1000000",
+  "markets": {
+    "BTC-USD": {
+      "marketId": "BTC-USD",
+      "symbol": "BTC",
+      "clearingHouse": "0xf77dda417d4003c017c96697809d3a25b2767aca586b5b7579e975e47508df77",
+      "basePriceFeedStorage": "0xb15b8979ef567338cd43e77ebab98d458dff4a19fe4ce3cc75d984e52746d6e6",
+      "lotSize": "1000000",
+      "tickSize": "1000000000",
+      "initialMarginRatio": "100000000000000000",
+      "maintenanceMarginRatio": "50000000000000000"
+    }
+  }
+}

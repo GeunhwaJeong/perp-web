@@ -21,7 +21,7 @@
  *                (`--updates <url>`, `--levels <n>`, `--size <btc per level>`, `--step <usd>`)
  *   signer-seed  write the registered signer's 32-byte seed for ORACLE_SIGNER_SEED to a 600 file
  *
- * Options: --env <cli env> (required; mainnet needs --confirm-mainnet to execute), --admin <alias> (default sigma-admin),
+ * Options: --env <cli env> (required: `mainnet`, which needs --confirm-mainnet to execute, or a localnet env), --admin <alias> (default sigma-admin),
  * --signer <alias> (default sigma-oracle-signer), --updates-url <url> (the service the front
  * end reads), --faucet (non-mainnet only: fund the admin from the faucet first).
  *
@@ -41,7 +41,9 @@ const PERP_ROOT = process.env.PERP_DEX_ROOT ?? join(homedir(), 'perp-dex');
 const CLI = process.env.HANEUL ?? join(PERP_ROOT, 'deps', 'bin', 'haneul');
 const DEPLOY_DIR = join(WEB_ROOT, '.deploy');
 const MAINNET_CHAIN_ID = 'a0053d9e';
-const MAINNET_ENV = 'haneul-mainnet';
+// The CLI env named like the build env, so that the Published.toml the CLI writes next to each
+// package on a real publish carries a [published.mainnet] block that dependents resolve.
+const MAINNET_ENV = 'mainnet';
 const GAS_BUDGET = '2000000000';
 const CLOCK = '@0x6';
 
@@ -127,7 +129,7 @@ const argValue = (name, fallback) => {
 const EXECUTE = process.argv.includes('--execute');
 const ENV = argValue('--env');
 if (!ENV) {
-  console.error('deploy.mjs: --env <cli env> is required (haneul-mainnet for the real thing, local for a rehearsal)');
+  console.error('deploy.mjs: --env <cli env> is required (mainnet for the real thing, local for a rehearsal)');
   process.exit(2);
 }
 const ADMIN_ALIAS = argValue('--admin', 'sigma-admin');
@@ -243,8 +245,10 @@ const publishStep = (me) => {
       continue;
     }
     const path = join(PERP_ROOT, name === SUPPORT ? `deploy/${SUPPORT}` : `packages/${name}`);
+    // A real publish records itself in the package's Published.toml (commit it); a rehearsal
+    // is ephemeral and goes through the pubfile.
     const base = IS_MAINNET
-      ? ['client', 'publish', '--pubfile-path', PUBFILE]
+      ? ['client', 'publish']
       : ['client', 'test-publish', '--build-env', 'mainnet', '--pubfile-path', PUBFILE];
     const run = (extra) =>
       spawnSync(CLI, [...base, '--gas-budget', GAS_BUDGET, ...extra], { encoding: 'utf8', cwd: path, maxBuffer: 64 * 1024 * 1024 });
