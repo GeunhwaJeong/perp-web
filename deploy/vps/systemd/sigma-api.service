@@ -1,0 +1,20 @@
+[Unit]
+Description=Sigma perp API
+After=network-online.target postgresql.service sigma-indexer.service
+Wants=network-online.target
+
+[Service]
+User=sigma
+WorkingDirectory=/opt/sigma
+EnvironmentFile=/etc/sigma/api.env
+ExecStart=/opt/sigma/bin/perp-api --database-url ${DATABASE_URL} --deployment /etc/sigma/perp.mainnet.json --listen-address 127.0.0.1:3002 --metrics-address 127.0.0.1:9185
+Restart=always
+RestartSec=5
+LimitNOFILE=65536
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

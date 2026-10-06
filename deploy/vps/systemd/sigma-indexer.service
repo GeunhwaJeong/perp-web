@@ -1,0 +1,20 @@
+[Unit]
+Description=Sigma perp indexer
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+User=sigma
+WorkingDirectory=/opt/sigma
+# PERP_PACKAGES and DATABASE_URL.
+EnvironmentFile=/etc/sigma/indexer.env
+ExecStart=/opt/sigma/bin/perp-indexer --database-url ${DATABASE_URL} --rpc-api-url http://158.69.54.239:9000 --streaming-url http://158.69.54.239:9000 --metrics-address 127.0.0.1:9184
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

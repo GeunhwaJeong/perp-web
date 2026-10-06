@@ -1,0 +1,20 @@
+[Unit]
+Description=Sigma price service (oracle-v2)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=sigma
+WorkingDirectory=/opt/sigma/oracle-v2
+# ORACLE_CONFIG, ORACLE_SIGNER_SEED and RELAYER_KEY; root-owned, mode 600.
+EnvironmentFile=/etc/sigma/oracle.env
+ExecStart=/usr/bin/node src/main.ts
+Restart=always
+RestartSec=2
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

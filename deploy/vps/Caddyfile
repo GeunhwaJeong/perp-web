@@ -1,0 +1,25 @@
+# /etc/caddy/Caddyfile on the Sigma VPS (149.56.47.78). Caddy obtains the certificates.
+
+# The trading site: a static build of this repository.
+sigma.haneul.io {
+    root * /var/www/sigma
+    encode gzip
+    try_files {path} /index.html
+    file_server
+}
+
+# The indexer API (REST and WebSocket) the site reads.
+api.sigma.haneul.io {
+    reverse_proxy 127.0.0.1:3002
+}
+
+# The price service's signed updates, which trades put in front of themselves.
+oracle.haneul.io {
+    reverse_proxy 127.0.0.1:8787
+}
+
+# TLS in front of the public full node's gRPC (plaintext h2c on the validator host), so that
+# the site, served over https, can call it.
+rpc.haneul.io {
+    reverse_proxy h2c://158.69.54.239:9000
+}

@@ -1,0 +1,20 @@
+[Unit]
+Description=Sigma funding cranker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=sigma
+WorkingDirectory=/opt/sigma
+ExecStart=/opt/sigma/bin/perp-cranker --deployment /etc/sigma/perp.mainnet.json --rpc-url http://158.69.54.239:9000 --chain-id a0053d9e --key-file /etc/sigma/cranker.key --oracle-updates-url http://127.0.0.1:8787/v1/updates --listen-address 127.0.0.1:9189
+Restart=always
+RestartSec=5
+# Exit code 3 means the deployment file changed: start again on the new markets.
+RestartForceExitStatus=3
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
