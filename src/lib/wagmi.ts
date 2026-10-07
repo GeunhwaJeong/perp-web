@@ -213,8 +213,8 @@ export const resolveWagmiConnector = ({
 
   if (wallet.connectorType === ConnectorType.Coinbase) {
     return coinbaseWalletConnector({
-      appName: 'dYdX',
-      appLogoUrl: '/logos/dydx-x.png',
+      appName: 'Sigma',
+      appLogoUrl: '/logos/sigma-badge.png',
       reloadOnDisconnect: false,
       version: '3',
     });

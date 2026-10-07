@@ -137,7 +137,7 @@ export const UserMenuContent = () => {
       >
         <div tw="row gap-0.5">
           {walletDisplay === 'chain'
-            ? `dYdX ${stringGetter({ key: STRING_KEYS.ADDRESS })}`
+            ? `Haneul ${stringGetter({ key: STRING_KEYS.ADDRESS })}`
             : stringGetter({ key: STRING_KEYS.SOURCE_ADDRESS })}
           {address != null && (
             <Icon
@@ -159,13 +159,9 @@ export const UserMenuContent = () => {
       <div tw="row justify-between">
         <div tw="row gap-0.5">
           <div tw="relative">
-            <img
-              tw="size-[3rem] rounded-1 bg-[#AA8CFF] object-contain"
-              src="/hedgie-profile.png"
-              alt="profile"
-            />
+            <img tw="size-[3rem] rounded-1 object-contain" src="/sigma-avatar.png" alt="profile" />
             <span tw="absolute bottom-0 right-[-0.25rem] flex size-[1.375rem] min-h-[1.375rem] min-w-[1.375rem] items-center justify-center rounded-[50%] border-2 border-solid border-color-layer-1 bg-color-layer-2">
-              <img src="/logos/dydx-x.png" alt="dydx" tw="size-0.625" />
+              <img src="/logos/sigma-badge.png" alt="Sigma" tw="size-0.625" />
             </span>
           </div>
 

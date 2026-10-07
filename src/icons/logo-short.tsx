@@ -2,7 +2,7 @@ import { useAppThemeAndColorModeContext } from '@/hooks/useAppThemeAndColorMode'
 
 export const LogoShortIcon: React.FC<{ id?: string; width?: number; height?: number }> = ({
   id,
-  width = 135,
+  width = 145,
   height = 145,
 }: {
   id?: string;
@@ -14,45 +14,17 @@ export const LogoShortIcon: React.FC<{ id?: string; width?: number; height?: num
 
   return (
     <svg
+      id={id}
       width={width}
       height={height}
-      viewBox="0 0 135 145"
+      viewBox="0 0 145 145"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
     >
-      <path d="M100.986 0L0 144.988H31.0048L132.514 0H100.986Z" fill={fill} />
       <path
-        d="M34.2346 0L63.9475 42.7232L48.4451 66.0268L2.58386 0H34.2346Z"
-        fill={`url(#${id ? `${id}_logo_gradient_0` : 'paint0_linear'})`}
+        d="M97.31 7.25Q102.05 8.54 104.32 11.24Q106.58 13.94 106.58 16.74Q106.58 19.76 104.32 22.35Q102.05 24.94 97.09 26.02Q89.97 26.02 82.96 26.56Q75.95 27.09 69.26 27.74Q66.68 28.17 65.17 28.39Q63.66 28.60 60.85 28.82L71.21 40.04Q81.13 51.68 92.13 62.90Q94.50 65.71 94.72 68.08Q94.93 70.45 93.64 73.69Q84.80 85.12 76.60 95.90Q68.40 106.69 59.56 118.34Q70.13 117.26 77.35 116.72Q84.58 116.18 89.43 115.96Q94.29 115.75 97.52 115.64Q100.76 115.53 103.78 115.10Q109.82 114.67 113.05 117.58Q116.29 120.49 116.29 124.16Q116.29 127.18 114.02 129.88Q111.76 132.57 106.80 133.65Q89.54 134.73 73.90 135.81Q58.26 136.89 39.71 137.75Q32.81 136.67 30.22 132.57Q27.63 128.47 30.65 123.51L71.42 69.80Q61.07 59.45 51.36 48.77Q41.65 38.10 31.95 27.09H32.16Q28.71 23.64 28.71 20.41Q28.71 16.74 31.95 13.94Q35.18 11.13 40.14 10.92Q47.05 10.92 54.17 10.38Q61.28 9.84 68.62 9.19Q75.74 8.54 82.75 7.90Q89.76 7.25 97.31 7.25Z"
+        fill={fill}
       />
-      <path
-        d="M103.995 145L71.0526 97.7455L86.555 75.0893L135 145H103.995Z"
-        fill={`url(#${id ? `${id}_logo_gradient_1` : 'paint1_linear'})`}
-      />
-      <defs>
-        <linearGradient
-          id={id ? `${id}_logo_gradient_0` : 'paint0_linear'}
-          x1="27.1293"
-          y1="9.0625"
-          x2="69.773"
-          y2="60.4324"
-          gradientUnits="userSpaceOnUse"
-        >
-          <stop stopColor={fill} />
-          <stop offset="1" stopColor={fill} stopOpacity="0.55" />
-        </linearGradient>
-        <linearGradient
-          id={id ? `${id}_logo_gradient_1` : 'paint1_linear'}
-          x1="111.1"
-          y1="133.996"
-          x2="58.6959"
-          y2="63.4999"
-          gradientUnits="userSpaceOnUse"
-        >
-          <stop stopColor="#6966FF" />
-          <stop offset="1" stopColor="#6966FF" stopOpacity="0.36" />
-        </linearGradient>
-      </defs>
     </svg>
   );
 };

@@ -9,8 +9,8 @@ const entryPointsDir = path.resolve(projectRoot, '../entry-points');
 
 const ENTRY_POINTS = [
     {
-        title: 'dYdX',
-        description: 'dYdX',
+        title: 'Sigma',
+        description: 'Sigma, perpetual futures on Haneul',
         fileName: 'index.html',
     },
 ];
@@ -22,7 +22,7 @@ try {
         const html = await fs.readFile(templateFilePath, 'utf-8');
         const destinationFilePath = path.resolve(entryPointsDir, entryPoint.fileName);
         const injectedHtml = html.replace(
-            '<title>dYdX</title>',
+            '<title>Sigma</title>',
             `<title>${entryPoint.title}</title>\n    <meta name="description" content="${entryPoint.description}" />`
         );
         await fs.writeFile(destinationFilePath, injectedHtml, 'utf-8');
