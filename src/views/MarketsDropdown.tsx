@@ -289,10 +289,13 @@ export const MarketsDropdown = memo(
     currentMarketId,
     launchableMarketId,
     logoUrl = '',
+    assetId,
   }: {
     currentMarketId?: string;
     launchableMarketId?: string;
     logoUrl: Nullable<string>;
+    // Lets the icon fall back to the bundled image when there is no metadata logo.
+    assetId?: string;
   }) => {
     const [isOpen, setIsOpen] = useState(false);
     const stringGetter = useStringGetter();
@@ -358,7 +361,7 @@ export const MarketsDropdown = memo(
                   <div tw="flex items-center gap-0.25">
                     <$AssetIconWithStar>
                       {isFavoritedMarket && <$FavoriteStatus iconName={IconName.Star} />}
-                      <$AssetIcon logoUrl={logoUrl} tw="mr-0.25" />
+                      <$AssetIcon logoUrl={logoUrl} symbol={assetId} tw="mr-0.25" />
                     </$AssetIconWithStar>
                     <h2 tw="text-color-text-2 font-medium-medium">{currentMarketId}</h2>
                   </div>

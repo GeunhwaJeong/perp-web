@@ -40,7 +40,7 @@ export const useSharePnlImage = (data: SharePNLAnalyticsDialogProps) => {
       closeType: data.closeType ?? undefined,
     };
 
-    const response = await fetch(pnlImageApi, {
+    const response = await fetch(pnlImageApi ?? '', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

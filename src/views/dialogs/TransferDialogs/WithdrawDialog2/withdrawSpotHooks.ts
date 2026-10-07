@@ -46,7 +46,7 @@ export const useWithdrawSol = () => {
     track(AnalyticsEvents.SpotSolWithdrawalStarted({ solAmount }));
 
     try {
-      if (!localSolanaKeypair || !solanaAddress) {
+      if (!localSolanaKeypair || !solanaAddress || !connection) {
         throw new Error('Solana wallet not available');
       }
 
@@ -147,7 +147,7 @@ export const useSolBalance = () => {
   return useQuery({
     queryKey: ['connectionSolBalance', solanaAddress],
     queryFn: wrapAndLogBonsaiError(async () => {
-      if (!solanaAddress) return '0';
+      if (!solanaAddress || !connection) return '0';
       const lamports = await connection.getBalance(new PublicKey(solanaAddress));
       return (lamports / LAMPORTS_PER_SOL).toString();
     }, 'spot/connectionSolBalance'),

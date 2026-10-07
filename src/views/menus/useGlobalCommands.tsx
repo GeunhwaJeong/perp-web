@@ -6,6 +6,7 @@ import { MarketFilters } from '@/constants/markets';
 import { type MenuConfig } from '@/constants/menus';
 import { AppRoute } from '@/constants/routes';
 
+import { useEnvFeatures } from '@/hooks/useEnvFeatures';
 import { useMarketsData } from '@/hooks/useMarketsData';
 import { useStringGetter } from '@/hooks/useStringGetter';
 import { useTokenConfigs } from '@/hooks/useTokenConfigs';
@@ -16,11 +17,14 @@ import { Icon, IconName } from '@/components/Icon';
 import { useAppDispatch } from '@/state/appTypes';
 import { openDialog } from '@/state/dialogs';
 
+import { isTruthy } from '@/lib/isTruthy';
+
 export const useGlobalCommands = (): MenuConfig<string | number, string | number> => {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const stringGetter = useStringGetter();
   const { chainTokenLabel } = useTokenConfigs();
+  const { isVaultEnabled, isChainTokenPageEnabled } = useEnvFeatures();
 
   const { markets } = useMarketsData({
     forceShowUnlaunchedMarkets: true,
@@ -50,19 +54,19 @@ export const useGlobalCommands = (): MenuConfig<string | number, string | number
           label: stringGetter({ key: STRING_KEYS.MARKETS }),
           onSelect: () => navigate(AppRoute.Markets),
         },
-        {
+        isChainTokenPageEnabled && {
           value: 'token',
           slotBefore: <Icon iconName={IconName.Coins} />,
           label: chainTokenLabel,
           onSelect: () => navigate(`/${chainTokenLabel}`),
         },
-        {
+        isVaultEnabled && {
           value: 'vaults',
           slotBefore: <Icon iconName={IconName.Governance} />,
           label: stringGetter({ key: STRING_KEYS.MEGAVAULT }),
           onSelect: () => navigate(AppRoute.Vault),
         },
-      ],
+      ].filter(isTruthy),
     },
     {
       group: 'other',

@@ -12,6 +12,7 @@ import { StatsigFlags } from '@/constants/statsig';
 import { useAccounts } from '@/hooks/useAccounts';
 import { useComplianceState } from '@/hooks/useComplianceState';
 import { useEnableSpot } from '@/hooks/useEnableSpot';
+import { useEnvFeatures } from '@/hooks/useEnvFeatures';
 import { useStatsigGateValue } from '@/hooks/useStatsig';
 import { useStringGetter } from '@/hooks/useStringGetter';
 import { useTokenConfigs } from '@/hooks/useTokenConfigs';
@@ -51,6 +52,7 @@ export const HeaderDesktop = () => {
   const onboardingState = useAppSelector(getOnboardingState);
   const { complianceState } = useComplianceState();
   const isSpotEnabled = useEnableSpot();
+  const { isVaultEnabled, isChainTokenPageEnabled } = useEnvFeatures();
 
   const affiliatesEnabled = useStatsigGateValue(StatsigFlags.ffEnableAffiliates);
   const hasSeenLaunchIncentives = useAppSelector(getHasSeenLaunchIncentives);
@@ -79,7 +81,7 @@ export const HeaderDesktop = () => {
           label: stringGetter({ key: STRING_KEYS.PORTFOLIO }),
           href: AppRoute.Portfolio,
         },
-        {
+        isVaultEnabled && {
           value: 'VAULT',
           label: stringGetter({ key: STRING_KEYS.MEGAVAULT }),
           href: AppRoute.Vault,
@@ -89,7 +91,7 @@ export const HeaderDesktop = () => {
           label: stringGetter({ key: STRING_KEYS.REFERRALS }),
           href: AppRoute.Referrals,
         },
-        {
+        isChainTokenPageEnabled && {
           value: chainTokenLabel,
           label: chainTokenLabel,
           href: `/${chainTokenLabel}`,
@@ -101,7 +103,7 @@ export const HeaderDesktop = () => {
           value: 'MORE',
           label: stringGetter({ key: STRING_KEYS.MORE }),
           subitems: [
-            {
+            !!documentation && {
               value: 'DOCUMENTATION',
               slotBefore: <Icon iconName={IconName.Terminal} />,
               label: stringGetter({ key: STRING_KEYS.API_DOCUMENTATION }),
@@ -121,19 +123,19 @@ export const HeaderDesktop = () => {
               label: stringGetter({ key: STRING_KEYS.API_TRADING_KEYS }),
               onClick: () => dispatch(openDialog(DialogTypes.TradingKeys())),
             },
-            {
+            !!mintscanBase && {
               value: 'MINTSCAN',
               slotBefore: <Icon iconName={IconName.Mintscan} />,
               label: stringGetter({ key: STRING_KEYS.MINTSCAN }),
               href: mintscanBase,
             },
-            {
+            !!fundingComparison && {
               value: 'FUNDING_COMPARISON',
               slotBefore: <Icon iconName={IconName.FundingChart} />,
               label: stringGetter({ key: STRING_KEYS.FUNDING_COMPARISON }),
               href: fundingComparison,
             },
-            {
+            !!community && {
               value: 'COMMUNITY',
               slotBefore: <Icon iconName={IconName.Discord} />,
               label: stringGetter({ key: STRING_KEYS.COMMUNITY }),
@@ -159,13 +161,13 @@ export const HeaderDesktop = () => {
                 dispatch(openDialog(DialogTypes.Help()));
               },
             },
-            {
+            !!exchangeStats && {
               value: 'STATS',
               slotBefore: <Icon iconName={IconName.FundingChart} />,
               label: stringGetter({ key: STRING_KEYS.STATISTICS }),
               href: exchangeStats,
             },
-          ],
+          ].filter(isTruthy),
         },
       ].filter(isTruthy),
     },

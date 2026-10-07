@@ -176,13 +176,13 @@ const useSkipClientContext = () => {
     const options: SkipClientOptions = {
       apiUrl: skip,
       endpointOptions: {
-        getRpcEndpointForChain: async (chainId: string) => {
-          if (chainId === getNobleChainId()) return nobleValidator;
-          if (chainId === getNeutronChainId()) return neutronValidator;
-          if (chainId === getOsmosisChainId()) return osmosisValidator;
+        getRpcEndpointForChain: async (chainId: string): Promise<string> => {
+          if (chainId === getNobleChainId()) return nobleValidator ?? '';
+          if (chainId === getNeutronChainId()) return neutronValidator ?? '';
+          if (chainId === getOsmosisChainId()) return osmosisValidator ?? '';
           if (chainId === selectedDydxChainId)
-            return compositeClient?.network.validatorConfig.restEndpoint ?? validators[0]!;
-          if (chainId === getSolanaChainId()) return solanaRpcUrl;
+            return compositeClient?.network.validatorConfig.restEndpoint ?? validators?.[0] ?? '';
+          if (chainId === getSolanaChainId()) return solanaRpcUrl ?? '';
           const evmRpcUrls = RPCUrlsByChainId[chainId];
           if (evmRpcUrls?.length) return evmRpcUrls[0]!;
           throw new Error(`Error: no rpc endpoint found for chainId: ${chainId}`);

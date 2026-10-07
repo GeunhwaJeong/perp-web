@@ -113,7 +113,7 @@ export const useAccountBalance = ({
     if (chainId === selectedDydxChainId) {
       return dydxAddress;
     }
-    if (typeof chainId === 'string' && SUPPORTED_COSMOS_CHAINS.includes(chainId)) {
+    if (typeof chainId === 'string' && (SUPPORTED_COSMOS_CHAINS as string[]).includes(chainId)) {
       return dydxAccountGraz?.[chainId]?.bech32Address;
     }
     return undefined;
@@ -135,7 +135,7 @@ export const useAccountBalance = ({
           return neutronValidator;
         }
         if (chainId === selectedDydxChainId) {
-          return validators[0];
+          return validators?.[0];
         }
         return undefined;
       })();
@@ -178,7 +178,7 @@ export const useAccountBalance = ({
     try {
       const address = solAddress;
       const token = addressOrDenom;
-      if (!address || !token) {
+      if (!address || !token || !connection) {
         throw new Error('Account or token address is not present');
       }
       const owner = new PublicKey(address);

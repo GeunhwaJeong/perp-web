@@ -12,7 +12,7 @@ import { setAllAssetsRaw } from '@/state/raw';
 import { MetadataServiceClient } from '@/clients/metadataService';
 
 import { createStoreEffect } from '../lib/createStoreEffect';
-import { loadableIdle } from '../lib/loadable';
+import { loadableIdle, loadableLoaded } from '../lib/loadable';
 import { mapLoadableData } from '../lib/mapLoadable';
 import { logBonsaiError, wrapAndLogBonsaiError } from '../logs';
 import { queryResultToLoadable } from './lib/queryResultToLoadable';
@@ -20,6 +20,12 @@ import { safeSubscribeObserver } from './lib/safeSubscribe';
 
 export function setUpAssetsQuery(store: RootStore) {
   return createStoreEffect(store, getMetadataEndpoint, (endpoint) => {
+    // Without a metadata service the asset list is simply empty; the UI then falls back to
+    // the bundled icons and market names instead of waiting forever.
+    if (endpoint == null) {
+      store.dispatch(setAllAssetsRaw(loadableLoaded({})));
+      return undefined;
+    }
     const metadataClient = new MetadataServiceClient(endpoint);
 
     const observer = new QueryObserver(appQueryClient, {

@@ -1,21 +1,13 @@
-import { ENVIRONMENT_CONFIG_MAP } from '@/constants/networks';
+import { ENVIRONMENT_CONFIG_MAP, type EnvironmentConfig } from '@/constants/networks';
 
 import { getSelectedNetwork } from '@/state/appSelectors';
 import { useAppSelector } from '@/state/appTypes';
 
-interface EnvironmentConfig {
-  name: string;
-  ethereumChainId: string;
-  dydxChainId: string;
-  chainName: string;
-  chainLogo: string;
-  deployerName: string;
-  megavaultOperatorName: string;
-  rewardsHistoryStartDateMs: string;
-  megavaultHistoryStartDateMs: string;
-}
+type StringEnvironmentConfigKey = {
+  [K in keyof EnvironmentConfig]: EnvironmentConfig[K] extends string ? K : never;
+}[keyof EnvironmentConfig];
 
-export type EnvironmentConfigKey = keyof EnvironmentConfig;
+export type EnvironmentConfigKey = StringEnvironmentConfigKey;
 
 export const useEnvConfig = (configKey: EnvironmentConfigKey): string => {
   const selectedNetwork = useAppSelector(getSelectedNetwork);

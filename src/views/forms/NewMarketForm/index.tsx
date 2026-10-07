@@ -181,7 +181,7 @@ export const NewMarketForm = ({
   if (NewMarketFormStep.SUCCESS === step && tickerToAdd && proposalTxHash) {
     return (
       <NewMarketSuccessStep2
-        transactionUrl={mintscanTxUrl.replace('{tx_hash}', proposalTxHash)}
+        transactionUrl={mintscanTxUrl?.replace('{tx_hash}', proposalTxHash) ?? ''}
         tickerToAdd={tickerToAdd}
       />
     );

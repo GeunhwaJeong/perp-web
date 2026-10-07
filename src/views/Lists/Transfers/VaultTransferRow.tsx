@@ -69,7 +69,7 @@ export const VaultTransferRow = ({
             value={value}
           />
         </div>
-        {transactionHash && (
+        {transactionHash && mintscanTxUrl && (
           <Link
             tw="text-color-text-0"
             href={`${mintscanTxUrl.replace('{tx_hash}', transactionHash)}`}

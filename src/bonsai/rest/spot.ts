@@ -51,7 +51,7 @@ export function setUpTokenMetadataQuery(store: RootStore) {
     const observer = new QueryObserver(appQueryClient, {
       queryKey: ['spot', 'tokenMetadata', currentSpotToken],
       queryFn: wrapAndLogBonsaiError(
-        () => getSpotTokenMetadata(endpoint, currentSpotToken),
+        () => getSpotTokenMetadata(endpoint ?? '', currentSpotToken),
         'spot/tokenMetadata'
       ),
       refetchInterval: timeUnits.minute * 5,
@@ -89,7 +89,7 @@ export function setUpSolPriceQuery(store: RootStore) {
     const observer = new QueryObserver(appQueryClient, {
       queryKey: ['spotTokenPrice', SOL_MINT_ADDRESS],
       queryFn: wrapAndLogBonsaiError(
-        () => getSpotTokenUsdPrice(params.endpoint, SOL_MINT_ADDRESS),
+        () => getSpotTokenUsdPrice(params.endpoint ?? '', SOL_MINT_ADDRESS),
         'spot/solPrice'
       ),
       refetchInterval: timeUnits.second * 10,
@@ -127,7 +127,7 @@ export function setUpSpotTokenPriceQuery(store: RootStore) {
     const observer = new QueryObserver(appQueryClient, {
       queryKey: ['spotTokenPrice', params.currentSpotToken],
       queryFn: wrapAndLogBonsaiError(
-        () => getSpotTokenUsdPrice(params.endpoint, params.currentSpotToken),
+        () => getSpotTokenUsdPrice(params.endpoint ?? '', params.currentSpotToken),
         'spot/tokenPrice'
       ),
       refetchInterval: timeUnits.second * 10,
@@ -177,7 +177,7 @@ export function setUpPortfolioTradesQuery(store: RootStore) {
     const observer = new QueryObserver(appQueryClient, {
       queryKey: ['spot', 'portfolioTrades', walletAddress],
       queryFn: wrapAndLogBonsaiError(
-        () => getSpotPortfolioTrades(endpoint, walletAddress),
+        () => getSpotPortfolioTrades(endpoint ?? '', walletAddress),
         'spot/portfolioTrades'
       ),
       refetchInterval: timeUnits.minute * 2,

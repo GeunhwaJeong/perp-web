@@ -79,7 +79,7 @@ export const useSpotTransactionSubmit = () => {
       // Create (unsigned) transaction from backend
       step = 'createTransaction';
       const createTransactionTimer = startTimer();
-      const createResponse = await createSpotTransaction(spotApiEndpoint, requestWithAccount);
+      const createResponse = await createSpotTransaction(spotApiEndpoint ?? '', requestWithAccount);
       timingMs.createTransactionMs = createTransactionTimer.elapsed();
 
       // Sign, serialize, and encode
@@ -95,7 +95,7 @@ export const useSpotTransactionSubmit = () => {
       // Land signed transaction
       step = 'landTransaction';
       const landTransactionTimer = startTimer();
-      const landResponse = await landSpotTransaction(spotApiEndpoint, {
+      const landResponse = await landSpotTransaction(spotApiEndpoint ?? '', {
         signedTransaction: signedTransactionBase58,
         expectedTokenMint: payload.tokenMint,
         landingMethod: createResponse.metadata.jupiterRequestId

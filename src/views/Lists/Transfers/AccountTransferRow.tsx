@@ -77,12 +77,14 @@ export const AccountTransferRow = ({
           />
           <span tw="text-color-text-0 font-mini-book">{transferString}</span>
         </div>
-        <Link
-          tw="text-color-text-0"
-          href={`${mintscanTxUrl.replace('{tx_hash}', transactionHash)}`}
-        >
-          <Icon iconName={IconName.LinkOut} />
-        </Link>
+        {mintscanTxUrl && (
+          <Link
+            tw="text-color-text-0"
+            href={`${mintscanTxUrl.replace('{tx_hash}', transactionHash)}`}
+          >
+            <Icon iconName={IconName.LinkOut} />
+          </Link>
+        )}
       </div>
     </$TransferRow>
   );

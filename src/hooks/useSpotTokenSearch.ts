@@ -17,7 +17,7 @@ export const useSpotTokenSearch = (query: string, debounceMs = 300) => {
   return useQuery({
     queryKey: ['spotTokenSearch', debouncedQuery],
     queryFn: wrapAndLogBonsaiError(async (): Promise<SpotHeaderToken[]> => {
-      const res = await searchSpotTokens(spotApiEndpoint, debouncedQuery);
+      const res = await searchSpotTokens(spotApiEndpoint ?? '', debouncedQuery);
       return res.tokens.map((token) => ({
         name: token.name,
         symbol: token.symbol,

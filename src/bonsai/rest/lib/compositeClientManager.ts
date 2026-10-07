@@ -71,7 +71,7 @@ function makeCompositeClient({
 
   async function initializeCompositeClient() {
     const indexerConfig = await getIndexerConfig();
-    const validatorUrl = await getValidatorToUse(chainId, networkConfig.endpoints.validators);
+    const validatorUrl = await getValidatorToUse(chainId, networkConfig.endpoints.validators ?? []);
 
     const compositeClient = await (
       await getLazyCompositeClient()
@@ -103,7 +103,7 @@ function makeCompositeClient({
   }
 
   async function initializeNobleClient() {
-    return (await getLazyStargateClient()).connect(networkConfig.endpoints.nobleValidator);
+    return (await getLazyStargateClient()).connect(networkConfig.endpoints.nobleValidator ?? '');
   }
 
   async function initializeIndexerClient() {

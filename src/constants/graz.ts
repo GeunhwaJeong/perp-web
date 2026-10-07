@@ -48,7 +48,7 @@ export const GRAZ_CHAINS = [
   // dYdX
   {
     chainId: dydxChainId,
-    rpc: ENVIRONMENT_CONFIG_MAP[selectedNetwork].endpoints.validators[0],
+    rpc: ENVIRONMENT_CONFIG_MAP[selectedNetwork].endpoints.validators?.[0] ?? '',
     bech32Config: {
       bech32PrefixAccAddr: BECH32_PREFIX,
     },

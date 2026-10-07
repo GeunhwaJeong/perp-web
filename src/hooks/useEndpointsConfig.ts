@@ -1,26 +1,9 @@
-import { ENVIRONMENT_CONFIG_MAP } from '@/constants/networks';
+import { ENVIRONMENT_CONFIG_MAP, type EndpointsConfig } from '@/constants/networks';
 
 import { getSelectedNetwork } from '@/state/appSelectors';
 import { useAppSelector } from '@/state/appTypes';
 
-export interface EndpointsConfig {
-  indexers: {
-    api: string;
-    socket: string;
-  }[];
-  validators: string[];
-  skip: string;
-  nobleValidator: string;
-  osmosisValidator: string;
-  neutronValidator: string;
-  faucet?: string;
-  stakingAPR?: string;
-  solanaRpcUrl: string;
-  affiliates?: string;
-  spotApi: string;
-  geoV2: string;
-  pnlImageApi: string;
-}
+export type { EndpointsConfig };
 
 export const useEndpointsConfig = () => {
   const selectedNetwork = useAppSelector(getSelectedNetwork);

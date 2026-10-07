@@ -38,6 +38,9 @@ export function setUpGeoQuery(store: RootStore) {
   );
 
   return createStoreEffect(store, geoEndpoint, (endpoint) => {
+    if (endpoint == null) {
+      return undefined;
+    }
     const observer = new QueryObserver(appQueryClient, {
       queryKey: ['geo', endpoint],
       queryFn: wrapAndLogBonsaiError(() => fetchGeo(endpoint), 'geo'),

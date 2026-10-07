@@ -110,7 +110,7 @@ export function createNobleTransactionStoreEffect<T>(
       selectorResults;
     const environmentInfo = ENVIRONMENT_CONFIG_MAP[network];
     const chainId = environmentInfo.dydxChainId as DydxChainId;
-    const nobleClientRpcUrl = environmentInfo.endpoints.nobleValidator;
+    const nobleClientRpcUrl = environmentInfo.endpoints.nobleValidator ?? '';
     const tokenConfig = TOKEN_CONFIG_MAP[chainId];
 
     const wallet = {

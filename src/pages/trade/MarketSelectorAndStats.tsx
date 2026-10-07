@@ -31,6 +31,7 @@ export const MarketSelectorAndStats = ({
 
   const tradeableImageUrl = useAppSelector(BonsaiHelpers.currentMarket.assetLogo);
   const tradeableMarketId = useAppSelector(getCurrentMarketDisplayId) ?? '';
+  const assetId = getAssetFromMarketId(launchableMarketId ?? tradeableMarketId);
 
   return (
     <$Container className={className}>
@@ -38,6 +39,7 @@ export const MarketSelectorAndStats = ({
         launchableMarketId={launchableMarketId}
         currentMarketId={launchableId ?? tradeableMarketId}
         logoUrl={launchableImageUrl ?? tradeableImageUrl}
+        assetId={assetId}
       />
 
       <VerticalSeparator fullHeight />

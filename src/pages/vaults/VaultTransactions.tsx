@@ -127,7 +127,7 @@ export const VaultTransactionsTable = ({
             getCellValue: (row) => row.transactionHash,
             label: stringGetter({ key: STRING_KEYS.TRANSACTION }),
             renderCell: ({ transactionHash }) =>
-              transactionHash ? (
+              transactionHash && mintscanTxUrl ? (
                 <Link
                   withIcon
                   href={`${mintscanTxUrl.replace('{tx_hash}', transactionHash)}`}
