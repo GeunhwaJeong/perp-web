@@ -16,8 +16,3 @@ export const getTvChartConfig = (
   }
   return state.tradingView.chartConfig;
 };
-
-/**
- * @returns the price chart resolution saved by the user
- */
-export const getSavedChartResolution = (state: RootState) => state.tradingView.resolution;

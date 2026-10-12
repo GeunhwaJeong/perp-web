@@ -10,7 +10,8 @@ import { LaunchableMarketDetails } from '@/views/MarketDetails/LaunchableMarketD
 import { MarketLinks } from '@/views/MarketLinks';
 import { DepthChart } from '@/views/charts/DepthChart';
 import { FundingChart } from '@/views/charts/FundingChart';
-import { PriceChart } from '@/views/charts/LightweightChart/PriceChart';
+import { TvChart } from '@/views/charts/TradingView/TvChart';
+import { TvChartLaunchable } from '@/views/charts/TradingView/TvChartLaunchable';
 
 import { useAppDispatch, useAppSelector } from '@/state/appTypes';
 import { getSelectedLocale } from '@/state/localizationSelectors';
@@ -36,7 +37,7 @@ export const InnerPanel = ({ launchableMarketId }: { launchableMarketId?: string
     if (launchableMarketId) {
       return [
         {
-          content: <PriceChart marketId={launchableMarketId} />,
+          content: <TvChartLaunchable marketId={launchableMarketId} />,
           forceMount: true,
           label: stringGetter({ key: STRING_KEYS.PRICE_CHART_SHORT }),
           value: Tab.Price,
@@ -50,7 +51,7 @@ export const InnerPanel = ({ launchableMarketId }: { launchableMarketId?: string
     }
     return [
       {
-        content: <PriceChart />,
+        content: <TvChart />,
         forceMount: true,
         label: stringGetter({ key: STRING_KEYS.PRICE_CHART_SHORT }),
         value: Tab.Price,

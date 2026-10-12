@@ -23,6 +23,7 @@ import { layoutMixins } from '@/styles/layoutMixins';
 
 import { IconName } from '@/components/Icon';
 import { Output, OutputType } from '@/components/Output';
+import { SpotTvChart } from '@/views/charts/TradingView/SpotTvChart';
 
 import { calculateSpotWalletStatus } from '@/state/accountCalculators';
 import { useAppDispatch, useAppSelector } from '@/state/appTypes';
@@ -286,7 +287,7 @@ const SpotPage = () => {
       </$SideGridSection>
 
       <$GridSection gridArea="Inner">
-        {/* The spot chart went with the charting library; this page is not served. */}
+        <SpotTvChart tokenMint={tokenMint} />
         {isDragging && <$CoverUpTradingView />}
       </$GridSection>
 
