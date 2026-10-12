@@ -12,6 +12,7 @@ import {
 import { DEFAULT_RESOLUTION } from '@/constants/candles';
 import { TOGGLE_ACTIVE_CLASS_NAME } from '@/constants/charts';
 import { STRING_KEYS, SUPPORTED_LOCALE_MAP } from '@/constants/localization';
+import { isDev } from '@/constants/networks';
 import type { TvWidget } from '@/constants/tvchart';
 
 import { store } from '@/state/_store';
@@ -135,6 +136,12 @@ export const useTradingView = ({
 
       const tvChartWidget = new Widget(options);
       setTvWidget(tvChartWidget);
+
+      if (isDev && typeof window !== 'undefined') {
+        // Lets the localnet chart suite read the widget's drawings and bars.
+        const w = window as unknown as { haneulPerp?: Record<string, unknown> };
+        w.haneulPerp = { ...w.haneulPerp, tvWidget: tvChartWidget };
+      }
 
       tvChartWidget.onChartReady(() => {
         // Initialize additional right-click-menu options

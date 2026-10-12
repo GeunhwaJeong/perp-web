@@ -7,7 +7,7 @@ import { groupBy } from 'lodash';
 import { DateTime } from 'luxon';
 import type {
   DatafeedConfiguration,
-  ErrorCallback,
+  DatafeedErrorCallback,
   GetMarksCallback,
   HistoryCallback,
   IBasicDataFeed,
@@ -48,9 +48,9 @@ const configurationData: DatafeedConfiguration = {
   supports_marks: true,
   exchanges: [
     {
-      value: 'dYdX', // `exchange` argument for the `searchSymbols` method, if a user selects this exchange
-      name: 'dYdX', // filter name
-      desc: 'dYdX v4 exchange', // full exchange name displayed in the filter popup
+      value: 'Sigma', // `exchange` argument for the `searchSymbols` method, if a user selects this exchange
+      name: 'Sigma', // filter name
+      desc: 'Sigma', // full exchange name displayed in the filter popup
     },
   ],
   symbols_types: [
@@ -99,8 +99,8 @@ export const getDydxDatafeed = (
       name: symbolItem.full_name,
       description: symbolItem.description,
       type: symbolItem.type,
-      exchange: 'dYdX',
-      listed_exchange: 'dYdX',
+      exchange: 'Sigma',
+      listed_exchange: 'Sigma',
       has_intraday: true,
       has_daily: true,
 
@@ -169,7 +169,7 @@ export const getDydxDatafeed = (
       firstDataRequest: boolean;
     },
     onHistoryCallback: HistoryCallback,
-    onErrorCallback: ErrorCallback
+    onErrorCallback: DatafeedErrorCallback
   ) => {
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (!symbolInfo) return;

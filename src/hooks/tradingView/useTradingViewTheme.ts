@@ -8,7 +8,7 @@ import { AppColorMode, AppTheme } from '@/state/appUiConfigs';
 import { getAppColorMode, getAppTheme } from '@/state/appUiConfigsSelectors';
 
 import { assertNever } from '@/lib/assertNever';
-import { getChartLineColors, getWidgetOverrides } from '@/lib/tradingView/utils';
+import { getChartLineStyle, getWidgetOverrides } from '@/lib/tradingView/utils';
 
 import { useSimpleUiEnabled } from '../useSimpleUiEnabled';
 
@@ -97,19 +97,7 @@ export const useTradingViewTheme = ({
         if (chartLines) {
           // Necessary to update existing chart lines
           Object.values(chartLines).forEach(({ chartLineType, line }) => {
-            const { maybeQuantityColor, borderColor, backgroundColor, textColor, textButtonColor } =
-              getChartLineColors({ chartLineType, appTheme, appColorMode });
-
-            if (maybeQuantityColor) {
-              line.setLineColor(maybeQuantityColor).setQuantityBackgroundColor(maybeQuantityColor);
-            }
-
-            line
-              .setQuantityBorderColor(borderColor)
-              .setBodyBackgroundColor(backgroundColor)
-              .setBodyBorderColor(borderColor)
-              .setBodyTextColor(textColor)
-              .setQuantityTextColor(textButtonColor);
+            line.setStyle(getChartLineStyle({ chartLineType, appTheme, appColorMode }));
           });
         }
       });

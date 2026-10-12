@@ -5,7 +5,6 @@ import { PlaceOrderPayload } from '@/bonsai/forms/triggers/types';
 import { isOperationFailure } from '@/bonsai/lib/operationResult';
 import { SubaccountOrder } from '@/bonsai/types/summaryTypes';
 import { OrderSide } from '@dydxprotocol/v4-client-js';
-import { IOrderLineAdapter } from 'public/tradingview/charting_library';
 import { shallowEqual } from 'react-redux';
 import tw from 'twin.macro';
 
@@ -13,7 +12,7 @@ import { AnalyticsEvents } from '@/constants/analytics';
 import { TOGGLE_ACTIVE_CLASS_NAME } from '@/constants/charts';
 import { STRING_KEYS } from '@/constants/localization';
 import { ORDER_TYPE_STRINGS } from '@/constants/trade';
-import type { ChartLine, PositionLineType, TvWidget } from '@/constants/tvchart';
+import type { ChartLine, ChartLineType, PositionLineType, TvWidget } from '@/constants/tvchart';
 import { IndexerOrderSide } from '@/types/indexer/indexerApiGen';
 
 import { Icon, IconName } from '@/components/Icon';
@@ -37,12 +36,11 @@ import {
   getOrderModificationError,
 } from '@/lib/orderModification';
 import { isNewOrderStatusOpen } from '@/lib/orders';
-import { getChartLineColors } from '@/lib/tradingView/utils';
+import { ChartLineShape } from '@/lib/tradingView/chartLineShape';
+import { getChartLineStyle } from '@/lib/tradingView/utils';
 
 import { useCustomNotification } from '../useCustomNotification';
 import { useStringGetter } from '../useStringGetter';
-
-const CHART_LINE_FONT = 'bold 10px Satoshi';
 
 /**
  * @description Hook to handle drawing chart lines
@@ -64,6 +62,16 @@ export const useChartLines = ({
   const dispatch = useAppDispatch();
 
   const chartLinesRef = useRef<Record<string, ChartLine>>({});
+
+  // A line the user deleted from the chart is dropped here so the next sync draws it again.
+  const liveLine = (key: string) => {
+    const line = chartLinesRef.current[key]?.line;
+    if (line?.isGone()) {
+      delete chartLinesRef.current[key];
+      return undefined;
+    }
+    return line;
+  };
 
   const appTheme = useAppSelector(getAppTheme);
   const appColorMode = useAppSelector(getAppColorMode);
@@ -92,29 +100,8 @@ export const useChartLines = ({
     [tvWidget]
   );
 
-  const setLineColorsAndFont = useCallback(
-    ({ chartLine }: { chartLine: ChartLine }) => {
-      const { line, chartLineType } = chartLine;
-      const { maybeQuantityColor, borderColor, backgroundColor, textColor, textButtonColor } =
-        getChartLineColors({
-          appTheme,
-          appColorMode,
-          chartLineType,
-        });
-
-      line
-        .setQuantityBorderColor(borderColor)
-        .setBodyBackgroundColor(backgroundColor)
-        .setBodyBorderColor(borderColor)
-        .setBodyTextColor(textColor)
-        .setQuantityTextColor(textButtonColor)
-        .setBodyFont(CHART_LINE_FONT)
-        .setQuantityFont(CHART_LINE_FONT);
-
-      if (maybeQuantityColor != null) {
-        line.setLineColor(maybeQuantityColor).setQuantityBackgroundColor(maybeQuantityColor);
-      }
-    },
+  const lineStyle = useCallback(
+    (chartLineType: ChartLineType) => getChartLineStyle({ appTheme, appColorMode, chartLineType }),
     [appColorMode, appTheme]
   );
 
@@ -133,7 +120,7 @@ export const useChartLines = ({
       size?: number | null;
     }) => {
       const shouldShow = !!(size && price);
-      const maybePositionLine = chartLinesRef.current[key]?.line;
+      const maybePositionLine = liveLine(key);
 
       if (!shouldShow) {
         if (maybePositionLine) {
@@ -152,22 +139,18 @@ export const useChartLines = ({
         if (maybePositionLine.getQuantity() !== quantity) {
           maybePositionLine.setQuantity(quantity);
         }
-      } else {
-        const positionLine = tvWidget
-          ?.chart()
-          .createPositionLine({ disableUndo: false })
-          .setPrice(formattedPrice)
-          .setQuantity(quantity)
-          .setText(label);
-
-        if (positionLine) {
-          const chartLine: ChartLine = { line: positionLine, chartLineType };
-          setLineColorsAndFont({ chartLine });
-          chartLinesRef.current[key] = chartLine;
-        }
+      } else if (tvWidget) {
+        const positionLine = new ChartLineShape(tvWidget, {
+          price: formattedPrice,
+          quantity,
+          text: label,
+          style: lineStyle(chartLineType),
+          movable: false,
+        });
+        chartLinesRef.current[key] = { line: positionLine, chartLineType };
       }
     },
-    [setLineColorsAndFont, tvWidget]
+    [lineStyle, tvWidget]
   );
 
   const updatePositionLines = useCallback(() => {
@@ -227,7 +210,7 @@ export const useChartLines = ({
 
   const notify = useCustomNotification();
   const onMoveOrderLine = useCallback(
-    async (order: SubaccountOrder, orderLine?: IOrderLineAdapter) => {
+    async (order: SubaccountOrder, orderLine?: ChartLineShape) => {
       if (!orderLine || !canModifyOrderTypeFromChart(order)) return;
 
       const oldPrice = (order.triggerPrice ?? order.price).toNumber();
@@ -318,7 +301,7 @@ export const useChartLines = ({
         (!!pendingReplacementOrder && !replacementOrderPlaced) ||
         (!cancelReason && status != null && isNewOrderStatusOpen(status));
 
-      const maybeOrderLine = chartLinesRef.current[key]?.line;
+      const maybeOrderLine = liveLine(key);
 
       const pendingReplacementOrderPrice =
         pendingReplacementOrder?.orderPayload.triggerPrice ??
@@ -341,23 +324,19 @@ export const useChartLines = ({
           if (maybeOrderLine.getQuantity() !== quantity) {
             maybeOrderLine.setQuantity(quantity);
           }
-        } else {
-          const orderLine = tvWidget
-            ?.chart()
-            .createOrderLine({ disableUndo: false })
-            .setPrice(formattedPrice)
-            .setQuantity(quantity)
-            .setText(orderString);
-          if (orderLine) {
-            const chartLine: ChartLine = {
-              line: orderLine,
-              chartLineType: side === IndexerOrderSide.BUY ? OrderSide.BUY : OrderSide.SELL,
-            };
-            setLineColorsAndFont({ chartLine });
-            chartLinesRef.current[key] = chartLine;
-          }
-          if (canModifyOrderTypeFromChart(order)) {
-            orderLine?.onMove(() => onMoveOrderLine(order, orderLine));
+        } else if (tvWidget) {
+          const chartLineType = side === IndexerOrderSide.BUY ? OrderSide.BUY : OrderSide.SELL;
+          const movable = canModifyOrderTypeFromChart(order);
+          const orderLine = new ChartLineShape(tvWidget, {
+            price: formattedPrice,
+            quantity,
+            text: orderString,
+            style: lineStyle(chartLineType),
+            movable,
+          });
+          chartLinesRef.current[key] = { line: orderLine, chartLineType };
+          if (movable) {
+            orderLine.onMove(() => onMoveOrderLine(order, orderLine));
           }
 
           // Update pendingOrderAdjustmentRef here instead of a separate useEffect so that
@@ -380,7 +359,7 @@ export const useChartLines = ({
         line.line.remove();
         delete chartLinesRef.current[key];
       });
-  }, [currentMarketOrders, stringGetter, tvWidget, setLineColorsAndFont, onMoveOrderLine]);
+  }, [currentMarketOrders, stringGetter, tvWidget, lineStyle, onMoveOrderLine]);
 
   const clearChartLines = useCallback(() => {
     Object.values(chartLinesRef.current).forEach(({ line }) => {

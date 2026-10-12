@@ -18,6 +18,7 @@ import { AppTheme, type AppColorMode } from '@/state/appUiConfigs';
 
 import { getDisplayableTickerFromMarket } from '../assetUtils';
 import { isPresent } from '../typeUtils';
+import type { ChartLineStyle } from './chartLineShape';
 
 // Show order book candles instead of trade candles if there are no trades in that time period
 const MAX_NUM_TRADES_FOR_ORDERBOOK_PRICES = 1;
@@ -123,13 +124,13 @@ export const mapCandle = ({
 
 export const getSymbol = (marketId: string): TradingViewSymbol => ({
   description: marketId,
-  exchange: 'dYdX',
+  exchange: 'Sigma',
   full_name: getDisplayableTickerFromMarket(marketId),
   symbol: marketId,
   type: 'crypto',
 });
 
-export const getChartLineColors = ({
+export const getChartLineStyle = ({
   appTheme,
   appColorMode,
   chartLineType,
@@ -137,22 +138,16 @@ export const getChartLineColors = ({
   appTheme: AppTheme;
   appColorMode: AppColorMode;
   chartLineType: ChartLineType;
-}) => {
+}): ChartLineStyle => {
   const theme = Themes[appTheme][appColorMode];
-  const orderColors = {
-    [OrderSide.BUY]: theme.positive,
-    [OrderSide.SELL]: theme.negative,
-    entry: null,
-    liquidation: theme.warning,
+  const styles: Record<ChartLineType, ChartLineStyle> = {
+    [OrderSide.BUY]: { lineColor: theme.positive, textColor: theme.positive, lineStyle: 'dashed' },
+    [OrderSide.SELL]: { lineColor: theme.negative, textColor: theme.negative, lineStyle: 'dashed' },
+    entry: { lineColor: theme.textPrimary, textColor: theme.textPrimary, lineStyle: 'solid' },
+    liquidation: { lineColor: theme.warning, textColor: theme.warning, lineStyle: 'dotted' },
   };
 
-  return {
-    maybeQuantityColor: orderColors[chartLineType],
-    borderColor: theme.borderDefault,
-    backgroundColor: theme.layer1,
-    textColor: theme.textTertiary,
-    textButtonColor: theme.textButton,
-  };
+  return styles[chartLineType];
 };
 
 const timezone = DateTime.local().get('zoneName') as unknown as Timezone;

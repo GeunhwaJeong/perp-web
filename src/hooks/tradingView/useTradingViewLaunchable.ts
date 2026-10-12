@@ -56,7 +56,7 @@ export const useTradingViewLaunchable = ({
   const assetDataLoading = assetData == null;
 
   useEffect(() => {
-    if (marketId && !assetDataLoading && !tvWidget) {
+    if (marketId && metadataEndpoint && !assetDataLoading && !tvWidget) {
       const widgetOptions = getWidgetOptions(true, isSimpleUi, isTablet);
       const widgetOverrides = getWidgetOverrides({ appTheme, appColorMode, isSimpleUi });
       const languageCode = SUPPORTED_LOCALE_MAP[selectedLocale].baseTag;
