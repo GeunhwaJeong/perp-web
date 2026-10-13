@@ -19,12 +19,14 @@ export const CreateScreen = ({
   suggested,
   initialName,
   onContinue,
+  isPending,
   goBack,
   onClose,
 }: {
   suggested: SuggestedName;
   initialName?: string;
   onContinue: (name: string) => void;
+  isPending?: boolean;
   goBack: () => void;
   onClose: () => void;
 }) => {
@@ -79,6 +81,7 @@ export const CreateScreen = ({
         <BrandedButton
           size="large"
           disabled={!canContinue || suggested.isInitializing}
+          loading={isPending}
           onClick={() => onContinue(value)}
         >
           Continue

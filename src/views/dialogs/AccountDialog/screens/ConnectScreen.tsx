@@ -80,6 +80,7 @@ export const ConnectScreen = ({
   error,
   onCreateAccount,
   onLogIn,
+  onPasskey,
   hasLocalAccount,
 }: {
   wallets: WalletInfo[];
@@ -88,6 +89,7 @@ export const ConnectScreen = ({
   error?: string;
   onCreateAccount: () => void;
   onLogIn: () => void;
+  onPasskey: () => void;
   hasLocalAccount: boolean;
 }) => {
   const [showAll, setShowAll] = useState(false);
@@ -100,6 +102,15 @@ export const ConnectScreen = ({
 
       <Column $gap={spacing.s12}>
         <OptionGroup>
+          <OptionRow type="button" onClick={onPasskey} disabled={connectingWallet !== undefined}>
+            <OptionIcon $tint>
+              <PasskeyIcon size={24} />
+            </OptionIcon>
+            <OptionLabel>
+              <span>Passkey</span>
+              <span>Face ID or fingerprint, on chain</span>
+            </OptionLabel>
+          </OptionRow>
           {wallets.length === 0 ? (
             <$Empty>No wallet extension detected in this browser.</$Empty>
           ) : (

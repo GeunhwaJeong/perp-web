@@ -2,9 +2,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
   BiometricCancelledError,
+  createPasskeyAccount,
   InvalidPasswordError,
   isPlatformAuthenticatorAvailable,
+  passkeyAccountStore,
+  recoverPasskeyAccount,
   SIGMA_ACCOUNT_WALLET_NAME,
+  SIGMA_PASSKEY_WALLET_NAME,
 } from '@/haneul/account';
 import { dAppKit, type HaneulNetwork } from '@/haneul/dAppKit';
 import { lookupPrimaryName, NAME_SERVICE_CONFIGS, requestNameIssue } from '@/haneul/names';
@@ -28,6 +32,7 @@ import { CompleteScreen } from './screens/CompleteScreen';
 import { ConnectScreen } from './screens/ConnectScreen';
 import { CreateScreen } from './screens/CreateScreen';
 import { ImportScreen } from './screens/ImportScreen';
+import { PasskeyScreen } from './screens/PasskeyScreen';
 import { PasswordScreen } from './screens/PasswordScreen';
 import { ResetScreen, UnlockScreen } from './screens/UnlockScreen';
 import { WelcomeScreen } from './screens/WelcomeScreen';
@@ -40,6 +45,7 @@ const SCREENS = [
   'unlock',
   'reset',
   'connect',
+  'passkey',
   'welcome',
   'create',
   'password',
@@ -94,6 +100,8 @@ export const AccountDialog = ({ setIsOpen: setIsOpenRaw }: DialogProps<Onboardin
     account && status !== 'unlocked' ? 'unlock' : 'connect'
   );
   const [pendingName, setPendingName] = useState<string>();
+  // Which kind of account the create screen's name is for.
+  const [mode, setMode] = useState<'local' | 'passkey'>('local');
   const [pendingMnemonic, setPendingMnemonic] = useState<string>();
   // Held only between the password screen and the Face ID offer, then dropped.
   const [pendingPassword, setPendingPassword] = useState<string>();
@@ -129,7 +137,15 @@ export const AccountDialog = ({ setIsOpen: setIsOpenRaw }: DialogProps<Onboardin
   }, [currentOnboardingStep, dydxAddress, screen, setIsOpen]);
 
   const externalWallets = useMemo(
-    () => availableWallets.filter((wallet) => wallet.name !== SIGMA_ACCOUNT_WALLET_NAME),
+    () =>
+      availableWallets.filter(
+        (wallet) =>
+          wallet.name !== SIGMA_ACCOUNT_WALLET_NAME && wallet.name !== SIGMA_PASSKEY_WALLET_NAME
+      ),
+    [availableWallets]
+  );
+  const passkeyWallet = useMemo(
+    () => availableWallets.find((wallet) => wallet.name === SIGMA_PASSKEY_WALLET_NAME),
     [availableWallets]
   );
   const sigmaWallet = useMemo(
@@ -142,11 +158,21 @@ export const AccountDialog = ({ setIsOpen: setIsOpenRaw }: DialogProps<Onboardin
     await selectWallet(sigmaWallet);
   }, [selectWallet, sigmaWallet]);
 
+  const connectPasskeyWallet = useCallback(async () => {
+    if (!passkeyWallet) throw new Error('The Sigma passkey wallet is not registered');
+    await selectWallet(passkeyWallet);
+  }, [passkeyWallet, selectWallet]);
+
   /** Writes the chosen name on chain through the issuer; the UI never waits on it. */
   const issueName = useCallback(
-    (name: string, address: string) => {
+    (name: string, address: string, target: 'local' | 'passkey') => {
       requestNameIssue({ name, address })
-        .then(() => store.setName({ username: name, status: 'claimed' }))
+        .then(() =>
+          (target === 'local' ? store : passkeyAccountStore).setName({
+            username: name,
+            status: 'claimed',
+          })
+        )
         .catch((issueError: unknown) => log('AccountDialog/issueName', asError(issueError)));
     },
     [store]
@@ -198,8 +224,25 @@ export const AccountDialog = ({ setIsOpen: setIsOpenRaw }: DialogProps<Onboardin
       await store.create({ username, password });
       await connectSigmaWallet();
       const address = store.address;
-      if (username && address) issueName(username, address);
+      if (username && address) issueName(username, address, 'local');
     }, password);
+
+  const onCreatePasskey = () =>
+    finish(async () => {
+      const username = pendingName;
+      const record = await createPasskeyAccount(username);
+      passkeyAccountStore.set(record);
+      await connectPasskeyWallet();
+      if (username) issueName(username, record.address, 'passkey');
+    });
+
+  const onRecoverPasskey = () =>
+    finish(async () => {
+      const record = await recoverPasskeyAccount();
+      passkeyAccountStore.set(record);
+      await connectPasskeyWallet();
+      recoverName(record.address);
+    });
 
   const onImport = (password: string) =>
     finish(async () => {
@@ -260,6 +303,16 @@ export const AccountDialog = ({ setIsOpen: setIsOpenRaw }: DialogProps<Onboardin
     }
   };
 
+  const passkeyRecord = passkeyAccountStore.getSnapshot();
+  const completed =
+    mode === 'passkey' && passkeyRecord
+      ? passkeyRecord
+      : {
+          username: account?.username,
+          address: account?.address ?? '',
+          nameStatus: account?.nameStatus,
+        };
+
   const onSelectWallet = (wallet: WalletInfo) => {
     if (isWorking) return;
     inBackground(selectWallet(wallet));
@@ -300,9 +353,24 @@ export const AccountDialog = ({ setIsOpen: setIsOpenRaw }: DialogProps<Onboardin
           onSelectWallet={onSelectWallet}
           connectingWallet={selectedWallet}
           error={selectedWalletError}
-          onCreateAccount={() => go('welcome')}
+          onCreateAccount={() => {
+            setMode('local');
+            go('welcome');
+          }}
           onLogIn={() => go(hasLocalAccount ? 'unlock' : 'import')}
+          onPasskey={() => {
+            setMode('passkey');
+            go('passkey');
+          }}
           hasLocalAccount={hasLocalAccount}
+        />
+        <PasskeyScreen
+          onCreate={() => go('create')}
+          onRecover={onRecoverPasskey}
+          isPending={isWorking}
+          error={error}
+          goBack={() => go('connect')}
+          onClose={close}
         />
         <WelcomeScreen onContinue={() => go('create')} onClose={close} />
         <CreateScreen
@@ -310,9 +378,14 @@ export const AccountDialog = ({ setIsOpen: setIsOpenRaw }: DialogProps<Onboardin
           initialName={pendingName}
           onContinue={(name) => {
             setPendingName(name);
-            go('password');
+            if (mode === 'passkey') {
+              inBackground(onCreatePasskey());
+            } else {
+              go('password');
+            }
           }}
-          goBack={() => go('welcome')}
+          isPending={mode === 'passkey' && isWorking}
+          goBack={() => go(mode === 'passkey' ? 'passkey' : 'welcome')}
           onClose={close}
         />
         <PasswordScreen
@@ -348,9 +421,9 @@ export const AccountDialog = ({ setIsOpen: setIsOpenRaw }: DialogProps<Onboardin
           error={error}
         />
         <CompleteScreen
-          username={account?.username}
-          address={account?.address ?? ''}
-          nameStatus={account?.nameStatus}
+          username={completed.username}
+          address={completed.address}
+          nameStatus={completed.nameStatus}
           onDone={close}
           onBackUp={close}
         />

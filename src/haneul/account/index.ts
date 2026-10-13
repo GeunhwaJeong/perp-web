@@ -8,3 +8,14 @@ export {
   SigmaAccountWallet,
   sigmaAccountWalletInitializer,
 } from './SigmaAccountWallet';
+export {
+  createPasskeyAccount,
+  passkeyAccountStore,
+  recoverPasskeyAccount,
+  type PasskeyAccountRecord,
+} from './passkey';
+export {
+  SIGMA_PASSKEY_WALLET_NAME,
+  SigmaPasskeyWallet,
+  sigmaPasskeyWalletInitializer,
+} from './SigmaPasskeyWallet';
