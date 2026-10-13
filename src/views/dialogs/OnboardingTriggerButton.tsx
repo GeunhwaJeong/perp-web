@@ -19,12 +19,13 @@ type StyleProps = {
 
 /**
  * The header's call to action. "Get started" for a visitor, "Log in" when this browser
- * already holds an account that is locked, the Uniswap pairing; always the accent pill.
+ * already holds an account that is locked, the Uniswap pairing, in the app's own
+ * rounded-rectangle button.
  */
 export const OnboardingTriggerButton = ({
   onClick,
   className,
-  shape = ButtonShape.Pill,
+  shape = ButtonShape.Rectangle,
   size = ButtonSize.Small,
 }: OnboardingTriggerButtonProps & StyleProps) => {
   const isSimpleUi = useSimpleUiEnabled();
