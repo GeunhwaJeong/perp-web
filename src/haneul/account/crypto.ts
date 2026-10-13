@@ -81,6 +81,13 @@ export const exportRawKey = async (key: CryptoKey): Promise<Uint8Array> =>
 
 export const generateRawKey = (): Uint8Array => randomBytes(AES_KEY_BITS / 8);
 
+// WebCrypto rejects `additionalData: undefined` outright, so the key is only set when used.
+const gcmParams = (iv: Uint8Array, additionalData?: string): AesGcmParams => ({
+  name: 'AES-GCM',
+  iv: asBuffer(iv),
+  ...(additionalData ? { additionalData: asBuffer(utf8ToBytes(additionalData)) } : {}),
+});
+
 export const encryptWithKey = async ({
   key,
   plaintext,
@@ -92,11 +99,7 @@ export const encryptWithKey = async ({
 }): Promise<{ ciphertext: Uint8Array; iv: Uint8Array }> => {
   const iv = randomBytes(IV_BYTES);
   const ciphertext = await subtle().encrypt(
-    {
-      name: 'AES-GCM',
-      iv,
-      additionalData: additionalData ? asBuffer(utf8ToBytes(additionalData)) : undefined,
-    },
+    gcmParams(iv, additionalData),
     key,
     asBuffer(plaintext)
   );
@@ -116,11 +119,7 @@ export const decryptWithKey = async ({
 }): Promise<Uint8Array> => {
   try {
     const plaintext = await subtle().decrypt(
-      {
-        name: 'AES-GCM',
-        iv: asBuffer(iv),
-        additionalData: additionalData ? asBuffer(utf8ToBytes(additionalData)) : undefined,
-      },
+      gcmParams(iv, additionalData),
       key,
       asBuffer(ciphertext)
     );
