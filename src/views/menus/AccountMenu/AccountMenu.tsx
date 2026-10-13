@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 
 import { BonsaiCore } from '@/bonsai/ontology';
+import { SIGMA_ACCOUNT_WALLET_NAME } from '@/haneul/account';
 import { LAMPORTS_PER_SOL } from '@solana/web3.js';
 import styled, { css } from 'styled-components';
 import tw from 'twin.macro';
@@ -20,6 +21,7 @@ import { useBreakpoints } from '@/hooks/useBreakpoints';
 import { useComplianceState } from '@/hooks/useComplianceState';
 import { useEnableSpot } from '@/hooks/useEnableSpot';
 import { useEnvFeatures } from '@/hooks/useEnvFeatures';
+import { useLocalAccount } from '@/hooks/useLocalAccount';
 import { useMobileAppUrl } from '@/hooks/useMobileAppUrl';
 import { useStatsigGateValue } from '@/hooks/useStatsig';
 import { useStringGetter } from '@/hooks/useStringGetter';
@@ -80,6 +82,8 @@ export const AccountMenu = () => {
     canDeriveSolanaWallet,
   } = useAccounts();
   const { registerAffiliate } = useSubaccount();
+  const { account: localAccount, store: localAccountStore } = useLocalAccount();
+  const isSigmaAccount = walletInfo?.name === SIGMA_ACCOUNT_WALLET_NAME && localAccount !== null;
 
   const onRecoverKeys = () => {
     dispatch(openDialog(DialogTypes.Onboarding()));
@@ -279,6 +283,42 @@ export const AccountMenu = () => {
               dispatch(openDialog(DialogTypes.ShareAffiliate()));
             },
           },
+        ...(isSigmaAccount
+          ? [
+              {
+                value: 'RecoveryPhrase',
+                icon: <Icon iconName={IconName.ExportKeys} />,
+                label: (
+                  <span>
+                    Recovery phrase{' '}
+                    {!localAccount.backedUpAt && <Tag sign={TagSign.Warning}>Back up</Tag>}
+                  </span>
+                ),
+                onSelect: () =>
+                  dispatch(openDialog(DialogTypes.AccountSecurity({ intent: 'recoveryPhrase' }))),
+              },
+              {
+                value: 'FaceIdUnlock',
+                icon: <Icon iconName={IconName.Lock} />,
+                label: localAccount.biometric ? 'Turn off Face ID unlock' : 'Unlock with Face ID',
+                onSelect: () =>
+                  localAccount.biometric
+                    ? localAccountStore.disableBiometric()
+                    : dispatch(
+                        openDialog(DialogTypes.AccountSecurity({ intent: 'enableBiometric' }))
+                      ),
+              },
+              {
+                value: 'LockAccount',
+                icon: <Icon iconName={IconName.Lock} />,
+                label: 'Lock',
+                onSelect: () => {
+                  localAccountStore.lock();
+                  dispatch(openDialog(DialogTypes.DisconnectWallet()));
+                },
+              },
+            ]
+          : []),
         {
           value: 'Preferences',
           icon: <Icon iconName={IconName.Gear} />,

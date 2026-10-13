@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   BiometricCancelledError,
   InvalidPasswordError,
+  isPlatformAuthenticatorAvailable,
   SIGMA_ACCOUNT_WALLET_NAME,
 } from '@/haneul/account';
 import { dAppKit, type HaneulNetwork } from '@/haneul/dAppKit';
@@ -22,6 +23,7 @@ import { useAppDispatch, useAppSelector } from '@/state/appTypes';
 import { log } from '@/lib/telemetry';
 
 import { AccountModal, Pager } from './AccountModal';
+import { BiometricScreen } from './screens/BiometricScreen';
 import { CompleteScreen } from './screens/CompleteScreen';
 import { ConnectScreen } from './screens/ConnectScreen';
 import { CreateScreen } from './screens/CreateScreen';
@@ -43,12 +45,18 @@ const SCREENS = [
   'password',
   'import',
   'importPassword',
+  'biometric',
   'complete',
 ] as const;
 type Screen = (typeof SCREENS)[number];
 
 // Screens the dialog must not auto-close out of once the wallet is connected.
-const HELD_OPEN: ReadonlySet<Screen> = new Set(['password', 'importPassword', 'complete']);
+const HELD_OPEN: ReadonlySet<Screen> = new Set([
+  'password',
+  'importPassword',
+  'biometric',
+  'complete',
+]);
 // Screens where a stray click outside would lose typed input.
 const NOT_DISMISSIBLE: ReadonlySet<Screen> = new Set(['password', 'importPassword', 'import']);
 
@@ -87,6 +95,8 @@ export const AccountDialog = ({ setIsOpen: setIsOpenRaw }: DialogProps<Onboardin
   );
   const [pendingName, setPendingName] = useState<string>();
   const [pendingMnemonic, setPendingMnemonic] = useState<string>();
+  // Held only between the password screen and the Face ID offer, then dropped.
+  const [pendingPassword, setPendingPassword] = useState<string>();
   const [isWorking, setIsWorking] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState<string>();
@@ -156,7 +166,7 @@ export const AccountDialog = ({ setIsOpen: setIsOpenRaw }: DialogProps<Onboardin
   );
 
   const finish = useCallback(
-    async (work: () => Promise<void>) => {
+    async (work: () => Promise<void>, password?: string) => {
       setIsWorking(true);
       setError(undefined);
       try {
@@ -166,7 +176,13 @@ export const AccountDialog = ({ setIsOpen: setIsOpenRaw }: DialogProps<Onboardin
           setTimeout(resolve, SUCCESS_DISPLAY_MS);
         });
         setIsSuccess(false);
-        go('complete');
+        // Offer Face ID only where the platform can do it; otherwise straight to done.
+        if (password && (await isPlatformAuthenticatorAvailable())) {
+          setPendingPassword(password);
+          go('biometric');
+        } else {
+          go('complete');
+        }
       } catch (workError) {
         setError(errorMessage(workError, 'Something went wrong. Try again.'));
       } finally {
@@ -183,7 +199,7 @@ export const AccountDialog = ({ setIsOpen: setIsOpenRaw }: DialogProps<Onboardin
       await connectSigmaWallet();
       const address = store.address;
       if (username && address) issueName(username, address);
-    });
+    }, password);
 
   const onImport = (password: string) =>
     finish(async () => {
@@ -192,7 +208,29 @@ export const AccountDialog = ({ setIsOpen: setIsOpenRaw }: DialogProps<Onboardin
       setPendingMnemonic(undefined);
       await connectSigmaWallet();
       if (store.address) recoverName(store.address);
-    });
+    }, password);
+
+  const onEnableBiometric = async () => {
+    if (!pendingPassword) return;
+    setIsWorking(true);
+    setError(undefined);
+    try {
+      await store.enableBiometric(pendingPassword);
+      setPendingPassword(undefined);
+      go('complete');
+    } catch (enrolError) {
+      if (!(enrolError instanceof BiometricCancelledError)) {
+        setError(errorMessage(enrolError, 'Could not set up Face ID on this device.'));
+      }
+    } finally {
+      setIsWorking(false);
+    }
+  };
+
+  const onSkipBiometric = () => {
+    setPendingPassword(undefined);
+    go('complete');
+  };
 
   const onUnlock = async (password: string) => {
     setIsWorking(true);
@@ -302,6 +340,12 @@ export const AccountDialog = ({ setIsOpen: setIsOpenRaw }: DialogProps<Onboardin
           isSuccess={isSuccess}
           error={error}
           goBack={() => go('import')}
+        />
+        <BiometricScreen
+          onEnable={onEnableBiometric}
+          onSkip={onSkipBiometric}
+          isPending={isWorking}
+          error={error}
         />
         <CompleteScreen
           username={account?.username}

@@ -1,4 +1,4 @@
-export { isPlatformAuthenticatorAvailable } from './biometric';
+export { isPlatformAuthenticatorAvailable, passwordFromBiometric } from './biometric';
 export * from './errors';
 export { isValidMnemonic, mnemonicWords, normalizeMnemonic } from './mnemonic';
 export { localAccountStore, type AccountSnapshot, type AccountStatus } from './store';

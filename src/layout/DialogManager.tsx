@@ -5,6 +5,7 @@ import { DialogTypes } from '@/constants/dialogs';
 
 import { CriteriaDialog } from '@/views/Affiliates/CriteriaDialog';
 import { AccountDialog } from '@/views/dialogs/AccountDialog/AccountDialog';
+import { AccountSecurityDialog } from '@/views/dialogs/AccountDialog/AccountSecurityDialog';
 import { AcknowledgeTermsDialog } from '@/views/dialogs/AcknowledgeTermsDialog';
 import { AdjustIsolatedMarginDialog } from '@/views/dialogs/AdjustIsolatedMarginDialog';
 import { CancelAllOrdersConfirmationDialog } from '@/views/dialogs/CancelAllOrdersConfirmationDialog';
@@ -98,6 +99,7 @@ export const DialogManager = React.memo(() => {
     Help: (args) => <HelpDialog {...args} {...modalProps} />,
     MobileDownload: (args) => <MobileDownloadDialog {...args} {...modalProps} />,
     Onboarding: (args) => <AccountDialog {...args} {...modalProps} />,
+    AccountSecurity: (args) => <AccountSecurityDialog {...args} {...modalProps} />,
     OrderDetails: (args) => <OrderDetailsDialog {...args} {...modalProps} />,
     PredictionMarketIntro: (args) => <PredictionMarketIntroDialog {...args} {...modalProps} />,
     Preferences: (args) => <PreferencesDialog {...args} {...modalProps} />,

@@ -45,6 +45,7 @@ export type OnboardingDialogProps = {};
 export type OrderDetailsDialogProps = { orderId: string };
 export type PredictionMarketIntroDialogProps = {};
 export type PreferencesDialogProps = {};
+export type AccountSecurityDialogProps = { intent: 'recoveryPhrase' | 'enableBiometric' };
 export type RateLimitDialogProps = { preventClose?: boolean };
 export type ReclaimChildSubaccountFundsDialogProps = {};
 export type ReferralDialogProps = { refCode: string };
@@ -118,6 +119,7 @@ export type CoinbaseDepositDialogProps = {
 
 export const DialogTypes = unionize(
   {
+    AccountSecurity: ofType<AccountSecurityDialogProps>(),
     AcknowledgeTerms: ofType<AcknowledgeTermsDialogProps>(),
     AdjustIsolatedMargin: ofType<AdjustIsolatedMarginDialogProps>(),
     CancelAllOrdersConfirmation: ofType<CancelAllOrdersConfirmationDialogProps>(),
