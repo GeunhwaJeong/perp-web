@@ -3,6 +3,7 @@ import { HaneulGrpcClient } from '@haneullabs/haneul/grpc';
 
 import { isDev } from '@/constants/networks';
 
+import { sigmaAccountWalletInitializer } from './account';
 import { devWalletInitializer } from './devWallet';
 import { HANEUL_GRPC_URLS, type HaneulNetwork } from './networks';
 
@@ -18,7 +19,8 @@ const networks: HaneulNetwork[] = isDev ? ['mainnet', 'localnet'] : ['mainnet'];
  *
  * - All chain access goes through the gRPC client's core API; there is no JSON-RPC path.
  * - The Slush web wallet is disabled: it belongs to another network.
- * - Dev builds register a persistent local dev wallet as the test signer.
+ * - The Sigma account (the local, password-sealed key) is always registered as a wallet.
+ * - Dev builds also register a persistent local dev wallet as the test signer.
  */
 export const dAppKit = createDAppKit({
   networks,
@@ -26,7 +28,7 @@ export const dAppKit = createDAppKit({
   createClient: (network) =>
     new HaneulGrpcClient({ network, baseUrl: HANEUL_GRPC_URLS[network as HaneulNetwork] }),
   slushWalletConfig: null,
-  walletInitializers: isDev ? [devWalletInitializer()] : [],
+  walletInitializers: [sigmaAccountWalletInitializer(), ...(isDev ? [devWalletInitializer()] : [])],
   storageKey: 'haneul:dapp-kit',
 });
 
