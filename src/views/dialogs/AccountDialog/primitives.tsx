@@ -125,7 +125,8 @@ const $BrandedButton = styled.button<{
   height: ${({ $size }) => ($size === 'large' ? '56px' : '48px')};
   padding: 0 ${spacing.s16};
   border: 0;
-  border-radius: ${radii.full};
+  /* The app's own button corner (BaseButton's 0.5em), not Uniswap's pill. */
+  border-radius: 0.5em;
   ${({ $size }) => ($size === 'large' ? type.button1 : type.button2)}
   cursor: pointer;
   transition:
