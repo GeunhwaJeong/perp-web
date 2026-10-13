@@ -37,4 +37,6 @@ export const NAME_SERVICE_CONFIGS: Partial<Record<HaneulNetwork, NameServiceConf
  * key signs `admin::reserve_domain` and hands the registration to the address). Unset
  * means names are chosen now and written later.
  */
-export const NAME_ISSUER_URL: string | undefined = import.meta.env.VITE_NAME_ISSUER_URL;
+export const NAME_ISSUER_URL: string | undefined = (
+  import.meta as { env?: { VITE_NAME_ISSUER_URL?: string } }
+).env?.VITE_NAME_ISSUER_URL;

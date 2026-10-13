@@ -51,3 +51,6 @@ local-client-js-hash
 # deployment state of scripts/haneul-mainnet/deploy.mjs (caps, seeds); back it up, never commit it
 .deploy/
 public/configs/haneul/perp.localnet.json
+
+# name issuer ledger (operator state, never committed)
+.name-issuer/
