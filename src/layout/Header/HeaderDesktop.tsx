@@ -11,7 +11,6 @@ import { StatsigFlags } from '@/constants/statsig';
 
 import { useAccounts } from '@/hooks/useAccounts';
 import { useComplianceState } from '@/hooks/useComplianceState';
-import { useEnableSpot } from '@/hooks/useEnableSpot';
 import { useEnvFeatures } from '@/hooks/useEnvFeatures';
 import { useStatsigGateValue } from '@/hooks/useStatsig';
 import { useStringGetter } from '@/hooks/useStringGetter';
@@ -51,7 +50,6 @@ export const HeaderDesktop = () => {
   const { dydxAccounts } = useAccounts();
   const onboardingState = useAppSelector(getOnboardingState);
   const { complianceState } = useComplianceState();
-  const isSpotEnabled = useEnableSpot();
   const { isVaultEnabled, isChainTokenPageEnabled } = useEnvFeatures();
 
   const affiliatesEnabled = useStatsigGateValue(StatsigFlags.ffEnableAffiliates);
@@ -65,11 +63,6 @@ export const HeaderDesktop = () => {
           value: 'TRADE',
           label: stringGetter({ key: STRING_KEYS.TRADE }),
           href: AppRoute.Trade,
-        },
-        isSpotEnabled && {
-          value: 'SPOT',
-          label: stringGetter({ key: STRING_KEYS.SPOT }),
-          href: AppRoute.Spot,
         },
         {
           value: 'MARKETS',

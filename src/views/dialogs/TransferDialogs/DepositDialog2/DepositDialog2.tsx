@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 
 import styled from 'styled-components';
 import { mainnet } from 'viem/chains';
 
-import { AnalyticsEvents } from '@/constants/analytics';
 import { ComplianceStates } from '@/constants/compliance';
 import { DepositDialog2Props, DialogProps } from '@/constants/dialogs';
 import { CosmosChainId } from '@/constants/graz';
@@ -15,20 +14,15 @@ import { WalletNetworkType } from '@/constants/wallets';
 import { useAccounts } from '@/hooks/useAccounts';
 import { useBreakpoints } from '@/hooks/useBreakpoints';
 import { useComplianceState } from '@/hooks/useComplianceState';
-import { useEnableSpot } from '@/hooks/useEnableSpot';
 import { useStringGetter } from '@/hooks/useStringGetter';
 
 import { Dialog, DialogPlacement } from '@/components/Dialog';
 import { LoadingSpace } from '@/components/Loading/LoadingSpinner';
-import { SpotTabItem, SpotTabs } from '@/pages/spot/SpotTabs';
 
 import { SourceAccount } from '@/state/wallet';
 
-import { track } from '@/lib/analytics/analytics';
-
 import { DepositFormContent, DepositFormState } from './DepositForm/DepositFormContainer';
 import { DepositStatus } from './DepositForm/DepositStatus';
-import { SpotDepositForm } from './SpotDepositForm';
 import { useDepositTokenBalances } from './queries';
 
 function getDefaultToken(
@@ -69,31 +63,20 @@ function getDefaultToken(
 }
 
 export const DepositDialog2 = ({ setIsOpen }: DialogProps<DepositDialog2Props>) => {
-  const { sourceAccount, solanaAddress } = useAccounts();
+  const { sourceAccount } = useAccounts();
   const { complianceState } = useComplianceState();
   const { isLoading: isLoadingBalances, withBalances } = useDepositTokenBalances();
   const highestBalance = withBalances.at(0);
 
   const { isMobile } = useBreakpoints();
   const stringGetter = useStringGetter();
-  const isSpotEnabled = useEnableSpot();
 
-  const [currentDepositType, setCurrentDepositType] = useState<'perps' | 'spot'>('perps');
   const [formState, setFormState] = useState<DepositFormState>('form');
   const [currentPerpsDeposit, setCurrentPerpsDeposit] = useState<{
     txHash: string;
     chainId: string;
   }>();
   const tokenSelectRef = useRef<HTMLDivElement | null>(null);
-
-  const handleTabChange = useCallback(
-    (newTab: 'perps' | 'spot') => {
-      if (newTab === currentDepositType) return;
-      setCurrentDepositType(newTab);
-      setFormState('form');
-    },
-    [currentDepositType]
-  );
 
   const dialogTitle = (
     {
@@ -116,47 +99,26 @@ export const DepositDialog2 = ({ setIsOpen }: DialogProps<DepositDialog2Props>) 
     }
   };
 
-  useEffect(() => {
-    // Optimistic Deposit Initiated for tracking purposes
-    if (currentDepositType === 'spot') {
-      track(AnalyticsEvents.SpotDepositInitiated({}));
-    }
-  }, [currentDepositType]);
-
   useLayoutEffect(() => {
-    if (complianceState === ComplianceStates.READ_ONLY) {
+    if (complianceState !== ComplianceStates.FULL_ACCESS) {
       setIsOpen(false);
-    } else if (complianceState !== ComplianceStates.FULL_ACCESS) {
-      handleTabChange('spot');
     }
-  }, [complianceState, handleTabChange, setIsOpen]);
+  }, [complianceState, setIsOpen]);
 
-  const tabs: SpotTabItem[] = [
-    {
-      value: 'perps',
-      label: stringGetter({ key: STRING_KEYS.PERPETUALS }),
-      content: isLoadingBalances ? (
-        <div tw="flex h-full w-full items-center justify-center overflow-hidden">
-          <LoadingSpace tw="my-4" />
-        </div>
-      ) : (
-        <DepositFormContent
-          defaultToken={getDefaultToken(sourceAccount, highestBalance)}
-          formState={formState}
-          setFormState={setFormState}
-          onDeposit={setCurrentPerpsDeposit}
-          tokenSelectRef={tokenSelectRef}
-          onShowForm={onShowForm}
-        />
-      ),
-      disabled: complianceState !== ComplianceStates.FULL_ACCESS,
-    },
-    {
-      value: 'spot',
-      label: stringGetter({ key: STRING_KEYS.SPOT }),
-      content: <SpotDepositForm />,
-    },
-  ];
+  const perpsContent = isLoadingBalances ? (
+    <div tw="flex h-full w-full items-center justify-center overflow-hidden">
+      <LoadingSpace tw="my-4" />
+    </div>
+  ) : (
+    <DepositFormContent
+      defaultToken={getDefaultToken(sourceAccount, highestBalance)}
+      formState={formState}
+      setFormState={setFormState}
+      onDeposit={setCurrentPerpsDeposit}
+      tokenSelectRef={tokenSelectRef}
+      onShowForm={onShowForm}
+    />
+  );
 
   return (
     <$Dialog
@@ -164,7 +126,7 @@ export const DepositDialog2 = ({ setIsOpen }: DialogProps<DepositDialog2Props>) 
       preventCloseOnOverlayClick
       withAnimation
       setIsOpen={setIsOpen}
-      onBack={formState === 'form' || currentDepositType === 'spot' ? undefined : onBack}
+      onBack={formState === 'form' ? undefined : onBack}
       title={dialogTitle}
       placement={isMobile ? DialogPlacement.FullScreen : DialogPlacement.Default}
       hasHeaderBorder
@@ -176,14 +138,7 @@ export const DepositDialog2 = ({ setIsOpen }: DialogProps<DepositDialog2Props>) 
           chainId={currentPerpsDeposit.chainId}
         />
       ) : (
-        <div tw="h-full w-full p-1.25">
-          <SpotTabs
-            value={currentDepositType}
-            onValueChange={(v) => handleTabChange(v as 'perps' | 'spot')}
-            hideTabs={formState !== 'form' || !isSpotEnabled || !solanaAddress}
-            items={tabs}
-          />
-        </div>
+        <div tw="h-full w-full p-1.25">{perpsContent}</div>
       )}
     </$Dialog>
   );

@@ -75,7 +75,6 @@ const PortfolioPage = lazy(() => import('@/pages/portfolio/Portfolio'));
 const AlertsPage = lazy(() => import('@/pages/AlertsPage'));
 const SettingsPage = lazy(() => import('@/pages/settings/Settings'));
 const TradePage = lazy(() => import('@/pages/trade/Trade'));
-const SpotPage = lazy(() => import('@/pages/spot/Spot'));
 const TermsOfUsePage = lazy(() => import('@/pages/TermsOfUsePage'));
 const PrivacyPolicyPage = lazy(() => import('@/pages/PrivacyPolicyPage'));
 const RewardsPage = lazy(() => import('@/pages/token/RewardsPage'));
@@ -210,11 +209,6 @@ const Content = () => {
                   path={AppRoute.Trade}
                   element={showMobileWeb ? <MobileWebTradePage /> : <TradePage />}
                 />
-              </Route>
-
-              <Route path={AppRoute.Spot}>
-                <Route path=":tokenMint" element={<SpotPage />} />
-                <Route index element={<SpotPage />} />
               </Route>
 
               <Route path={AppRoute.TradeForm}>

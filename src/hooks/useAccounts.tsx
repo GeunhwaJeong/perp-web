@@ -1,7 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 import { type LocalWallet, type Subaccount } from '@dydxprotocol/v4-client-js';
-import type { Keypair } from '@solana/web3.js';
 
 import { OnboardingGuard, OnboardingState } from '@/constants/account';
 import { LocalStorageKey } from '@/constants/localStorage';
@@ -131,9 +130,6 @@ const useAccountsContext = () => {
   const nobleAddress = undefined as string | undefined;
   const osmosisAddress = undefined as string | undefined;
   const neutronAddress = undefined as string | undefined;
-  const solanaAddress = undefined as string | undefined;
-  const localSolanaKeypair = undefined as Keypair | undefined;
-  const canDeriveSolanaWallet = false as boolean;
   const setWalletFromSignature = useCallback(
     async (_signature: string) => dydxAddress,
     [dydxAddress]
@@ -165,11 +161,6 @@ const useAccountsContext = () => {
     nobleAddress,
     osmosisAddress,
     neutronAddress,
-
-    // Solana spot accounts
-    solanaAddress,
-    localSolanaKeypair,
-    canDeriveSolanaWallet,
 
     // Onboarding state
     saveHasAcknowledgedTerms,

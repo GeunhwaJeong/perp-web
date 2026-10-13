@@ -11,11 +11,9 @@ import { WalletNetworkType } from '@/constants/wallets';
 
 import { useAccounts } from '@/hooks/useAccounts';
 import { useBreakpoints } from '@/hooks/useBreakpoints';
-import { useEnableSpot } from '@/hooks/useEnableSpot';
 import { useStringGetter } from '@/hooks/useStringGetter';
 
 import { Dialog, DialogPlacement } from '@/components/Dialog';
-import { SpotTabItem, SpotTabs } from '@/pages/spot/SpotTabs';
 
 import { useAppDispatch } from '@/state/appTypes';
 import {
@@ -26,12 +24,11 @@ import {
 } from '@/state/transfers';
 
 import { ChainSelect } from './ChainSelect';
-import { SpotWithdrawForm } from './SpotWithdrawForm';
 import { WithdrawForm } from './WithdrawForm';
 import { WithdrawStatus } from './WithdrawStatus';
 
 export const WithdrawDialog2 = ({ setIsOpen }: DialogProps<DepositDialog2Props>) => {
-  const { dydxAddress, sourceAccount, solanaAddress } = useAccounts();
+  const { dydxAddress, sourceAccount } = useAccounts();
   const [destinationAddress, setDestinationAddress] = useState(sourceAccount.address ?? '');
 
   const { isMobile } = useBreakpoints();
@@ -46,21 +43,9 @@ export const WithdrawDialog2 = ({ setIsOpen }: DialogProps<DepositDialog2Props>)
   const stringGetter = useStringGetter();
   const dispatch = useAppDispatch();
   const [amount, setAmount] = useState('');
-  const [spotDestinationAddress, setSpotDestinationAddress] = useState('');
   const [currentWithdrawId, setCurrentWithdrawId] = useState<string>();
-  const [currentWithdrawType, setCurrentWithdrawType] = useState<'perps' | 'spot'>('perps');
   const [formState, setFormState] = useState<'form' | 'chain-select'>('form');
   const chainSelectRef = useRef<HTMLDivElement | null>(null);
-  const isSpotEnabled = useEnableSpot();
-
-  const handleTabChange = (newTab: 'perps' | 'spot') => {
-    setCurrentWithdrawType(newTab);
-    setAmount('');
-    setDestinationAddress(sourceAccount.address ?? '');
-    setSpotDestinationAddress('');
-    setFormState('form');
-  };
-
   const dialogTitle =
     formState === 'form'
       ? stringGetter({ key: STRING_KEYS.WITHDRAW })
@@ -72,10 +57,6 @@ export const WithdrawDialog2 = ({ setIsOpen }: DialogProps<DepositDialog2Props>)
   };
 
   const onWithdrawSigned = (withdrawId: string) => {
-    setCurrentWithdrawId(withdrawId);
-  };
-
-  const onSpotWithdrawSigned = (withdrawId: string) => {
     setCurrentWithdrawId(withdrawId);
   };
 
@@ -92,63 +73,44 @@ export const WithdrawDialog2 = ({ setIsOpen }: DialogProps<DepositDialog2Props>)
     dispatch(onWithdrawBroadcast({ dydxAddress, withdrawId, subtransaction }));
   };
 
-  const tabs: SpotTabItem[] = [
-    {
-      value: 'perps',
-      label: 'Perpetuals',
-      content: (
-        <div tw="flex h-full w-[200%]">
-          <div
-            tw="w-[50%]"
-            style={{
-              marginLeft: formState === 'form' ? 0 : '-50%',
-              transition: 'margin 500ms',
-            }}
-          >
-            <WithdrawForm
-              amount={amount}
-              setAmount={setAmount}
-              destinationAddress={destinationAddress}
-              setDestinationAddress={setDestinationAddress}
-              destinationChain={destinationChain}
-              onChainSelect={() => setFormState('chain-select')}
-              onWithdraw={onWithdraw}
-              onWithdrawBroadcastUpdate={onWithdrawBroadcastUpdate}
-              onWithdrawSigned={onWithdrawSigned}
-            />
-          </div>
-          <div
-            ref={chainSelectRef}
-            tw="w-[50%] overflow-scroll"
-            style={{
-              pointerEvents: formState === 'form' ? 'none' : undefined,
-              height: formState === 'form' ? 0 : '100%',
-            }}
-          >
-            <ChainSelect
-              disabled={formState === 'form'}
-              selectedChain={destinationChain}
-              setSelectedChain={setDestinationChain}
-              onBack={onShowForm}
-            />
-          </div>
-        </div>
-      ),
-    },
-    {
-      value: 'spot',
-      label: 'Spot',
-      content: (
-        <SpotWithdrawForm
+  const perpsContent = (
+    <div tw="flex h-full w-[200%]">
+      <div
+        tw="w-[50%]"
+        style={{
+          marginLeft: formState === 'form' ? 0 : '-50%',
+          transition: 'margin 500ms',
+        }}
+      >
+        <WithdrawForm
           amount={amount}
           setAmount={setAmount}
-          destinationAddress={spotDestinationAddress}
-          setDestinationAddress={setSpotDestinationAddress}
-          onWithdrawSigned={onSpotWithdrawSigned}
+          destinationAddress={destinationAddress}
+          setDestinationAddress={setDestinationAddress}
+          destinationChain={destinationChain}
+          onChainSelect={() => setFormState('chain-select')}
+          onWithdraw={onWithdraw}
+          onWithdrawBroadcastUpdate={onWithdrawBroadcastUpdate}
+          onWithdrawSigned={onWithdrawSigned}
         />
-      ),
-    },
-  ];
+      </div>
+      <div
+        ref={chainSelectRef}
+        tw="w-[50%] overflow-scroll"
+        style={{
+          pointerEvents: formState === 'form' ? 'none' : undefined,
+          height: formState === 'form' ? 0 : '100%',
+        }}
+      >
+        <ChainSelect
+          disabled={formState === 'form'}
+          selectedChain={destinationChain}
+          setSelectedChain={setDestinationChain}
+          onBack={onShowForm}
+        />
+      </div>
+    </div>
+  );
 
   return (
     <$Dialog
@@ -161,22 +123,9 @@ export const WithdrawDialog2 = ({ setIsOpen }: DialogProps<DepositDialog2Props>)
       placement={isMobile ? DialogPlacement.FullScreen : DialogPlacement.Default}
     >
       {currentWithdrawId && (
-        <WithdrawStatus
-          id={currentWithdrawId}
-          type={currentWithdrawType}
-          onClose={() => setIsOpen(false)}
-        />
+        <WithdrawStatus id={currentWithdrawId} onClose={() => setIsOpen(false)} />
       )}
-      {!currentWithdrawId && (
-        <div tw="h-full w-full overflow-hidden p-1.25">
-          <SpotTabs
-            value={currentWithdrawType}
-            onValueChange={(v) => handleTabChange(v as 'perps' | 'spot')}
-            hideTabs={formState === 'chain-select' || !isSpotEnabled || !solanaAddress}
-            items={tabs}
-          />
-        </div>
-      )}
+      {!currentWithdrawId && <div tw="h-full w-full overflow-hidden p-1.25">{perpsContent}</div>}
     </$Dialog>
   );
 };

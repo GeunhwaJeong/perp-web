@@ -20,7 +20,6 @@ export const useEndpointsConfig = () => {
     stakingAPR: endpointsConfig.stakingAPR,
     solanaRpcUrl: endpointsConfig.solanaRpcUrl,
     affiliatesBaseUrl: endpointsConfig.affiliates,
-    spotApi: endpointsConfig.spotApi,
     geoV2: endpointsConfig.geoV2,
     pnlImageApi: endpointsConfig.pnlImageApi,
   };

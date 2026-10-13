@@ -1,8 +1,6 @@
 import { useMemo } from 'react';
 
-import { BonsaiCore } from '@/bonsai/ontology';
 import { SIGMA_ACCOUNT_WALLET_NAME } from '@/haneul/account';
-import { LAMPORTS_PER_SOL } from '@solana/web3.js';
 import styled, { css } from 'styled-components';
 import tw from 'twin.macro';
 
@@ -19,7 +17,6 @@ import { useAccountBalance } from '@/hooks/useAccountBalance';
 import { useAccounts } from '@/hooks/useAccounts';
 import { useBreakpoints } from '@/hooks/useBreakpoints';
 import { useComplianceState } from '@/hooks/useComplianceState';
-import { useEnableSpot } from '@/hooks/useEnableSpot';
 import { useEnvFeatures } from '@/hooks/useEnvFeatures';
 import { useLocalAccount } from '@/hooks/useLocalAccount';
 import { useMobileAppUrl } from '@/hooks/useMobileAppUrl';
@@ -52,22 +49,17 @@ import { isTruthy } from '@/lib/isTruthy';
 import { MustBigNumber } from '@/lib/numbers';
 import { truncateAddress } from '@/lib/wallet';
 
-import { SpotActions } from './SpotActions';
 import { SubaccountActions } from './SubaccountActions';
 import { WalletActions } from './WalletActions';
-
-// TODO: spot localization
 
 export const AccountMenu = () => {
   const stringGetter = useStringGetter();
   const { isTablet } = useBreakpoints();
   const { complianceState } = useComplianceState();
   const affiliatesEnabled = useStatsigGateValue(StatsigFlags.ffEnableAffiliates);
-  const spotEnabled = useEnableSpot();
   const dispatch = useAppDispatch();
   const onboardingState = useAppSelector(getOnboardingState);
   const freeCollateral = useAppSelector(getSubaccountFreeCollateral);
-  const spotWalletData = useAppSelector(BonsaiCore.spot.walletPositions.data);
 
   const { nativeTokenBalance, usdcBalance } = useAccountBalance();
 
@@ -78,8 +70,6 @@ export const AccountMenu = () => {
   const {
     sourceAccount: { walletInfo },
     dydxAddress,
-    solanaAddress,
-    canDeriveSolanaWallet,
   } = useAccounts();
   const { registerAffiliate } = useSubaccount();
   const { account: localAccount, store: localAccountStore } = useLocalAccount();
@@ -118,18 +108,6 @@ export const AccountMenu = () => {
         onboardingState === OnboardingState.AccountConnected && (
           <div tw="flexColumn gap-1 px-1 pb-0.5 pt-1">
             <div tw="row flex-wrap gap-[0.25rem]">
-              {!!walletInfo && canDeriveSolanaWallet && spotEnabled && solanaAddress && (
-                <$AddressCopyButton
-                  value={solanaAddress}
-                  size={ButtonSize.XSmall}
-                  shape={ButtonShape.Pill}
-                  copyIconPosition="end"
-                  action={ButtonAction.Base}
-                >
-                  <Icon iconName={IconName.Sol} size="1.25rem" />
-                  {stringGetter({ key: STRING_KEYS.SPOT })}
-                </$AddressCopyButton>
-              )}
               <$AddressCopyButton
                 value={dydxAddress}
                 size={ButtonSize.XSmall}
@@ -213,25 +191,6 @@ export const AccountMenu = () => {
                   withOnboarding
                 />
               </div>
-              {canDeriveSolanaWallet && spotEnabled && (
-                <div>
-                  <div>
-                    <$label>
-                      Spot Sol Balance
-                      <Icon iconName={IconName.Sol} size="1rem" />
-                    </$label>
-                    <$BalanceOutput
-                      type={OutputType.Asset}
-                      value={
-                        spotWalletData?.solBalance
-                          ? spotWalletData.solBalance / LAMPORTS_PER_SOL
-                          : 0
-                      }
-                    />
-                  </div>
-                  <SpotActions />
-                </div>
-              )}
             </$Balances>
             {showConfirmPendingDeposit && (
               <$ConfirmPendingDeposit>

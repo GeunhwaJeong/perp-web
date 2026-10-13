@@ -32,7 +32,6 @@ export interface EndpointsConfig {
   stakingAPR?: string;
   solanaRpcUrl?: string;
   affiliates?: string;
-  spotApi?: string;
   geoV2?: string;
   pnlImageApi?: string;
   metadataService?: string;

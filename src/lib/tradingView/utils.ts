@@ -205,8 +205,7 @@ export const getWidgetOverrides = ({
 export const getWidgetOptions = (
   isViewingUnlaunchedMarket?: boolean,
   isSimpleUi?: boolean,
-  isTablet?: boolean,
-  isViewingSpot?: boolean
+  isTablet?: boolean
 ): Partial<TradingTerminalWidgetOptions> & Pick<TradingTerminalWidgetOptions, 'container'> => {
   const disabledFeaturesForUnlaunchedMarket: TradingTerminalFeatureset[] = [
     'chart_scroll',
@@ -241,9 +240,6 @@ export const getWidgetOptions = (
     ? ['iframe_loading_compatibility_mode' as const]
     : [];
 
-  // Features for spot charts (seconds resolution, etc.)
-  const spotFeatures: TradingTerminalFeatureset[] = isViewingSpot ? ['seconds_resolution'] : [];
-
   return {
     // debug: true,
     container: 'tv-price-chart',
@@ -260,7 +256,6 @@ export const getWidgetOptions = (
       'hide_left_toolbar_by_default',
       'hide_right_toolbar',
       ...tabletFeatures,
-      ...spotFeatures,
     ],
   };
 };
