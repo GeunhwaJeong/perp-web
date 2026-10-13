@@ -1,7 +1,7 @@
 /* Constants */
 
 :root {
-  --fontFamily-base: 'Satoshi', system-ui, -apple-system, Helvetica, Arial, sans-serif;
+  --fontFamily-base: 'Switzer', system-ui, -apple-system, Helvetica, Arial, sans-serif;
   --fontFamily-monospace: Courier, monospace, var(--fontFamily-base);
 
   --fontWeight-base-0: 450;
