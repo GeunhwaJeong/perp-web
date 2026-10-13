@@ -1,10 +1,9 @@
 import { OnboardingState } from '@/constants/account';
 import { ButtonAction, ButtonShape, ButtonSize, ButtonType } from '@/constants/buttons';
-import { STRING_KEYS } from '@/constants/localization';
 
 import useOnboardingFlow from '@/hooks/Onboarding/useOnboardingFlow';
+import { useLocalAccount } from '@/hooks/useLocalAccount';
 import { useSimpleUiEnabled } from '@/hooks/useSimpleUiEnabled';
-import { useStringGetter } from '@/hooks/useStringGetter';
 
 import { Button } from '@/components/Button';
 
@@ -18,16 +17,33 @@ type StyleProps = {
   shape?: ButtonShape;
 };
 
+/**
+ * The header's call to action. "Get started" for a visitor, "Log in" when this browser
+ * already holds an account that is locked, the Uniswap pairing; always the accent pill.
+ */
 export const OnboardingTriggerButton = ({
   onClick,
   className,
-  shape,
+  shape = ButtonShape.Pill,
   size = ButtonSize.Small,
 }: OnboardingTriggerButtonProps & StyleProps) => {
-  const stringGetter = useStringGetter();
   const isSimpleUi = useSimpleUiEnabled();
+  const { account, status } = useLocalAccount();
   const { openOnboardingDialog, onboardingState, isAccountViewOnly, isOnboardingDisabled } =
     useOnboardingFlow({ onClick });
+
+  const hasLockedAccount = account !== null && status !== 'unlocked';
+
+  const label =
+    onboardingState === OnboardingState.AccountConnected
+      ? isAccountViewOnly
+        ? 'Unavailable'
+        : 'Log in'
+      : onboardingState === OnboardingState.WalletConnected
+        ? 'Reconnect'
+        : hasLockedAccount
+          ? 'Log in'
+          : 'Get started';
 
   return (
     <Button
@@ -41,14 +57,7 @@ export const OnboardingTriggerButton = ({
       }}
       onClick={openOnboardingDialog}
     >
-      {onboardingState === OnboardingState.AccountConnected
-        ? isAccountViewOnly
-          ? stringGetter({ key: STRING_KEYS.UNAVAILABLE })
-          : stringGetter({ key: STRING_KEYS.SIGN_IN_TITLE })
-        : {
-            [OnboardingState.Disconnected]: stringGetter({ key: STRING_KEYS.SIGN_IN_TITLE }),
-            [OnboardingState.WalletConnected]: stringGetter({ key: STRING_KEYS.RECOVER_KEYS }),
-          }[onboardingState as string]}
+      {label}
     </Button>
   );
 };

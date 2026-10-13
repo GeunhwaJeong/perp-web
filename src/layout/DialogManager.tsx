@@ -4,6 +4,7 @@ import React from 'react';
 import { DialogTypes } from '@/constants/dialogs';
 
 import { CriteriaDialog } from '@/views/Affiliates/CriteriaDialog';
+import { AccountDialog } from '@/views/dialogs/AccountDialog/AccountDialog';
 import { AcknowledgeTermsDialog } from '@/views/dialogs/AcknowledgeTermsDialog';
 import { AdjustIsolatedMarginDialog } from '@/views/dialogs/AdjustIsolatedMarginDialog';
 import { CancelAllOrdersConfirmationDialog } from '@/views/dialogs/CancelAllOrdersConfirmationDialog';
@@ -27,7 +28,6 @@ import { ExternalLinkDialog } from '@/views/dialogs/ExternalLinkDialog';
 import { GlobalCommandDialog } from '@/views/dialogs/GlobalCommandDialog';
 import { HelpDialog } from '@/views/dialogs/HelpDialog';
 import { MobileDownloadDialog } from '@/views/dialogs/MobileDownloadDialog';
-import { OnboardingDialog } from '@/views/dialogs/OnboardingDialog';
 import { PredictionMarketIntroDialog } from '@/views/dialogs/PredictionMarketIntroDialog';
 import { PreferencesDialog } from '@/views/dialogs/PreferencesDialog';
 import { RateLimitDialog } from '@/views/dialogs/RateLimitDialog';
@@ -97,7 +97,7 @@ export const DialogManager = React.memo(() => {
     GlobalCommand: (args) => <GlobalCommandDialog {...args} {...modalProps} />,
     Help: (args) => <HelpDialog {...args} {...modalProps} />,
     MobileDownload: (args) => <MobileDownloadDialog {...args} {...modalProps} />,
-    Onboarding: (args) => <OnboardingDialog {...args} {...modalProps} />,
+    Onboarding: (args) => <AccountDialog {...args} {...modalProps} />,
     OrderDetails: (args) => <OrderDetailsDialog {...args} {...modalProps} />,
     PredictionMarketIntro: (args) => <PredictionMarketIntroDialog {...args} {...modalProps} />,
     Preferences: (args) => <PreferencesDialog {...args} {...modalProps} />,

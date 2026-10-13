@@ -19,6 +19,33 @@ const isNotFound = (error: unknown) =>
   error !== null &&
   (error as { reason?: string }).reason === 'notFound';
 
+/**
+ * The name an address has set as its primary (`reverse_registry`), without the TLD, or
+ * undefined when it has none. Used after a restore to put the username back on the account.
+ */
+export const lookupPrimaryName = async ({
+  client,
+  config,
+  address,
+}: {
+  client: ClientWithCoreApi;
+  config: NameServiceConfig;
+  address: string;
+}): Promise<string | undefined> => {
+  try {
+    const { dynamicField } = await client.core.getDynamicField({
+      parentId: config.reverseRegistryTable,
+      name: { type: 'address', bcs: bcs.Address.serialize(address).toBytes() },
+    });
+    const { labels } = DomainBcs.parse(dynamicField.value.bcs);
+    // labels are TLD first: ["haneul", "name"]
+    return labels.length === 2 && labels[0] === NAME_TLD ? labels[1] : undefined;
+  } catch (error) {
+    if (isNotFound(error)) return undefined;
+    throw error;
+  }
+};
+
 /** True when the table has an entry under `name`, false when it does not; throws otherwise. */
 const hasField = async ({
   client,
