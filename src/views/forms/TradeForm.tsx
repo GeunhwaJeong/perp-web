@@ -273,7 +273,7 @@ const $TradeForm = styled.form`
   isolation: isolate;
 
   ${layoutMixins.flexColumn}
-  gap: 0.75rem;
+  gap: 0.5rem;
 
   ${layoutMixins.stickyArea1}
   --stickyArea1-background: var(--color-layer-2);

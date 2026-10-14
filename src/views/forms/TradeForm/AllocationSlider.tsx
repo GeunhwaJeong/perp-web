@@ -65,7 +65,7 @@ export const AllocationSlider = ({
 
 const $InputContainer = styled.div`
   ${formMixins.inputContainer}
-  --input-height: 3.5rem;
+  --input-height: 2.25rem;
   --input-backgroundColor: none;
 
   @media ${breakpoints.tablet} {
@@ -77,8 +77,8 @@ const $InnerInputContainer = styled.div`
   ${formMixins.inputContainer}
   --input-backgroundColor: var(--color-layer-4);
   --input-borderColor: none;
-  --input-height: 2.25rem;
-  --input-width: 4rem;
+  --input-height: 2rem;
+  --input-width: 3.75rem;
 
   margin-left: 0.25rem;
 
@@ -93,7 +93,7 @@ const $InnerInputContainer = styled.div`
 `;
 
 const $AllocationSlider = styled(Slider)`
-  height: 1.375rem;
+  height: 1.125rem;
 
   --slider-track-background: linear-gradient(
     90deg,

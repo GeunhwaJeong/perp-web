@@ -181,6 +181,10 @@ const $MarketDetailsItems = styled.div`
 const $Details = styled(Details)<{ $horizontalScroll?: boolean }>`
   font: var(--font-mini-book);
 
+  > * {
+    padding: 0 0.75rem;
+  }
+
   @media ${breakpoints.tablet} {
     ${layoutMixins.withOuterAndInnerBorders}
     font: var(--font-small-book);

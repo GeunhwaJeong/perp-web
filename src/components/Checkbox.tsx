@@ -47,10 +47,10 @@ const $Root = styled(Root)`
   --checkbox-backgroundColor: var(--color-layer-0);
   --checkbox-borderColor: var(--color-border);
 
-  min-width: 1.25rem;
-  height: 1.25rem;
+  min-width: 1rem;
+  height: 1rem;
 
-  border-radius: 0.375rem;
+  border-radius: 0.25rem;
   border: var(--border-width) solid var(--checkbox-borderColor);
   background-color: var(--checkbox-backgroundColor);
 

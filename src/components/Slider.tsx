@@ -119,8 +119,8 @@ const $Tick = styled.span<{ $midpoint?: number; $light: boolean; $text?: string 
 `;
 
 const $Thumb = styled(Thumb)`
-  height: 1.375rem;
-  width: 1.375rem;
+  height: 1.125rem;
+  width: 1.125rem;
   display: flex;
   justify-content: center;
   align-items: center;
