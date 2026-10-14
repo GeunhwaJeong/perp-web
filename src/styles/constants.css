@@ -3,7 +3,7 @@
   --default-border-width: 1px;
 
   /* Header + footer constants */
-  --page-header-height: 2.75rem;
+  --page-header-height: 3.5rem;
   --page-header-height-mobile: 4rem;
   --page-footer-height: 2rem;
   --page-footer-height-mobile: 3.5rem;
@@ -13,7 +13,7 @@
   --restriction-warning-height-mobile: min-content;
 
   /* Sidebar constants */
-  --sidebar-width: 20.25rem;
+  --sidebar-width: 16.625rem;
   --spot-sidebar-width: 25rem;
   --collapsed-sidebar-width: 3.5rem;
 
@@ -21,13 +21,17 @@
   --default-page-content-max-width: 80rem;
 
   /* Trade constants */
-  --market-info-row-height: 2.675rem;
+  /* The trade page is a set of panels on a darker page, not one surface cut by lines. */
+  --panel-gap: 3px;
+  --panel-radius: 0.3125rem;
+
+  --market-info-row-height: 3.75rem;
   --market-info-row-height-mobile: 4.5rem;
 
   --tabs-height: 2.675rem;
   --tabs-height-mobile: 3.25rem;
 
-  --orderbook-trades-width: 18.75rem;
+  --orderbook-trades-width: 16.625rem;
 
   --tableHeader-height: 2.5rem;
   --tableHeader-height-mobile: 3.25rem;
