@@ -1,6 +1,12 @@
 import { BonsaiCore } from '@/bonsai/ontology';
 import { OrderStatus, SubaccountOrder } from '@/bonsai/types/summaryTypes';
-import { dAppKit } from '@/haneul/dAppKit';
+import { dAppKit, type HaneulNetwork } from '@/haneul/dAppKit';
+import {
+  looksLikeName,
+  NAME_SERVICE_CONFIGS,
+  normalizeAddressInput,
+  resolveNameAddress,
+} from '@/haneul/names';
 import {
   eventsOf,
   fetchPriceUpdates,
@@ -27,12 +33,17 @@ import {
   type PerpDeployment,
 } from '@/haneul/perp';
 import { signAndExecute } from '@/haneul/perp/executor';
+import { buildCoinSend, isGasCoinType, listCoins } from '@/haneul/transfer';
 import { OrderExecution, OrderSide, OrderTimeInForce, OrderType } from '@dydxprotocol/v4-client-js';
+import type { ClientWithCoreApi } from '@haneullabs/haneul/client';
 
 import { AnalyticsEvents, TradeMetadataSource } from '@/constants/analytics';
 import { STRING_KEYS } from '@/constants/localization';
 import { isDev } from '@/constants/networks';
 import { MARKET_ORDER_MAX_SLIPPAGE, PlaceOrderStatuses } from '@/constants/trade';
+import { DydxChainAsset } from '@/constants/wallets';
+
+import { selectTokenConfigs } from '@/hooks/useTokenConfigs';
 
 import type { RootStore } from '@/state/_store';
 import { store as reduxStore } from '@/state/_store';
@@ -133,6 +144,9 @@ const toOrderSpec = (
         : undefined,
   };
 };
+
+// 0.02 HANEUL left in the wallet when sending the gas coin, enough for a few transactions.
+const GAS_RESERVE_UNITS = 20_000_000n;
 
 const failure = (message: string, stringKey?: string) =>
   wrapSimpleError(FN, message, stringKey ?? STRING_KEYS.SOMETHING_WENT_WRONG);
@@ -719,6 +733,83 @@ export class AccountTransactionSupervisor {
     } catch (error) {
       return this.toFailure(error);
     }
+  }
+
+  /**
+   * Sends coins from the wallet to another address or to a `name.haneul`. The gas coin is split
+   * from the gas object and keeps a reserve for fees; any other coin is merged from the wallet's
+   * coin objects first.
+   */
+  public async sendCoins({
+    asset,
+    amount,
+    recipient,
+  }: {
+    asset: DydxChainAsset;
+    amount: number;
+    recipient: string;
+  }): Promise<OperationResult<{ digest: string; recipient: string; symbol: string }>> {
+    const wallet = await this.walletContext();
+    if (isOperationFailure(wallet)) return wallet;
+    const { address } = wallet.payload;
+    const tokens = selectTokenConfigs(this.store.getState());
+    const token =
+      asset === DydxChainAsset.USDC
+        ? { coinType: tokens.usdcDenom, decimals: tokens.usdcDecimals, symbol: tokens.usdcLabel }
+        : {
+            coinType: tokens.chainTokenDenom,
+            decimals: tokens.chainTokenDecimals,
+            symbol: tokens.chainTokenLabel,
+          };
+    const units = collateralToUnits(amount, token.decimals);
+    if (units <= 0n) return failure('Enter an amount to send', STRING_KEYS.ENTER_AMOUNT);
+    try {
+      const client = dAppKit.getClient();
+      const to = await this.resolveRecipient(client, recipient);
+      if (isOperationFailure(to)) return to;
+      if (to.payload === address) return failure('That is the connected wallet itself');
+      const coins = await listCoins(client, address, token.coinType);
+      const balance = coins.reduce((sum, c) => sum + c.balance, 0n);
+      // The gas coin pays for this transaction too, so a little has to stay behind.
+      const reserve = isGasCoinType(token.coinType) ? GAS_RESERVE_UNITS : 0n;
+      if (balance < units + reserve) {
+        return failure('Not enough in the wallet to send', STRING_KEYS.INSUFFICIENT_BALANCE);
+      }
+      const tx = buildCoinSend({
+        coinType: token.coinType,
+        coins: coins.map((c) => c.objectId),
+        amount: units,
+        recipient: to.payload,
+      });
+      const result = await signAndExecute(tx);
+      appQueryClient
+        .invalidateQueries({ queryKey: ['validator', 'accountBalances'] })
+        .catch(() => undefined);
+      logBonsaiInfo(FN, 'coins sent', { digest: result.digest, amount, symbol: token.symbol });
+      return wrapOperationSuccess({
+        digest: result.digest,
+        recipient: to.payload,
+        symbol: token.symbol,
+      });
+    } catch (error) {
+      return this.toFailure(error);
+    }
+  }
+
+  /** An address as typed, or the address a `name.haneul` points to. */
+  private async resolveRecipient(
+    client: ClientWithCoreApi,
+    input: string
+  ): Promise<OperationResult<string>> {
+    const direct = normalizeAddressInput(input);
+    if (direct) return wrapOperationSuccess(direct);
+    if (!looksLikeName(input)) return failure('Enter an address or a name');
+    const network = dAppKit.stores.$currentNetwork.get() as HaneulNetwork;
+    const config = NAME_SERVICE_CONFIGS[network];
+    if (!config) return failure('Names are not available on this network');
+    const resolved = await resolveNameAddress({ client, config, name: input });
+    if (!resolved) return failure(`${input.trim()} is not a registered name, or points nowhere`);
+    return wrapOperationSuccess(resolved);
   }
 
   /**

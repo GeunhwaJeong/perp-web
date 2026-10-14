@@ -18,4 +18,5 @@ export {
 export { appendRandomDigits, generateNameCandidate } from './generate';
 export { NameIssuerUnavailableError, requestNameIssue } from './issuer';
 export { linkAccountName, type NameOwner } from './link';
+export { looksLikeName, normalizeAddressInput, resolveNameAddress } from './resolve';
 export { setReverseLookup } from './reverse';

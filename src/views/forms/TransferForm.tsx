@@ -1,54 +1,32 @@
-import { useMemo, useState, type FormEvent } from 'react';
+import { type FormEvent, useState } from 'react';
 
-import { TransferToken } from '@/bonsai/forms/transfers';
-import { parseTransactionError } from '@/bonsai/lib/extractErrors';
-import { ErrorType } from '@/bonsai/lib/validationErrors';
-import { validation } from '@dydxprotocol/v4-client-js';
-import { noop } from 'lodash';
-import { type NumberFormatValues } from 'react-number-format';
-import type { SyntheticInputEvent } from 'react-number-format/types/types';
+import { accountTransactionManager } from '@/bonsai/AccountTransactionSupervisor';
+import { isOperationFailure } from '@/bonsai/lib/operationResult';
+import { looksLikeName, normalizeAddressInput } from '@/haneul/names';
 import styled from 'styled-components';
 
 import { AlertType } from '@/constants/alerts';
-import { ButtonShape, ButtonSize } from '@/constants/buttons';
+import { ButtonAction, ButtonType } from '@/constants/buttons';
 import { STRING_KEYS } from '@/constants/localization';
-import { NumberSign, TOKEN_DECIMALS, USD_DECIMALS } from '@/constants/numbers';
 import { DydxChainAsset } from '@/constants/wallets';
 
-import { useTransferForm } from '@/hooks/transferHooks';
-import { useAccounts } from '@/hooks/useAccounts';
-import { useDydxClient } from '@/hooks/useDydxClient';
-import { useRestrictions } from '@/hooks/useRestrictions';
+import { useAccountBalance } from '@/hooks/useAccountBalance';
+import { useCustomNotification } from '@/hooks/useCustomNotification';
 import { useStringGetter } from '@/hooks/useStringGetter';
-import { useSubaccount } from '@/hooks/useSubaccount';
 import { useTokenConfigs } from '@/hooks/useTokenConfigs';
-import { useWithdrawalInfo } from '@/hooks/useWithdrawalInfo';
 
-import { formMixins } from '@/styles/formMixins';
 import { layoutMixins } from '@/styles/layoutMixins';
 
 import { AlertMessage } from '@/components/AlertMessage';
 import { AssetIcon } from '@/components/AssetIcon';
-import { DiffOutput } from '@/components/DiffOutput';
+import { Button } from '@/components/Button';
 import { FormInput } from '@/components/FormInput';
-import { FormMaxInputToggleButton } from '@/components/FormMaxInputToggleButton';
 import { Icon, IconName } from '@/components/Icon';
 import { InputType } from '@/components/Input';
-import { OutputType } from '@/components/Output';
+import { Output, OutputType } from '@/components/Output';
 import { SelectItem, SelectMenu } from '@/components/SelectMenu';
-import { Tag } from '@/components/Tag';
-import { ToggleButton } from '@/components/ToggleButton';
-import { ValidationAlertMessage } from '@/components/ValidationAlert';
-import { WithDetailsReceipt } from '@/components/WithDetailsReceipt';
-import { TransferButtonAndReceipt } from '@/views/forms/TransferForm/TransferButtonAndReceipt';
 
-import { getSelectedDydxChainId } from '@/state/appSelectors';
-import { useAppSelector } from '@/state/appTypes';
-
-import { useDisappearingValue } from '@/lib/disappearingValue';
-import { calc } from '@/lib/do';
-import { log } from '@/lib/telemetry';
-import { isValidKey, Nullable } from '@/lib/typeUtils';
+import { truncateAddress } from '@/lib/wallet';
 
 type TransferFormProps = {
   selectedAsset?: DydxChainAsset;
@@ -56,421 +34,163 @@ type TransferFormProps = {
   className?: string;
 };
 
+// Kept back when sending the gas coin so the wallet can still pay for a few transactions.
+const GAS_RESERVE_HANEUL = 0.02;
+
+/**
+ * Sends HANEUL or the collateral coin from the wallet to an address or a `name.haneul`. The
+ * trading account is not involved: collateral on the account is withdrawn to the wallet first.
+ */
 export const TransferForm = ({
   selectedAsset = DydxChainAsset.CHAINTOKEN,
   onDone,
   className,
 }: TransferFormProps) => {
   const stringGetter = useStringGetter();
-
-  const { dydxAddress } = useAccounts();
-  const { transfer } = useSubaccount();
-  const selectedDydxChainId = useAppSelector(getSelectedDydxChainId);
-  const { tokensConfigs, usdcImage, usdcLabel, chainTokenImage, chainTokenLabel } =
-    useTokenConfigs();
-  useWithdrawalInfo({ transferType: 'transfer' });
-
-  const form = useTransferForm(selectedAsset === DydxChainAsset.USDC);
-
+  const notify = useCustomNotification();
   const {
-    memo,
-    amountInput: { amount, type: transferType },
-    recipientAddress,
-  } = form.state;
+    chainTokenLabel,
+    chainTokenImage,
+    chainTokenDecimals,
+    usdcLabel,
+    usdcImage,
+    usdcDecimals,
+  } = useTokenConfigs();
+  const { nativeTokenBalance, usdcBalance } = useAccountBalance();
 
-  // Form states
-  const [error, setError] = useDisappearingValue<string>();
-  const [isLoading, setIsLoading] = useState(false);
+  const [asset, setAsset] = useState<DydxChainAsset>(selectedAsset);
+  const [recipient, setRecipient] = useState('');
+  const [amount, setAmount] = useState('');
+  const [error, setError] = useState<string>();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const onChangeAsset = (newAsset: Nullable<DydxChainAsset>) => {
+  const isNative = asset === DydxChainAsset.CHAINTOKEN;
+  const symbol = isNative ? chainTokenLabel : usdcLabel;
+  const decimals = isNative ? chainTokenDecimals : usdcDecimals;
+  const balance = isNative ? nativeTokenBalance.toNumber() : usdcBalance;
+  const sendable = Math.max(0, isNative ? balance - GAS_RESERVE_HANEUL : balance);
+
+  const value = Number(amount);
+  const recipientAddress = normalizeAddressInput(recipient);
+  const recipientIsName = recipientAddress == null && looksLikeName(recipient);
+  const isValid = value > 0 && value <= sendable && (recipientAddress != null || recipientIsName);
+
+  const onSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!isValid) return;
     setError(undefined);
-
-    if (newAsset === DydxChainAsset.CHAINTOKEN) {
-      form.actions.setNativeAmount('');
-    } else if (newAsset === DydxChainAsset.USDC) {
-      form.actions.setUsdcAmount('');
-    }
-  };
-
-  const { sanctionedAddresses } = useRestrictions();
-
-  const isAddressValid = useMemo(
-    () =>
-      recipientAddress &&
-      dydxAddress !== recipientAddress &&
-      validation.isValidAddress(recipientAddress) &&
-      !sanctionedAddresses.has(recipientAddress),
-    [recipientAddress, sanctionedAddresses, dydxAddress]
-  );
-
-  const isUSDCSelected = transferType === TransferToken.USDC;
-  const isChainTokenSelected = transferType === TransferToken.NATIVE;
-  const showMemoField = isChainTokenSelected;
-
-  const asset = isUSDCSelected ? DydxChainAsset.USDC : DydxChainAsset.CHAINTOKEN;
-
-  const { screenAddresses } = useDydxClient();
-
-  const canSubmit = useMemo(
-    () =>
-      form.errors.find((e) => e.type === ErrorType.error) == null && form.summary.payload != null,
-    [form.errors, form.summary.payload]
-  );
-  const onTransfer = async () => {
-    // const assetDenom = isValidKey(asset, tokensConfigs) ? tokensConfigs[asset].denom : undefined;
-    const payload = form.summary.payload;
-    if (!canSubmit || payload == null) {
+    setIsSubmitting(true);
+    const result = await accountTransactionManager.sendCoins({ asset, amount: value, recipient });
+    setIsSubmitting(false);
+    if (isOperationFailure(result)) {
+      setError(result.errorString);
       return;
     }
-    setIsLoading(true);
-    setError(undefined);
-
-    try {
-      const screenResults = await screenAddresses({
-        addresses: [recipientAddress!, dydxAddress!],
-      });
-
-      if (screenResults[dydxAddress!]) {
-        setError(
-          stringGetter({
-            key: STRING_KEYS.WALLET_RESTRICTED_WITHDRAWAL_TRANSFER_ORIGINATION_ERROR_MESSAGE,
-          })
-        );
-      } else if (screenResults[recipientAddress!]) {
-        setError(
-          stringGetter({
-            key: STRING_KEYS.WALLET_RESTRICTED_WITHDRAWAL_TRANSFER_DESTINATION_ERROR_MESSAGE,
-          })
-        );
-      } else {
-        const txResponse = await transfer(payload);
-        if (txResponse.type === 'success') {
-          // eslint-disable-next-line no-console
-          console.log('TransferForm > txReceipt > ', txResponse.payload.hash);
-          onDone?.();
-        } else {
-          throw new Error(txResponse.errorString || 'Transaction did not commit.');
-        }
-      }
-    } catch (err) {
-      if (err?.code === 429) {
-        setError(stringGetter({ key: STRING_KEYS.RATE_LIMIT_REACHED_ERROR_MESSAGE }));
-      } else {
-        setError(
-          err.message
-            ? stringGetter({
-                key: STRING_KEYS.SOMETHING_WENT_WRONG_WITH_MESSAGE,
-                params: {
-                  ERROR_MESSAGE: stringGetter({
-                    key:
-                      parseTransactionError('TransferForm onTransfer', err.message)?.stringKey ??
-                      STRING_KEYS.UNKNOWN_ERROR,
-                  }),
-                },
-              })
-            : stringGetter({ key: STRING_KEYS.SOMETHING_WENT_WRONG })
-        );
-      }
-      log('TransferForm/onTransfer', err);
-    } finally {
-      setIsLoading(false);
-    }
+    notify({
+      title: 'Sent',
+      body: `${value} ${result.payload.symbol} to ${
+        recipientIsName ? recipient.trim() : truncateAddress(result.payload.recipient)
+      }`,
+      icon: <Icon iconName={IconName.Send} />,
+    });
+    onDone?.();
   };
-
-  const onChangeAddress = (value?: string) => {
-    form.actions.setRecipientAddress(value ?? '');
-  };
-
-  const onChangeAmount = (value?: string) => {
-    if (isUSDCSelected) {
-      form.actions.setUsdcAmount(value ?? '');
-    } else {
-      form.actions.setNativeAmount(value ?? '');
-    }
-  };
-
-  const onChangeMemo = (value: string) => {
-    form.actions.setMemo(value);
-  };
-
-  const onPasteAddress = async () => {
-    try {
-      const value = await navigator.clipboard.readText();
-      onChangeAddress(value);
-    } catch (err) {
-      // expected error if user rejects clipboard access
-    }
-  };
-
-  const onPasteMemo = async () => {
-    try {
-      const value = await navigator.clipboard.readText();
-      onChangeMemo(value);
-    } catch (err) {
-      // expected error if user rejects clipboard access
-    }
-  };
-
-  const selectedTokenConfig = isValidKey(asset, tokensConfigs) ? tokensConfigs[asset] : undefined;
-
-  const assetOptions = [
-    {
-      value: DydxChainAsset.USDC,
-      label: (
-        <$InlineRow>
-          <AssetIcon logoUrl={usdcImage} symbol="USDC" /> {usdcLabel}
-        </$InlineRow>
-      ),
-    },
-    {
-      value: DydxChainAsset.CHAINTOKEN,
-      label: (
-        <$InlineRow>
-          <AssetIcon logoUrl={chainTokenImage} symbol={chainTokenLabel} />
-          {chainTokenLabel}
-        </$InlineRow>
-      ),
-    },
-  ];
-
-  const networkOptions = [
-    {
-      chainId: selectedDydxChainId,
-      label: (
-        <$InlineRow>
-          <AssetIcon symbol="DYDX" /> {stringGetter({ key: STRING_KEYS.DYDX_CHAIN })}
-        </$InlineRow>
-      ),
-    },
-  ];
-
-  const { balanceBefore, balanceAfter } = calc(() => {
-    if (isUSDCSelected) {
-      return {
-        balanceBefore: form.summary.accountBefore.freeCollateral,
-        balanceAfter: form.summary.accountAfter.freeCollateral,
-      };
-    }
-    return {
-      balanceBefore: form.summary.accountBefore.availableNativeBalance,
-      balanceAfter: form.summary.accountAfter.availableNativeBalance,
-    };
-  });
-
-  const amountDetailItems = [
-    {
-      key: 'amount',
-      label: (
-        <span>
-          {stringGetter({ key: STRING_KEYS.AVAILABLE })} <Tag>{selectedTokenConfig?.name}</Tag>
-        </span>
-      ),
-      value: (
-        <DiffOutput
-          type={OutputType.Asset}
-          value={balanceBefore}
-          sign={NumberSign.Negative}
-          newValue={balanceAfter}
-          hasInvalidNewValue={(balanceAfter ?? 0) < 0}
-          withDiff={
-            form.summary.inputs.amount != null && balanceBefore != null && balanceAfter != null
-          }
-          fractionDigits={isUSDCSelected ? USD_DECIMALS : TOKEN_DECIMALS}
-        />
-      ),
-    },
-  ];
-
-  const renderFormInputButton = ({
-    label,
-    isInputEmpty,
-    onClear,
-    onClick,
-  }: {
-    label: string;
-    isInputEmpty: boolean;
-    onClear: () => void;
-    onClick: () => void;
-  }) => (
-    <$FormInputToggleButton
-      size={ButtonSize.XSmall}
-      isPressed={!isInputEmpty}
-      onPressedChange={(isPressed: boolean) => (isPressed ? onClick : onClear)()}
-      disabled={isLoading}
-      shape={isInputEmpty ? ButtonShape.Rectangle : ButtonShape.Circle}
-    >
-      {isInputEmpty ? label : <Icon iconName={IconName.Close} />}
-    </$FormInputToggleButton>
-  );
-
-  const onToggleMaxButton = (isPressed: boolean) =>
-    isPressed ? onChangeAmount(balanceBefore?.toString() ?? '') : onChangeAmount(undefined);
-
-  const firstError = useMemo(
-    () => form.errors.find((e) => e.type === ErrorType.error),
-    [form.errors]
-  );
-  const ctaErrorAction = useMemo(() => {
-    const key = firstError?.resources.title?.stringKey;
-    return key ? stringGetter({ key }) : undefined;
-  }, [firstError?.resources.title?.stringKey, stringGetter]);
-
-  const validationAlert = useMemo(() => {
-    return firstError?.resources.text?.stringKey != null ? firstError : undefined;
-  }, [firstError]);
-
-  const hasErrors = useMemo(() => {
-    return firstError != null;
-  }, [firstError]);
 
   return (
-    <$Form
-      className={className}
-      onSubmit={(e: FormEvent) => {
-        e.preventDefault();
-        onTransfer();
-      }}
-    >
-      <$Row>
-        <FormInput
-          id="destination"
-          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-          onInput={(e: SyntheticInputEvent) => onChangeAddress(e.target?.value)}
-          label={
-            <span tw="inlineRow">
-              {stringGetter({ key: STRING_KEYS.DESTINATION })}
-              {isAddressValid && <Icon iconName={IconName.Check} tw="text-color-success" />}
-            </span>
-          }
-          type={InputType.Text}
-          value={recipientAddress}
-          placeholder={stringGetter({ key: STRING_KEYS.ADDRESS })}
-          slotRight={renderFormInputButton({
-            label: stringGetter({ key: STRING_KEYS.PASTE }),
-            isInputEmpty: recipientAddress.trim() === '',
-            onClear: () => onChangeAddress(''),
-            onClick: onPasteAddress,
-          })}
-          disabled={isLoading}
-        />
-        <$NetworkSelectMenu
-          label={stringGetter({ key: STRING_KEYS.NETWORK })}
-          value={selectedDydxChainId}
-          onValueChange={noop}
-        >
-          {networkOptions.map(({ chainId, label }) => (
-            <$SelectItem key={chainId} value={chainId} label={label} />
-          ))}
-        </$NetworkSelectMenu>
-      </$Row>
-
-      <$SelectMenu
+    <$Form className={className} onSubmit={onSubmit}>
+      <SelectMenu
         label={stringGetter({ key: STRING_KEYS.ASSET })}
         value={asset}
-        onValueChange={onChangeAsset}
-        withPortal={false}
+        onValueChange={(next: DydxChainAsset) => {
+          setAsset(next);
+          setAmount('');
+        }}
       >
-        {assetOptions.map(({ value, label }) => (
-          <$SelectItem key={value} value={value} label={label} />
-        ))}
-      </$SelectMenu>
-
-      <WithDetailsReceipt
-        side="bottom"
-        detailItems={amountDetailItems}
-        tw="[--withReceipt-backgroundColor:--color-layer-2]"
-      >
-        <FormInput
-          label={stringGetter({ key: STRING_KEYS.AMOUNT })}
-          type={InputType.Number}
-          onChange={({ formattedValue }: NumberFormatValues) => onChangeAmount(formattedValue)}
-          value={amount}
-          decimals={isUSDCSelected ? USD_DECIMALS : TOKEN_DECIMALS}
-          slotRight={
-            isUSDCSelected &&
-            balanceBefore != null &&
-            balanceBefore > 0 && (
-              <FormMaxInputToggleButton
-                size={ButtonSize.XSmall}
-                isInputEmpty={amount.trim().length === 0}
-                isLoading={isLoading}
-                onPressedChange={onToggleMaxButton}
-              />
-            )
+        <SelectItem
+          value={DydxChainAsset.CHAINTOKEN}
+          label={
+            <$InlineRow>
+              <AssetIcon logoUrl={chainTokenImage} symbol={chainTokenLabel} /> {chainTokenLabel}
+            </$InlineRow>
           }
-          disabled={isLoading}
         />
-      </WithDetailsReceipt>
+        <SelectItem
+          value={DydxChainAsset.USDC}
+          label={
+            <$InlineRow>
+              <AssetIcon logoUrl={usdcImage} symbol={usdcLabel} /> {usdcLabel}
+            </$InlineRow>
+          }
+        />
+      </SelectMenu>
 
-      {showMemoField && (
-        <FormInput
-          label={stringGetter({ key: STRING_KEYS.MEMO })}
-          placeholder={stringGetter({ key: STRING_KEYS.REQUIRED_FOR_TRANSFERS_TO_CEX })}
-          type={InputType.Text}
-          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-          onInput={(e: SyntheticInputEvent) => onChangeMemo(e.target?.value || '')}
-          value={memo ?? undefined}
-          slotRight={renderFormInputButton({
-            label: stringGetter({ key: STRING_KEYS.PASTE }),
-            isInputEmpty: !memo,
-            onClear: () => onChangeMemo(''),
-            onClick: onPasteMemo,
-          })}
-          disabled={isLoading}
-        />
+      <FormInput
+        type={InputType.Text}
+        label="To"
+        placeholder="0x… or name.haneul"
+        value={recipient}
+        onInput={(e: { target?: { value?: string } }) => setRecipient(e.target?.value ?? '')}
+      />
+      {recipientIsName && (
+        <span tw="text-color-text-0 font-mini-book">
+          Sent to the address{' '}
+          {recipient.trim().toLowerCase().endsWith('.haneul')
+            ? recipient.trim()
+            : `${recipient.trim()}.haneul`}{' '}
+          points to.
+        </span>
       )}
 
-      {validationAlert && <ValidationAlertMessage error={validationAlert} />}
-      {error && <AlertMessage type={AlertType.Error}>{error}</AlertMessage>}
-
-      <$Footer>
-        <TransferButtonAndReceipt
-          summary={form.summary}
-          isDisabled={isLoading || hasErrors}
-          isLoading={isLoading}
-          slotLeft={
-            ctaErrorAction ? (
-              <Icon iconName={IconName.Warning} tw="text-color-warning" />
-            ) : undefined
-          }
-          buttonText={ctaErrorAction ?? undefined}
+      <FormInput
+        type={InputType.Number}
+        label={stringGetter({ key: STRING_KEYS.AMOUNT })}
+        decimals={decimals}
+        value={amount}
+        onInput={({ formattedValue }: { formattedValue?: string }) =>
+          setAmount(formattedValue ?? '')
+        }
+        slotRight={
+          <Button
+            type={ButtonType.Button}
+            action={ButtonAction.Base}
+            onClick={() => setAmount(String(sendable))}
+            state={{ isDisabled: sendable <= 0 }}
+          >
+            Max
+          </Button>
+        }
+      />
+      <div tw="row justify-between text-color-text-0 font-small-medium">
+        <span>{stringGetter({ key: STRING_KEYS.WALLET_BALANCE })}</span>
+        <Output
+          tw="text-color-text-1"
+          type={OutputType.Number}
+          value={balance}
+          fractionDigits={Math.min(decimals, 6)}
+          tag={symbol}
+          useGrouping
         />
-      </$Footer>
+      </div>
+
+      {error ? <AlertMessage type={AlertType.Error}>{error}</AlertMessage> : null}
+
+      <Button
+        type={ButtonType.Submit}
+        action={ButtonAction.Primary}
+        state={{ isLoading: isSubmitting, isDisabled: !isValid }}
+      >
+        {value > sendable ? stringGetter({ key: STRING_KEYS.INSUFFICIENT_BALANCE }) : 'Send'}
+      </Button>
     </$Form>
   );
 };
+
 const $Form = styled.form`
-  ${formMixins.transfersForm}
+  ${layoutMixins.flexColumn}
+  gap: 1.25rem;
+  padding: 1.25rem 0 0;
 `;
 
-const $Footer = styled.footer`
-  ${formMixins.footer}
-`;
-
-const $Row = styled.div`
-  ${layoutMixins.gridEqualColumns}
-  gap: var(--form-input-gap);
-`;
-
-const $SelectMenu = styled(SelectMenu)`
-  ${formMixins.inputSelectMenu}
-` as typeof SelectMenu;
-
-const $SelectItem = styled(SelectItem)`
-  ${formMixins.inputSelectMenuItem}
-` as typeof SelectItem;
-
-const $NetworkSelectMenu = styled($SelectMenu)`
-  pointer-events: none;
-` as typeof SelectMenu;
 const $InlineRow = styled.span`
   ${layoutMixins.inlineRow}
-  height: 100%;
-
-  --asset-icon-size: 1.1em;
-`;
-const $FormInputToggleButton = styled(ToggleButton)`
-  ${formMixins.inputInnerToggleButton}
-
-  --button-padding: 0 0.5rem;
 `;

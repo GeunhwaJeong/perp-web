@@ -42,7 +42,6 @@ import { TransferDialog } from '@/views/dialogs/TransferDialog';
 import { TriggersDialog } from '@/views/dialogs/TriggersDialog';
 import { VaultDepositWithdrawDialog } from '@/views/dialogs/VaultDepositWithdrawDialog';
 import { WithdrawFromSubaccountDialog } from '@/views/dialogs/WithdrawFromSubaccountDialog';
-import { WithdrawalGateDialog } from '@/views/dialogs/WithdrawalGateDialog';
 
 import { useAppDispatch, useAppSelector } from '@/state/appTypes';
 import { closeDialog, openDialog } from '@/state/dialogs';
@@ -106,7 +105,6 @@ export const DialogManager = React.memo(() => {
     TradingKeys: (args) => <TradingKeysDialog {...args} {...modalProps} />,
     VaultDepositWithdraw: (args) => <VaultDepositWithdrawDialog {...args} {...modalProps} />,
     Withdraw2: (args) => <CollateralWithdrawDialog {...args} {...modalProps} />,
-    WithdrawalGated: (args) => <WithdrawalGateDialog {...args} {...modalProps} />,
     WithdrawFromSubaccount: (args) => <WithdrawFromSubaccountDialog {...args} {...modalProps} />,
   });
 });

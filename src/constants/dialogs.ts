@@ -93,10 +93,6 @@ export type TradingKeysDialogProps = {};
 export type VaultDepositWithdrawDialogProps = { initialType?: 'DEPOSIT' | 'WITHDRAW' };
 export type WithdrawDialog2Props = {};
 export type DepositDialog2Props = {};
-export type WithdrawalGatedDialogProps = {
-  transferType: 'withdrawal' | 'transfer';
-  estimatedUnblockTime?: string | null;
-};
 export type WithdrawFromSubaccountDialogProps = {};
 export const DialogTypes = unionize(
   {
@@ -137,7 +133,6 @@ export const DialogTypes = unionize(
     Triggers: ofType<TriggersDialogProps>(),
     VaultDepositWithdraw: ofType<VaultDepositWithdrawDialogProps>(),
     Withdraw2: ofType<WithdrawDialog2Props>(),
-    WithdrawalGated: ofType<WithdrawalGatedDialogProps>(),
     WithdrawFromSubaccount: ofType<WithdrawFromSubaccountDialogProps>(),
   },
   { tag: 'type' as const, value: 'props' as const }
