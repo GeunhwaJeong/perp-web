@@ -91,6 +91,8 @@ export type SubaccountPositionBase = ConvertStringToBigNumber<
   | 'netFunding'
   | 'unrealizedPnl'
   | 'exitPrice'
+  | 'unsettledFunding'
+  | 'liquidationPrice'
 >;
 
 export type MarginMode = 'ISOLATED' | 'CROSS';
@@ -130,6 +132,9 @@ export type SubaccountPositionDerivedExtra = {
   marginValueInitial: BigNumber;
   marginValueInitialFromSelectedLeverage: BigNumber;
   liquidationPrice: BigNumber | null;
+  // True when `liquidationPrice` is the indexer's, computed the way the engine judges
+  // liquidation; false when it is the local estimate, as for a simulated position.
+  liquidationPriceFromIndexer: boolean;
 
   updatedUnrealizedPnl: BigNumber;
   updatedUnrealizedPnlPercent: BigNumber | null;

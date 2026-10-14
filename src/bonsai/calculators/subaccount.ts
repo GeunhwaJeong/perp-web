@@ -204,10 +204,18 @@ function calculateSubaccountPosition(
 ): SubaccountPosition {
   const bnPosition = getBnPosition(position);
   const core = calculateDerivedPositionCore(bnPosition, market, rawSelectedMarketLeverages);
+  const extra = calculatePositionDerivedExtra(core, subaccountSummary);
+  // The indexer's liquidation price is the engine's: it counts the funding accrued since the
+  // last settlement and the size resting orders could add. The local estimate stands in for an
+  // older indexer and for simulated positions, which carry none. `null` from the indexer means
+  // no price liquidates the position, and is kept over the estimate.
+  const fromIndexer = bnPosition.liquidationPrice !== undefined;
   return {
     ...bnPosition,
     ...core,
-    ...calculatePositionDerivedExtra(core, subaccountSummary),
+    ...extra,
+    liquidationPrice: fromIndexer ? bnPosition.liquidationPrice! : extra.liquidationPrice,
+    liquidationPriceFromIndexer: fromIndexer,
   };
 }
 
@@ -224,6 +232,14 @@ function getBnPosition(position: IndexerPerpetualPositionResponseObject): Subacc
     netFunding: ToBigNumber(position.netFunding),
     unrealizedPnl: ToBigNumber(position.unrealizedPnl),
     exitPrice: position.exitPrice != null ? ToBigNumber(position.exitPrice) : position.exitPrice,
+    unsettledFunding:
+      position.unsettledFunding != null
+        ? ToBigNumber(position.unsettledFunding)
+        : position.unsettledFunding,
+    liquidationPrice:
+      position.liquidationPrice != null
+        ? ToBigNumber(position.liquidationPrice)
+        : position.liquidationPrice,
   };
 }
 
@@ -366,6 +382,7 @@ function calculatePositionDerivedExtra(
     marginValueInitial,
     marginValueInitialFromSelectedLeverage,
     liquidationPrice,
+    liquidationPriceFromIndexer: false,
     updatedUnrealizedPnl,
     updatedUnrealizedPnlPercent,
   };
@@ -406,6 +423,10 @@ export function applyRestingOrdersToLiquidationPrices(
     (o) => `${o.marketId}:${o.subaccountNumber}`
   );
   return positions.map((position) => {
+    // The indexer already counts resting orders in its price.
+    if (position.liquidationPriceFromIndexer) {
+      return position;
+    }
     const orders = resting[`${position.market}:${position.subaccountNumber}`];
     if (position.marginMode !== 'ISOLATED' || orders == null || orders.length === 0) {
       return position;

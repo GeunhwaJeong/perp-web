@@ -1686,6 +1686,11 @@ export interface IndexerPerpetualPositionResponseObject {
    * @memberof PerpetualPositionResponseObject
    */
   subaccountNumber: number;
+  // Served by the Sigma indexer: the funding accrued since the engine last settled the position
+  // (already part of `netFunding`), and the mark price at which its margin meets the
+  // maintenance requirement, `null` when no price does.
+  unsettledFunding?: string | null;
+  liquidationPrice?: string | null;
 }
 /**
  *

@@ -130,6 +130,8 @@ function increasePosition(
 
   return {
     ...currentPosition,
+    // The indexer's liquidation price was for the position before the trade.
+    liquidationPrice: undefined,
     size: newSizeBn.toString(10),
     maxSize: (currentPosition.side === IndexerPositionSide.LONG
       ? BigNumber.max(currentPosition.maxSize, newSizeBn)
@@ -171,6 +173,8 @@ function decreasePosition(
 
   const newPosition = {
     ...currentPosition,
+    // The indexer's liquidation price was for the position before the trade.
+    liquidationPrice: undefined,
     size: newSizeBn.toString(10),
     realizedPnl: MustBigNumber(currentPosition.realizedPnl)
       .plus(

@@ -1,3 +1,5 @@
+import { useMemo } from 'react';
+
 import { BonsaiCore } from '@/bonsai/ontology';
 import BigNumber from 'bignumber.js';
 import styled, { css } from 'styled-components';
@@ -27,7 +29,7 @@ import { useAppDispatch, useAppSelector } from '@/state/appTypes';
 import { openDialog } from '@/state/dialogs';
 import { getCurrentSelectedFormSummary } from '@/state/tradeFormSelectors';
 
-import { MustBigNumber } from '@/lib/numbers';
+import { BIG_NUMBERS, MustBigNumber } from '@/lib/numbers';
 import { Nullable, orEmptyObj } from '@/lib/typeUtils';
 
 import { AccountInfoDiffOutput } from './AccountInfoDiffOutput';
@@ -36,6 +38,8 @@ enum AccountInfoItem {
   PortfolioValue = 'portfolio-value',
   MarginUsed = 'margin-used',
   AvailableBalance = 'available-balance',
+  UnrealizedPnl = 'unrealized-pnl',
+  UnrealizedFunding = 'unrealized-funding',
 }
 
 const getUsageValue = (value: Nullable<BigNumber>, valuePost: Nullable<number>) => {
@@ -60,6 +64,20 @@ export const AccountInfoSection = () => {
   const isLoading = !!isLoadingGuards || isLoadingData;
 
   const { freeCollateral: availableBalance, marginUsage, equity: portfolioValue } = subAccount;
+  const positions = useAppSelector(BonsaiCore.account.parentSubaccountPositions.data);
+  // The engine settles funding only when a session touches the market, so what a position has
+  // accrued since is shown apart from its P&L: it is what the next trade will move.
+  const { unrealizedPnl, unrealizedFunding } = useMemo(
+    () =>
+      (positions ?? []).reduce(
+        (totals, position) => ({
+          unrealizedPnl: totals.unrealizedPnl.plus(position.updatedUnrealizedPnl),
+          unrealizedFunding: totals.unrealizedFunding.plus(position.unsettledFunding ?? 0),
+        }),
+        { unrealizedPnl: BIG_NUMBERS.ZERO, unrealizedFunding: BIG_NUMBERS.ZERO }
+      ),
+    [positions]
+  );
   const parentSubaccountAfterOperation = orEmptyObj(
     useAppSelector(getCurrentSelectedFormSummary).summary.accountDetailsAfter?.account
   );
@@ -159,6 +177,38 @@ export const AccountInfoSection = () => {
               : availableBalance
           }
           valuePost={availableBalancePost?.toNumber()}
+        />
+      ),
+    },
+    {
+      key: AccountInfoItem.UnrealizedPnl,
+      label: (
+        <WithTooltip tooltip="unrealized-pnl" side="left">
+          {stringGetter({ key: STRING_KEYS.UNREALIZED_PNL })}
+        </WithTooltip>
+      ),
+      value: (
+        <AccountInfoDiffOutput
+          hasError={false}
+          hideDiff
+          isPositive={unrealizedPnl.gte(0)}
+          type={OutputType.Fiat}
+          value={unrealizedPnl}
+          valuePost={null}
+        />
+      ),
+    },
+    {
+      key: AccountInfoItem.UnrealizedFunding,
+      label: 'Unrealized Funding',
+      value: (
+        <AccountInfoDiffOutput
+          hasError={false}
+          hideDiff
+          isPositive={unrealizedFunding.gte(0)}
+          type={OutputType.Fiat}
+          value={unrealizedFunding}
+          valuePost={null}
         />
       ),
     },
