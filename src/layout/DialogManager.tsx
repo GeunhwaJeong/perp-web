@@ -26,7 +26,6 @@ import { ExchangeOfflineDialog } from '@/views/dialogs/ExchangeOfflineDialog';
 import { ExternalLinkDialog } from '@/views/dialogs/ExternalLinkDialog';
 import { GlobalCommandDialog } from '@/views/dialogs/GlobalCommandDialog';
 import { HelpDialog } from '@/views/dialogs/HelpDialog';
-import { MobileDownloadDialog } from '@/views/dialogs/MobileDownloadDialog';
 import { PredictionMarketIntroDialog } from '@/views/dialogs/PredictionMarketIntroDialog';
 import { PreferencesDialog } from '@/views/dialogs/PreferencesDialog';
 import { RateLimitDialog } from '@/views/dialogs/RateLimitDialog';
@@ -86,7 +85,6 @@ export const DialogManager = React.memo(() => {
     FillDetails: (args) => <FillDetailsDialog {...args} {...modalProps} />,
     GlobalCommand: (args) => <GlobalCommandDialog {...args} {...modalProps} />,
     Help: (args) => <HelpDialog {...args} {...modalProps} />,
-    MobileDownload: (args) => <MobileDownloadDialog {...args} {...modalProps} />,
     Onboarding: (args) => <AccountDialog {...args} {...modalProps} />,
     AccountSecurity: (args) => <AccountSecurityDialog {...args} {...modalProps} />,
     OrderDetails: (args) => <OrderDetailsDialog {...args} {...modalProps} />,

@@ -5,18 +5,14 @@ import styled from 'styled-components';
 
 import { STRING_KEYS } from '@/constants/localization';
 import { AppRoute, PortfolioRoute } from '@/constants/routes';
-import { StatsigDynamicConfigs } from '@/constants/statsig';
 
-import { useAccounts } from '@/hooks/useAccounts';
 import { useBreakpoints } from '@/hooks/useBreakpoints';
 import { useAppSelectorWithArgs } from '@/hooks/useParameterizedSelector';
 import { useShouldShowTriggers } from '@/hooks/useShouldShowTriggers';
-import { useAllStatsigDynamicConfigValues } from '@/hooks/useStatsig';
 import { useStringGetter } from '@/hooks/useStringGetter';
 
 import { AttachedExpandingSection, DetachedSection } from '@/components/ContentSection';
 import { ContentSectionHeader } from '@/components/ContentSectionHeader';
-import { TelegramInviteBanner } from '@/views/TelegramInviteBanner';
 import { PositionsTable, PositionsTableColumnKey } from '@/views/tables/PositionsTable';
 
 import { calculateShouldRenderActionsInPositionsTable } from '@/state/accountCalculators';
@@ -32,12 +28,6 @@ export const Overview = () => {
   const navigate = useNavigate();
 
   const { isTablet } = useBreakpoints();
-  const { dydxAddress } = useAccounts();
-
-  const dynamicConfigs = useAllStatsigDynamicConfigValues();
-  const feedbackRequestWalletAddresses = dynamicConfigs[StatsigDynamicConfigs.dcHighestVolumeUsers];
-  const shouldShowTelegramInvite =
-    dydxAddress && feedbackRequestWalletAddresses?.includes(dydxAddress);
 
   const handleViewUnopenedIsolatedOrders = useCallback(() => {
     navigate(`${AppRoute.Portfolio}/${PortfolioRoute.Orders}`, {
@@ -50,12 +40,6 @@ export const Overview = () => {
 
   return (
     <div>
-      {shouldShowTelegramInvite && (
-        <DetachedSection>
-          <TelegramInviteBanner />
-        </DetachedSection>
-      )}
-
       <DetachedSection>
         <AccountOverviewSection />
       </DetachedSection>

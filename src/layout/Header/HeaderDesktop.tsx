@@ -25,7 +25,6 @@ import { Icon, IconName } from '@/components/Icon';
 import { IconButton } from '@/components/IconButton';
 import { NavigationMenu } from '@/components/NavigationMenu';
 import { VerticalSeparator } from '@/components/Separator';
-import { MobileDownloadLinks } from '@/views/MobileDownloadLinks';
 import { AccountMenu } from '@/views/menus/AccountMenu/AccountMenu';
 import { LanguageSelector } from '@/views/menus/LanguageSelector';
 import { NetworkSelectMenu } from '@/views/menus/NetworkSelectMenu';
@@ -190,8 +189,6 @@ export const HeaderDesktop = () => {
               <span tw="font-small-bold">{stringGetter({ key: STRING_KEYS.DEPOSIT })}</span>
             </Button>
           )}
-
-        {onboardingState !== OnboardingState.AccountConnected && <MobileDownloadLinks />}
 
         <$IconButton
           shape={ButtonShape.Rectangle}

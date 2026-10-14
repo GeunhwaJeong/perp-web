@@ -37,7 +37,6 @@ export type ExternalLinkDialogProps = {
 export type FillDetailsDialogProps = { fillId: string };
 export type GlobalCommandDialogProps = {};
 export type HelpDialogProps = {};
-export type MobileDownloadDialogProps = { mobileAppUrl: string };
 export type OnboardingDialogProps = {};
 export type OrderDetailsDialogProps = { orderId: string };
 export type PredictionMarketIntroDialogProps = {};
@@ -120,7 +119,6 @@ export const DialogTypes = unionize(
     FillDetails: ofType<FillDetailsDialogProps>(),
     GlobalCommand: ofType<GlobalCommandDialogProps>(),
     Help: ofType<HelpDialogProps>(),
-    MobileDownload: ofType<MobileDownloadDialogProps>(),
     Onboarding: ofType<OnboardingDialogProps>(),
     OrderDetails: ofType<OrderDetailsDialogProps>(),
     PredictionMarketIntro: ofType<PredictionMarketIntroDialogProps>(),
