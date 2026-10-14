@@ -43,7 +43,7 @@ export const TradeSideTabs = ({ sharedContent, className }: ElementProps & Style
     <$TradeSideTabs
       className={className}
       fullWidthTabs
-      dividerStyle="none"
+      dividerStyle="underline"
       activeTab={side}
       value={side}
       items={items}
@@ -58,33 +58,20 @@ export const TradeSideTabs = ({ sharedContent, className }: ElementProps & Style
 
 const tradeSideTabsType = getSimpleStyledOutputType(Tabs, {} as { activeTab: OrderSide });
 
-/* A segmented control, not a tab strip: a filled track with the chosen side as a raised thumb. */
 const $TradeSideTabs = styled(Tabs)<{ activeTab: OrderSide }>`
-  --tabs-height: 2.0625rem;
-  --trigger-paddingX: 0.5rem;
-  --trigger-font: var(--font-mini-medium);
-  --trigger-backgroundColor: transparent;
-  --trigger-hover-textColor: var(--color-text-2);
-
-  > div > header {
-    margin: 0.625rem 0.625rem 0;
-    padding: 0.25rem;
-    background-color: var(--color-layer-4);
-    border-radius: 0.5rem;
-
-    button[role='tab'] {
-      border-radius: 0.3125rem;
-    }
-  }
-
+  --tabs-height: 2.625rem;
   ${({ activeTab }) =>
     activeTab === OrderSide.BUY
       ? css`
-          --trigger-active-backgroundColor: var(--color-positive-dark);
+          --trigger-active-underline-backgroundColor: var(--color-positive-dark);
+          --trigger-active-underlineColor: var(--color-positive);
           --trigger-active-textColor: var(--color-positive);
+          --trigger-hover-textColor: var(--color-text-2);
         `
       : css`
-          --trigger-active-backgroundColor: var(--color-negative-dark);
+          --trigger-active-underline-backgroundColor: var(--color-negative-dark);
+          --trigger-active-underlineColor: var(--color-negative);
           --trigger-active-textColor: var(--color-negative);
+          --trigger-hover-textColor: var(--color-text-2);
         `};
 ` as typeof tradeSideTabsType;
