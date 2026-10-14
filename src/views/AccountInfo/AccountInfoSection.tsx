@@ -193,7 +193,7 @@ export const AccountInfoSection = () => {
           hideDiff
           isPositive={unrealizedPnl.gte(0)}
           type={OutputType.Fiat}
-          value={unrealizedPnl}
+          value={dydxAccounts ? unrealizedPnl : undefined}
           valuePost={null}
         />
       ),
@@ -207,7 +207,7 @@ export const AccountInfoSection = () => {
           hideDiff
           isPositive={unrealizedFunding.gte(0)}
           type={OutputType.Fiat}
-          value={unrealizedFunding}
+          value={dydxAccounts ? unrealizedFunding : undefined}
           valuePost={null}
         />
       ),
