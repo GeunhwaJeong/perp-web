@@ -202,6 +202,25 @@ export const getWidgetOverrides = ({
   };
 };
 
+/**
+ * TradingView remembers whether the drawing toolbar is open in the browser, under its own
+ * localStorage key, and that memory wins over the widget's feature flags. Builds before this one
+ * hid the toolbar by default, so every returning browser carries a "hidden" entry. This opens it
+ * once per browser; a trader who closes it afterwards keeps that choice.
+ */
+const DRAWING_TOOLBAR_KEY = 'tradingview.ChartDrawingToolbarWidget.visible';
+const DRAWING_TOOLBAR_SEEDED_KEY = 'sigma.tradingView.drawingToolbarSeeded';
+
+export const showDrawingToolbarOnce = () => {
+  try {
+    if (localStorage.getItem(DRAWING_TOOLBAR_SEEDED_KEY)) return;
+    localStorage.setItem(DRAWING_TOOLBAR_KEY, 'true');
+    localStorage.setItem(DRAWING_TOOLBAR_SEEDED_KEY, '1');
+  } catch {
+    // Storage can be unavailable (private mode, blocked); the widget then uses its default.
+  }
+};
+
 export const getWidgetOptions = (
   isViewingUnlaunchedMarket?: boolean,
   isSimpleUi?: boolean,

@@ -25,7 +25,12 @@ import { updateChartConfig } from '@/state/tradingView';
 import { getTvChartConfig } from '@/state/tradingViewSelectors';
 
 import { getDydxDatafeed } from '@/lib/tradingView/dydxfeed';
-import { getSavedResolution, getWidgetOptions, getWidgetOverrides } from '@/lib/tradingView/utils';
+import {
+  getSavedResolution,
+  getWidgetOptions,
+  getWidgetOverrides,
+  showDrawingToolbarOnce,
+} from '@/lib/tradingView/utils';
 import { orEmptyObj } from '@/lib/typeUtils';
 
 import { useBreakpoints } from '../useBreakpoints';
@@ -134,6 +139,7 @@ export const useTradingView = ({
         auto_save_delay: 1,
       };
 
+      showDrawingToolbarOnce();
       const tvChartWidget = new Widget(options);
       setTvWidget(tvChartWidget);
 
