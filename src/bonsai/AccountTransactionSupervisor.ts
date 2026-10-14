@@ -725,13 +725,19 @@ export class AccountTransactionSupervisor {
   }
 
   /**
-   * The collateral the connected wallet holds and what the trading account can withdraw, both
-   * read from chain, in collateral units (e.g. 12.5 TUSD). The withdrawable amount is the
-   * account balance plus the collateral left in markets the account no longer trades in, which
-   * a withdrawal returns to the balance on the way (see `withdrawCollateral`).
+   * The collateral the connected wallet holds, the trading account's unallocated balance and
+   * what the account can withdraw, all read from chain, in collateral units (e.g. 12.5 TUSD).
+   * The withdrawable amount is the balance plus the collateral left in markets without a
+   * position or resting orders, which a withdrawal returns to the balance on the way (see
+   * `withdrawCollateral`).
    */
   public async collateralBalances(): Promise<
-    OperationResult<{ wallet: number; account: number | undefined; symbol: string }>
+    OperationResult<{
+      wallet: number;
+      account: number | undefined;
+      withdrawable: number | undefined;
+      symbol: string;
+    }>
   > {
     const wallet = await this.walletContext();
     if (isOperationFailure(wallet)) return wallet;
@@ -752,7 +758,8 @@ export class AccountTransactionSupervisor {
         : 0n;
       return wrapOperationSuccess({
         wallet: unitsToCollateral(held, decimals).toNumber(),
-        account: account
+        account: account ? unitsToCollateral(account.collateral, decimals).toNumber() : undefined,
+        withdrawable: account
           ? unitsToCollateral(account.collateral + returnable, decimals).toNumber()
           : undefined,
         symbol: coinType.split('::').pop() ?? 'USD',
@@ -827,8 +834,9 @@ export class AccountTransactionSupervisor {
           : [];
       const available = returns.reduce((sum, m) => sum + m.units, collateral);
       if (available < units) {
+        const most = unitsToCollateral(available, deployment.collateral.decimals).toFixed();
         return failure(
-          'Not enough free collateral; collateral backing an open position has to be moved back first',
+          `Not enough free collateral: at most ${most} can be withdrawn now; collateral backing an open position stays in its market`,
           STRING_KEYS.INSUFFICIENT_BALANCE
         );
       }

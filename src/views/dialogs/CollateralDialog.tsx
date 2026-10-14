@@ -21,13 +21,19 @@ import { Output, OutputType } from '@/components/Output';
 
 type Mode = 'deposit' | 'withdraw';
 
-type Balances = { wallet: number; account: number | undefined; symbol: string };
+type Balances = {
+  wallet: number;
+  account: number | undefined;
+  withdrawable: number | undefined;
+  symbol: string;
+};
 
 /**
  * Moves collateral between the wallet and the trading account on the perpetuals engine. A
  * deposit is a coin transfer into the account (opening it on the first deposit); a withdrawal
- * pays the account's unallocated balance back to the wallet. Collateral allocated to a market
- * is moved back with that market's margin controls first.
+ * pays the account's unallocated balance back to the wallet, together with any collateral left
+ * in a market without a position or resting orders. Collateral backing an open position is
+ * moved back with that market's margin controls first.
  */
 const CollateralDialog = ({
   mode,
@@ -56,7 +62,7 @@ const CollateralDialog = ({
     loadBalances();
   }, [loadBalances]);
 
-  const available = mode === 'deposit' ? balances?.wallet : balances?.account;
+  const available = mode === 'deposit' ? balances?.wallet : balances?.withdrawable;
   const value = Number(amount);
   const isValid = value > 0 && available != null && value <= available;
 
@@ -106,7 +112,7 @@ const CollateralDialog = ({
     >
       <form tw="flexColumn mt-1.25 gap-1.25" onSubmit={onSubmit}>
         {balanceRow(stringGetter({ key: STRING_KEYS.WALLET_BALANCE }), balances?.wallet)}
-        {balanceRow(stringGetter({ key: STRING_KEYS.AVAILABLE_BALANCE }), balances?.account)}
+        {balanceRow(stringGetter({ key: STRING_KEYS.AVAILABLE_BALANCE }), balances?.withdrawable)}
         <FormInput
           type={InputType.Number}
           label={stringGetter({ key: STRING_KEYS.AMOUNT })}

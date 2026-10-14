@@ -155,6 +155,13 @@ r = await supervisor('transferMargin', { marketId: MARKET, amount: 150, toMarket
 check('deallocate 150 from the market', r.type === 'success', JSON.stringify(r).slice(0, 120));
 b = await balances();
 check('account balance 1,250 after deallocating', close(b.account, 1250), JSON.stringify(b));
+// The market holds no position or orders, so the 250 left there is withdrawable as well: the
+// withdraw dialog counts it and a withdrawal returns it to the balance on the way.
+check(
+  'collateral in a market without a position counts as withdrawable',
+  close(b.withdrawable, 1500),
+  JSON.stringify(b)
+);
 
 // 6. withdrawals: through the dialog, then over the balance
 await page.evaluate(() =>
@@ -165,7 +172,7 @@ await page.evaluate(() =>
 );
 await dialog.waitFor({ timeout: 15_000 });
 await page.waitForFunction(
-  () => document.querySelector('[role="dialog"]')?.textContent?.includes('1,250') === true,
+  () => document.querySelector('[role="dialog"]')?.textContent?.includes('1,500') === true,
   null,
   { timeout: 15_000 }
 );
