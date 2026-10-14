@@ -62,7 +62,13 @@ export const clearPasskeyAccount = () => {
 export const passkeyProvider = (): PasskeyProvider =>
   new BrowserPasskeyProvider(RP_NAME, {
     rp: { name: RP_NAME, id: globalThis.location.hostname },
-    authenticatorSelection: { residentKey: 'required', userVerification: 'required' },
+    // The SDK defaults to 'cross-platform' (security keys, phones over QR); the screen
+    // promises Face ID or a fingerprint, which is the platform authenticator.
+    authenticatorSelection: {
+      authenticatorAttachment: 'platform',
+      residentKey: 'required',
+      userVerification: 'required',
+    },
   });
 
 const asCancelled = (error: unknown): never => {
