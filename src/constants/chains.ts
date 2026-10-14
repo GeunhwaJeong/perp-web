@@ -1,7 +1,6 @@
 import { arbitrum, avalanche, base, mainnet, optimism, polygon } from 'viem/chains';
 
 import { CosmosChainId } from './graz';
-import { SOLANA_MAINNET_ID } from './solana';
 import { WalletNetworkType } from './wallets';
 
 type Chain = {
@@ -55,13 +54,6 @@ export const CHAIN_INFO: { [chainId: string]: Chain } = {
     gasDenom: 'AVAX',
     explorerBaseUrl: 'https://snowtrace.io',
   },
-  [SOLANA_MAINNET_ID]: {
-    name: 'Solana',
-    icon: '/chains/solana.png',
-    walletNetworkType: WalletNetworkType.Solana,
-    gasDenom: 'SOL',
-    explorerBaseUrl: 'https://explorer.solana.com',
-  },
   [CosmosChainId.Neutron]: {
     name: 'Neutron',
     icon: '/chains/neutron.png',
@@ -91,7 +83,6 @@ export function isEvmDepositChainId(chainId: string) {
 }
 
 export const NEAR_INSTANT_DEPOSIT_CHAINS = [
-  SOLANA_MAINNET_ID,
   CosmosChainId.Noble,
   CosmosChainId.Osmosis,
   CosmosChainId.Neutron,

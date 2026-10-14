@@ -32,7 +32,6 @@ import { FillWithNoOrderNotificationRow } from '@/views/Lists/Alerts/FillWithNoO
 import { OrderCancelNotificationRow } from '@/views/Lists/Alerts/OrderCancelNotificationRow';
 import { OrderNotificationRow } from '@/views/Lists/Alerts/OrderNotificationRow';
 import { OrderStatusNotificationRow } from '@/views/Lists/Alerts/OrderStatusNotificationRow';
-import { SkipTransferNotificationRow } from '@/views/Lists/Alerts/SkipTransferNotificationRow';
 // eslint-disable-next-line import/no-cycle
 import { CancelAllNotification } from '@/views/notifications/CancelAllNotification';
 import { CloseAllPositionsNotification } from '@/views/notifications/CloseAllPositionsNotification';
@@ -301,89 +300,6 @@ export const notificationTypes: NotificationTypeConfig[] = [
             });
           });
       }, [trigger, appInitializedTime, stringGetter, fills, allMarkets]);
-    },
-  },
-
-  {
-    type: NotificationType.SkipTransfer2,
-    useTrigger: ({ trigger }) => {
-      const stringGetter = useStringGetter();
-      const { dydxAddress } = useAccounts();
-      const userTransfers = useAppSelectorWithArgs(selectTransfersByAddress, dydxAddress);
-      const { decimal: decimalSeparator, group: groupSeparator } = useLocaleSeparators();
-      const selectedLocale = useAppSelector(getSelectedLocale);
-
-      useEffect(() => {
-        // eslint-disable-next-line no-restricted-syntax
-        for (const transfer of userTransfers) {
-          const { type, status } = transfer;
-          const id = transfer.id;
-
-          const finalAmount = formatNumberOutput(
-            transfer.finalAmountUsd ?? transfer.estimatedAmountUsd,
-            OutputType.Fiat,
-            { decimalSeparator, groupSeparator, selectedLocale }
-          );
-
-          const isSuccess = status === 'success';
-          let body: string = '';
-          let title: string = '';
-
-          if (type === 'withdraw') {
-            title = stringGetter({
-              key: isSuccess ? STRING_KEYS.WITHDRAW : STRING_KEYS.WITHDRAW_IN_PROGRESS,
-            });
-
-            body = isSuccess
-              ? stringGetter({
-                  key: STRING_KEYS.WITHDRAW_COMPLETE,
-                  params: { AMOUNT_USD: finalAmount },
-                })
-              : stringGetter({ key: STRING_KEYS.PENDING, params: { AMOUNT_USD: finalAmount } });
-          } else {
-            // Deposit
-            title = stringGetter({
-              key: isSuccess ? STRING_KEYS.DEPOSIT : STRING_KEYS.DEPOSIT_IN_PROGRESS,
-            });
-
-            body = isSuccess
-              ? stringGetter({
-                  key: STRING_KEYS.DEPOSIT_AVAILABLE,
-                  params: { AMOUNT_USD: finalAmount },
-                })
-              : stringGetter({
-                  key: STRING_KEYS.DEPOSIT_PENDING,
-                  params: { AMOUNT_USD: finalAmount },
-                });
-          }
-
-          trigger({
-            id,
-            displayData: {
-              title,
-              icon: <Icon iconName={isSuccess ? IconName.Transfer : IconName.Clock} />,
-              body,
-              toastSensitivity: 'foreground',
-              groupKey: NotificationType.SkipTransfer,
-              renderSimpleAlert: ({ className, notification }) => (
-                <SkipTransferNotificationRow
-                  className={className}
-                  transfer={transfer}
-                  isUnseen={notification.status <= NotificationStatus.Unseen}
-                />
-              ),
-            },
-            updateKey: [isSuccess],
-          });
-        }
-      }, [decimalSeparator, groupSeparator, selectedLocale, stringGetter, trigger, userTransfers]);
-    },
-    useNotificationAction: () => {
-      const dispatch = useAppDispatch();
-
-      return (transferId: string) => {
-        dispatch(openDialog(DialogTypes.TransferStatus({ transferId })));
-      };
     },
   },
 

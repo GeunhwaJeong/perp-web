@@ -13,7 +13,6 @@ import { CancelOrphanedTriggerOrdersDialog } from '@/views/dialogs/CancelOrphane
 import { CancelPendingOrdersDialog } from '@/views/dialogs/CancelPendingOrdersDialog';
 import { CloseAllPositionsConfirmationDialog } from '@/views/dialogs/CloseAllPositionsConfirmationDialog';
 import { ClosePositionDialog } from '@/views/dialogs/ClosePositionDialog';
-import { CoinbaseDepositDialog } from '@/views/dialogs/CoinbaseDepositDialog';
 import {
   CollateralDepositDialog,
   CollateralWithdrawDialog,
@@ -46,8 +45,6 @@ import { StakingRewardDialog } from '@/views/dialogs/StakingRewardDialog';
 import { TradeDialog } from '@/views/dialogs/TradeDialog';
 import { TradingKeysDialog } from '@/views/dialogs/TradingKeysDialog';
 import { TransferDialog } from '@/views/dialogs/TransferDialog';
-import { DepositAddressDialog } from '@/views/dialogs/TransferDialogs/DepositAddressDialog';
-import { TransferStatusDialog } from '@/views/dialogs/TransferDialogs/TransferStatusDialog';
 import { TriggersDialog } from '@/views/dialogs/TriggersDialog';
 import { UnstakeDialog } from '@/views/dialogs/UnstakeDialog';
 import { VaultDepositWithdrawDialog } from '@/views/dialogs/VaultDepositWithdrawDialog';
@@ -84,10 +81,8 @@ export const DialogManager = React.memo(() => {
       <CancelOrphanedTriggerOrdersDialog {...args} {...modalProps} />
     ),
     CancelPendingOrders: (args) => <CancelPendingOrdersDialog {...args} {...modalProps} />,
-    CoinbaseDepositDialog: (args) => <CoinbaseDepositDialog {...args} {...modalProps} />,
     ComplianceConfig: (args) => <ComplianceConfigDialog {...args} {...modalProps} />,
     ConfirmPendingDeposit: (args) => <ConfirmPendingDepositDialog {...args} {...modalProps} />,
-    DepositAddresses: (args) => <DepositAddressDialog {...args} {...modalProps} />,
     // Collateral moves straight between the wallet and the trading account on the engine.
     Deposit2: (args) => <CollateralDepositDialog {...args} {...modalProps} />,
     DisconnectWallet: (args) => <DisconnectDialog {...args} {...modalProps} />,
@@ -121,7 +116,6 @@ export const DialogManager = React.memo(() => {
     Triggers: (args) => <TriggersDialog {...args} {...modalProps} />,
     Transfer: (args) => <TransferDialog {...args} {...modalProps} />,
     TradingKeys: (args) => <TradingKeysDialog {...args} {...modalProps} />,
-    TransferStatus: (args) => <TransferStatusDialog {...args} {...modalProps} />,
     Unstake: (args) => <UnstakeDialog {...args} {...modalProps} />,
     VaultDepositWithdraw: (args) => <VaultDepositWithdrawDialog {...args} {...modalProps} />,
     Withdraw2: (args) => <CollateralWithdrawDialog {...args} {...modalProps} />,

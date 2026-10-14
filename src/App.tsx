@@ -43,7 +43,6 @@ import { DialogTypes } from './constants/dialogs';
 import { LocalStorageKey } from './constants/localStorage';
 import { CustomFlags, StatsigFlags } from './constants/statsig';
 import { HaneulWalletProvider } from './haneul/HaneulWalletProvider';
-import { SkipProvider } from './hooks/transfers/skipClient';
 import { useAnalytics } from './hooks/useAnalytics';
 import { useBreakpoints } from './hooks/useBreakpoints';
 import { useCommandMenu } from './hooks/useCommandMenu';
@@ -55,7 +54,6 @@ import { useReferralCode } from './hooks/useReferralCode';
 import { useShouldShowFooter } from './hooks/useShouldShowFooter';
 import { useSimpleUiEnabled } from './hooks/useSimpleUiEnabled';
 import { useTokenConfigs } from './hooks/useTokenConfigs';
-import { useUpdateTransfers } from './hooks/useUpdateTransfers';
 import { WalletConnectionProvider } from './hooks/useWalletConnection';
 import { isTruthy } from './lib/isTruthy';
 import { AffiliatesPage } from './pages/affiliates/AffiliatesPage';
@@ -92,7 +90,6 @@ const Content = () => {
   useInitializePage();
   useAnalytics();
   useCommandMenu();
-  useUpdateTransfers();
   useReferralCode();
   useUiRefreshMigrations();
   useOpenDepositIfRelevant();
@@ -312,7 +309,6 @@ const providers = [
   wrapProvider(WalletConnectionProvider),
   wrapProvider(AccountsProvider),
   wrapProvider(SubaccountProvider),
-  wrapProvider(SkipProvider),
   wrapProvider(NotificationsProvider),
   wrapProvider(DialogAreaProvider),
   wrapProvider(StyleSheetManager, { shouldForwardProp }),

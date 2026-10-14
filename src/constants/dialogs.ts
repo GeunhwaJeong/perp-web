@@ -26,7 +26,6 @@ export type ComplianceConfigDialogProps = {};
 export type ConfirmPendingDepositDialogProps = {
   usdcBalance: number;
 };
-export type DepositAddressDialogProps = {};
 export type DisconnectWalletDialogProps = {};
 export type DisplaySettingsDialogProps = {};
 export type ExchangeOfflineDialogProps = { preventClose?: boolean };
@@ -102,7 +101,6 @@ export type UnstakeDialogProps = {};
 export type VaultDepositWithdrawDialogProps = { initialType?: 'DEPOSIT' | 'WITHDRAW' };
 export type WithdrawDialog2Props = {};
 export type DepositDialog2Props = {};
-export type TransferStatusDialogProps = { transferId: string };
 export type WithdrawalGatedDialogProps = {
   transferType: 'withdrawal' | 'transfer';
   estimatedUnblockTime?: string | null;
@@ -113,10 +111,6 @@ export type CriteriaDialogProps = {
   stakedAmount?: bigint;
   userTier?: number;
 };
-export type CoinbaseDepositDialogProps = {
-  onBack?: () => void;
-};
-
 export const DialogTypes = unionize(
   {
     AccountSecurity: ofType<AccountSecurityDialogProps>(),
@@ -128,10 +122,8 @@ export const DialogTypes = unionize(
     CloseAllPositionsConfirmation: ofType<CloseAllPositionsConfirmationDialogProps>(),
     ClosePosition: ofType<ClosePositionDialogProps>(),
     ComplianceConfig: ofType<ComplianceConfigDialogProps>(),
-    CoinbaseDepositDialog: ofType<CoinbaseDepositDialogProps>(),
     ConfirmPendingDeposit: ofType<ConfirmPendingDepositDialogProps>(),
     Criteria: ofType<CriteriaDialogProps>(),
-    DepositAddresses: ofType<DepositAddressDialogProps>(),
     /* TODO: rename Deposit2 to Deposit once old deposit flow is deprecated */
     Deposit2: ofType<DepositDialog2Props>(),
     DisconnectWallet: ofType<DisconnectWalletDialogProps>(),
@@ -161,7 +153,6 @@ export const DialogTypes = unionize(
     Trade: ofType<TradeDialogProps>(),
     Transfer: ofType<TransferDialogProps>(),
     TradingKeys: ofType<TradingKeysDialogProps>(),
-    TransferStatus: ofType<TransferStatusDialogProps>(),
     Triggers: ofType<TriggersDialogProps>(),
     Unstake: ofType<UnstakeDialogProps>(),
     VaultDepositWithdraw: ofType<VaultDepositWithdrawDialogProps>(),
