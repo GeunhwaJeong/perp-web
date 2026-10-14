@@ -67,8 +67,10 @@ export const setupBiometricUnlock = async ({
           // The user handle is returned on every assertion for a discoverable credential,
           // which is what makes it a key store the page does not have to hold.
           id: asBuffer(rawKey),
-          name: username ? `${username}.haneul` : 'Sigma account',
-          displayName: username ? `${username}.haneul` : 'Sigma account',
+          // Labelled as the unlock, so the system's credential picker tells it apart from a
+          // chain-native passkey account registered under the same site.
+          name: `${username ? `${username}.haneul` : 'Sigma account'} · Face ID unlock`,
+          displayName: `${username ? `${username}.haneul` : 'Sigma account'} · Face ID unlock`,
         },
         pubKeyCredParams: [
           { type: 'public-key', alg: -7 },

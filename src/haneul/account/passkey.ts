@@ -59,9 +59,15 @@ export const clearPasskeyAccount = () => {
   storage()?.removeItem(STORAGE_KEY);
 };
 
-export const passkeyProvider = (): PasskeyProvider =>
+export const passkeyProvider = (username?: string): PasskeyProvider =>
   new BrowserPasskeyProvider(RP_NAME, {
     rp: { name: RP_NAME, id: globalThis.location.hostname },
+    // The label the system's credential picker shows; the Face ID unlock credential of a
+    // password account lives under the same site and is labelled as the unlock.
+    user: {
+      name: username ? `${username}.haneul` : 'Sigma passkey account',
+      displayName: username ? `${username}.haneul` : 'Sigma passkey account',
+    },
     // The SDK defaults to 'cross-platform' (security keys, phones over QR); the screen
     // promises Face ID or a fingerprint, which is the platform authenticator.
     authenticatorSelection: {
@@ -97,7 +103,9 @@ const toRecord = (keypair: PasskeyKeypair, username?: string): PasskeyAccountRec
 
 /** Registers a fresh passkey with the authenticator; the address derives from its key. */
 export const createPasskeyAccount = async (username?: string): Promise<PasskeyAccountRecord> => {
-  const keypair = await PasskeyKeypair.getPasskeyInstance(passkeyProvider()).catch(asCancelled);
+  const keypair = await PasskeyKeypair.getPasskeyInstance(passkeyProvider(username)).catch(
+    asCancelled
+  );
   const record = toRecord(keypair, username);
   savePasskeyAccount(record);
   return record;

@@ -41,16 +41,23 @@ page.on('pageerror', (e) => {
 
 const cdp = await context.newCDPSession(page);
 await cdp.send('WebAuthn.enable', { enableUI: false });
-const { authenticatorId } = await cdp.send('WebAuthn.addVirtualAuthenticator', {
-  options: {
-    protocol: 'ctap2',
-    transport: 'internal',
-    hasResidentKey: true,
-    hasUserVerification: true,
-    isUserVerified: true,
-    automaticPresenceSimulation: true,
-  },
-});
+let authenticatorId;
+// With no system picker, the virtual authenticator answers a discoverable-credential
+// request with any resident credential for the site, so each part gets its own.
+const freshAuthenticator = async () => {
+  if (authenticatorId) await cdp.send('WebAuthn.removeVirtualAuthenticator', { authenticatorId });
+  ({ authenticatorId } = await cdp.send('WebAuthn.addVirtualAuthenticator', {
+    options: {
+      protocol: 'ctap2',
+      transport: 'internal',
+      hasResidentKey: true,
+      hasUserVerification: true,
+      isUserVerified: true,
+      automaticPresenceSimulation: true,
+    },
+  }));
+};
+await freshAuthenticator();
 
 const button = (name) => page.getByRole('button', { name });
 const stored = () =>
@@ -65,10 +72,11 @@ const wipeDevice = () =>
     localStorage.clear();
     sessionStorage.clear();
   });
-const headerShows = async (address) => {
-  const short = `${address.slice(0, 6)}...${address.slice(-4)}`;
+// The header trigger shows the account's name once it has one, else the short address.
+const headerShows = async (label) => {
+  const expected = label.startsWith('0x') ? `${label.slice(0, 6)}...${label.slice(-4)}` : label;
   const names = await page.getByRole('button').allInnerTexts();
-  return names.some((n) => n.includes(short));
+  return names.some((n) => n.includes(expected));
 };
 const credentialCount = async () =>
   (await cdp.send('WebAuthn.getCredentials', { authenticatorId })).credentials.length;
@@ -137,7 +145,7 @@ try {
   const address = account.address;
   await button(/start trading/i).click();
   await page.waitForTimeout(1200);
-  check('header shows the new address', await headerShows(address));
+  check('header shows the new name', await headerShows(`${username}.haneul`));
 
   await page.reload();
   await page.waitForTimeout(2500);
@@ -178,7 +186,7 @@ try {
   // ---- 2. Recovery phrase, Face ID toggle, lock, reset and restore -----------------------
   const openMenu = async () => {
     await page
-      .getByRole('button', { name: /0x[0-9a-f]{4}/i })
+      .getByRole('button', { name: /\.haneul$|0x[0-9a-f]{4}/i })
       .first()
       .click();
     await page.waitForTimeout(600);
@@ -250,6 +258,7 @@ try {
   );
 
   // ---- 3. Chain-native passkey account ---------------------------------------------------
+  await freshAuthenticator();
   await openFresh();
   await toConnectScreen();
   await button(/^passkey/i)
@@ -281,10 +290,10 @@ try {
   const passkeyAddress = record.address;
   await button(/start trading/i).click();
   await page.waitForTimeout(1200);
-  check('header shows the passkey address', await headerShows(passkeyAddress));
+  check('header shows the passkey name', await headerShows(`${passkeyName}.haneul`));
   await page.reload();
   await page.waitForTimeout(2500);
-  check('reload keeps the passkey account connected', await headerShows(passkeyAddress));
+  check('reload keeps the passkey account connected', await headerShows(`${passkeyName}.haneul`));
 
   await wipeDevice();
   await page.reload();
@@ -302,6 +311,7 @@ try {
   );
   await button(/start trading/i).click();
   await page.waitForTimeout(1200);
+  // Recovery finds no name here (dev has no name service), so the address shows.
   check('recovered passkey account connected', await headerShows(passkeyAddress));
 
   console.log(`\n${passed} checks passed`);
