@@ -7,12 +7,10 @@ import { ComplianceStates } from '@/constants/compliance';
 import { DialogTypes } from '@/constants/dialogs';
 import { STRING_KEYS, SUPPORTED_LOCALES } from '@/constants/localization';
 import { AppRoute } from '@/constants/routes';
-import { StatsigFlags } from '@/constants/statsig';
 
 import { useAccounts } from '@/hooks/useAccounts';
 import { useComplianceState } from '@/hooks/useComplianceState';
 import { useEnvFeatures } from '@/hooks/useEnvFeatures';
-import { useStatsigGateValue } from '@/hooks/useStatsig';
 import { useStringGetter } from '@/hooks/useStringGetter';
 import { useTokenConfigs } from '@/hooks/useTokenConfigs';
 import { useURLConfigs } from '@/hooks/useURLConfigs';
@@ -52,7 +50,6 @@ export const HeaderDesktop = () => {
   const { complianceState } = useComplianceState();
   const { isVaultEnabled, isChainTokenPageEnabled } = useEnvFeatures();
 
-  const affiliatesEnabled = useStatsigGateValue(StatsigFlags.ffEnableAffiliates);
   const hasSeenLaunchIncentives = useAppSelector(getHasSeenLaunchIncentives);
 
   const navItems = [
@@ -78,11 +75,6 @@ export const HeaderDesktop = () => {
           value: 'VAULT',
           label: stringGetter({ key: STRING_KEYS.MEGAVAULT }),
           href: AppRoute.Vault,
-        },
-        affiliatesEnabled && {
-          value: 'REFERRALS',
-          label: stringGetter({ key: STRING_KEYS.REFERRALS }),
-          href: AppRoute.Referrals,
         },
         isChainTokenPageEnabled && {
           value: chainTokenLabel,

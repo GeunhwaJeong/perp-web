@@ -7,7 +7,6 @@ import { TagsOf, UnionOf, ofType, unionize } from 'unionize';
 import { BigNumberish } from '@/lib/numbers';
 import { Nullable } from '@/lib/typeUtils';
 
-import { IAffiliateStats } from './affiliates';
 import { DydxChainAsset } from './wallets';
 
 type SharedDialogProps = { setIsOpen: (open: boolean) => void };
@@ -47,13 +46,11 @@ export type PreferencesDialogProps = {};
 export type AccountSecurityDialogProps = { intent: 'recoveryPhrase' | 'enableBiometric' };
 export type RateLimitDialogProps = { preventClose?: boolean };
 export type ReclaimChildSubaccountFundsDialogProps = {};
-export type ReferralDialogProps = { refCode: string };
 export type RestrictedGeoDialogProps = { preventClose?: boolean };
 export type RestrictedWalletDialogProps = { preventClose?: boolean };
 export type SelectMarginModeDialogProps = {};
 export type SetMarketLeverageDialogProps = { marketId: string };
 export type SetupPasskeyDialogProps = { onClose: () => void };
-export type ShareAffiliateDialogProps = {};
 export type SharePNLShareType = 'open' | 'close' | 'liquidated' | 'partialClose' | 'extended';
 export type SharePNLAnalyticsDialogProps = {
   assetId: string;
@@ -106,11 +103,6 @@ export type WithdrawalGatedDialogProps = {
   estimatedUnblockTime?: string | null;
 };
 export type WithdrawFromSubaccountDialogProps = {};
-export type CriteriaDialogProps = {
-  accountStats?: IAffiliateStats;
-  stakedAmount?: bigint;
-  userTier?: number;
-};
 export const DialogTypes = unionize(
   {
     AccountSecurity: ofType<AccountSecurityDialogProps>(),
@@ -123,7 +115,6 @@ export const DialogTypes = unionize(
     ClosePosition: ofType<ClosePositionDialogProps>(),
     ComplianceConfig: ofType<ComplianceConfigDialogProps>(),
     ConfirmPendingDeposit: ofType<ConfirmPendingDepositDialogProps>(),
-    Criteria: ofType<CriteriaDialogProps>(),
     /* TODO: rename Deposit2 to Deposit once old deposit flow is deprecated */
     Deposit2: ofType<DepositDialog2Props>(),
     DisconnectWallet: ofType<DisconnectWalletDialogProps>(),
@@ -140,12 +131,10 @@ export const DialogTypes = unionize(
     Preferences: ofType<PreferencesDialogProps>(),
     RateLimit: ofType<RateLimitDialogProps>(),
     ReclaimChildSubaccountFunds: ofType<ReclaimChildSubaccountFundsDialogProps>(),
-    Referral: ofType<ReferralDialogProps>(),
     RestrictedGeo: ofType<RestrictedGeoDialogProps>(),
     RestrictedWallet: ofType<RestrictedWalletDialogProps>(),
     SetMarketLeverage: ofType<SetMarketLeverageDialogProps>(),
     SetupPasskey: ofType<SetupPasskeyDialogProps>(),
-    ShareAffiliate: ofType<ShareAffiliateDialogProps>(),
     SharePNLAnalytics: ofType<SharePNLAnalyticsDialogProps>(),
     SimpleUiTrade: ofType<SimpleUiTradeDialogProps>(),
     Stake: ofType<StakeDialogProps>(),

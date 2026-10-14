@@ -1,7 +1,6 @@
 import { useMemo } from 'react';
 
 import { BonsaiCore } from '@/bonsai/ontology';
-import { DoubleArrowUpIcon } from '@radix-ui/react-icons';
 import styled from 'styled-components';
 
 import { ButtonAction, ButtonShape } from '@/constants/buttons';
@@ -12,7 +11,6 @@ import { useAccounts } from '@/hooks/useAccounts';
 import { useLocaleSeparators } from '@/hooks/useLocaleSeparators';
 import { useStakingTierLevel } from '@/hooks/useStakingTierLevel';
 import { useStringGetter } from '@/hooks/useStringGetter';
-import { useSubaccount } from '@/hooks/useSubaccount';
 
 import { layoutMixins } from '@/styles/layoutMixins';
 
@@ -21,14 +19,10 @@ import { Button } from '@/components/Button';
 import { Details } from '@/components/Details';
 import { Icon, IconName } from '@/components/Icon';
 import { formatNumberOutput, Output, OutputType } from '@/components/Output';
-import { WithTooltip } from '@/components/WithTooltip';
 
 import { useAppDispatch, useAppSelector } from '@/state/appTypes';
 import { openDialog } from '@/state/dialogs';
 import { getSelectedLocale } from '@/state/localizationSelectors';
-
-import { MustBigNumber } from '@/lib/numbers';
-import { truncateAddress } from '@/lib/wallet';
 
 export const FeePageHeader = () => {
   const dispatch = useAppDispatch();
@@ -37,7 +31,6 @@ export const FeePageHeader = () => {
   const feeTiers = useAppSelector(BonsaiCore.configs.feeTiers);
   const stakingTiers = useAppSelector(BonsaiCore.configs.stakingTiers);
   const hasStakingTiers = stakingTiers != null && stakingTiers.length > 0;
-  const { referredBy } = useSubaccount();
   const { dydxAddress } = useAccounts();
   const { decimal: decimalSeparator, group: groupSeparator } = useLocaleSeparators();
   const selectedLocale = useAppSelector(getSelectedLocale);
@@ -56,11 +49,6 @@ export const FeePageHeader = () => {
   }, [userStats]);
 
   const userFeeTier = userStats.feeTierId;
-
-  const hasReceivedFeeTierBonus =
-    userFeeTier === '3' &&
-    referredBy !== undefined &&
-    MustBigNumber(volume).lt(feeTiers?.[2]?.volume ?? 0);
 
   const onStakeMore = () => {
     dispatch(openDialog(DialogTypes.Stake()));
@@ -166,23 +154,7 @@ export const FeePageHeader = () => {
         items={[
           {
             key: 'fee-tier',
-            label: (
-              <$CardLabel>
-                {stringGetter({ key: STRING_KEYS.FEE_TIER })}{' '}
-                {hasReceivedFeeTierBonus && (
-                  <WithTooltip
-                    tooltipString={stringGetter({
-                      key: STRING_KEYS.GIFTED_FEE_TIER_BONUS,
-                      params: {
-                        AFFILIATE: truncateAddress(referredBy),
-                      },
-                    })}
-                  >
-                    <DoubleArrowUpIcon tw="inline h-0.75 w-0.75 text-color-positive" />
-                  </WithTooltip>
-                )}
-              </$CardLabel>
-            ),
+            label: <$CardLabel>{stringGetter({ key: STRING_KEYS.FEE_TIER })} </$CardLabel>,
             value: (
               <span>
                 {stringGetter({

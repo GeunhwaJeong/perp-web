@@ -50,13 +50,11 @@ import { useComplianceState } from './hooks/useComplianceState';
 import { useInitializePage } from './hooks/useInitializePage';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { useMobileWebEnabled } from './hooks/useMobileWebEnabled';
-import { useReferralCode } from './hooks/useReferralCode';
 import { useShouldShowFooter } from './hooks/useShouldShowFooter';
 import { useSimpleUiEnabled } from './hooks/useSimpleUiEnabled';
 import { useTokenConfigs } from './hooks/useTokenConfigs';
 import { WalletConnectionProvider } from './hooks/useWalletConnection';
 import { isTruthy } from './lib/isTruthy';
-import { AffiliatesPage } from './pages/affiliates/AffiliatesPage';
 import { persistor } from './state/_store';
 import { setOnboardedThisSession } from './state/account';
 import { setCurrentPath } from './state/app';
@@ -90,7 +88,6 @@ const Content = () => {
   useInitializePage();
   useAnalytics();
   useCommandMenu();
-  useReferralCode();
   useUiRefreshMigrations();
   useOpenDepositIfRelevant();
 
@@ -195,8 +192,6 @@ const Content = () => {
         <$Main>
           <Suspense fallback={<LoadingSpace id="main" />}>
             <Routes>
-              <Route path={`${AppRoute.Referrals}/*`} element={<AffiliatesPage />} />
-
               <Route path={AppRoute.Trade}>
                 <Route
                   path=":market"

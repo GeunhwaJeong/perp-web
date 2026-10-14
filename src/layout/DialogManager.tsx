@@ -3,7 +3,6 @@ import React from 'react';
 
 import { DialogTypes } from '@/constants/dialogs';
 
-import { CriteriaDialog } from '@/views/Affiliates/CriteriaDialog';
 import { AccountDialog } from '@/views/dialogs/AccountDialog/AccountDialog';
 import { AccountSecurityDialog } from '@/views/dialogs/AccountDialog/AccountSecurityDialog';
 import { AcknowledgeTermsDialog } from '@/views/dialogs/AcknowledgeTermsDialog';
@@ -32,12 +31,10 @@ import { PredictionMarketIntroDialog } from '@/views/dialogs/PredictionMarketInt
 import { PreferencesDialog } from '@/views/dialogs/PreferencesDialog';
 import { RateLimitDialog } from '@/views/dialogs/RateLimitDialog';
 import { ReclaimChildSubaccountFundsDialog } from '@/views/dialogs/ReclaimChildSubaccountFundsDialog';
-import { ReferralDialog } from '@/views/dialogs/ReferralDialog';
 import { RestrictedGeoDialog } from '@/views/dialogs/RestrictedGeoDialog';
 import { RestrictedWalletDialog } from '@/views/dialogs/RestrictedWalletDialog';
 import { SetMarketLeverageDialog } from '@/views/dialogs/SetMarketLeverageDialog';
 import { SetupPasskeyDialog } from '@/views/dialogs/SetupPasskeyDialog';
-import { ShareAffiliateDialog } from '@/views/dialogs/ShareAffiliateDialog';
 import { SharePNLAnalyticsDialog } from '@/views/dialogs/SharePNLAnalyticsDialog';
 import { SimpleUiTradeDialog } from '@/views/dialogs/SimpleUiTradeDialog/SimpleUiTradeDialog';
 import { StakeDialog } from '@/views/dialogs/StakeDialog';
@@ -102,12 +99,10 @@ export const DialogManager = React.memo(() => {
     ReclaimChildSubaccountFunds: (args) => (
       <ReclaimChildSubaccountFundsDialog {...args} {...modalProps} />
     ),
-    Referral: (args) => <ReferralDialog {...args} {...modalProps} />,
     RestrictedGeo: (args) => <RestrictedGeoDialog {...args} {...modalProps} />,
     RestrictedWallet: (args) => <RestrictedWalletDialog {...args} {...modalProps} />,
     SetMarketLeverage: (args) => <SetMarketLeverageDialog {...args} {...modalProps} />,
     SetupPasskey: (args) => <SetupPasskeyDialog {...args} {...modalProps} />,
-    ShareAffiliate: (args) => <ShareAffiliateDialog {...args} {...modalProps} />,
     SharePNLAnalytics: (args) => <SharePNLAnalyticsDialog {...args} {...modalProps} />,
     SimpleUiTrade: (args) => <SimpleUiTradeDialog {...args} {...modalProps} />,
     Stake: (args) => <StakeDialog {...args} {...modalProps} />,
@@ -121,6 +116,5 @@ export const DialogManager = React.memo(() => {
     Withdraw2: (args) => <CollateralWithdrawDialog {...args} {...modalProps} />,
     WithdrawalGated: (args) => <WithdrawalGateDialog {...args} {...modalProps} />,
     WithdrawFromSubaccount: (args) => <WithdrawFromSubaccountDialog {...args} {...modalProps} />,
-    Criteria: (args) => <CriteriaDialog {...args} {...modalProps} />,
   });
 });

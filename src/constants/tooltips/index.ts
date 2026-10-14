@@ -1,6 +1,5 @@
 import type { TooltipStrings } from '@/constants/localization';
 
-import { affiliateTooltips } from './affiliates';
 import { depositTooltips } from './deposit';
 import { generalTooltips } from './general';
 import { newMarketsTooltips } from './newMarkets';
@@ -21,7 +20,6 @@ export const tooltipStrings = {
   ...triggersTooltips,
   ...withdrawTooltips,
   ...vaultTooltips,
-  ...affiliateTooltips,
 } satisfies TooltipStrings;
 
 export type TooltipStringKeys = keyof typeof tooltipStrings;

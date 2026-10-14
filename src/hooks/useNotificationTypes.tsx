@@ -27,7 +27,7 @@ import { IndexerOrderSide, IndexerOrderType } from '@/types/indexer/indexerApiGe
 
 import { Icon, IconName } from '@/components/Icon';
 import { Link } from '@/components/Link';
-import { formatNumberOutput, Output, OutputType } from '@/components/Output';
+import { Output, OutputType } from '@/components/Output';
 import { FillWithNoOrderNotificationRow } from '@/views/Lists/Alerts/FillWithNoOrderNotificationRow';
 import { OrderCancelNotificationRow } from '@/views/Lists/Alerts/OrderCancelNotificationRow';
 import { OrderNotificationRow } from '@/views/Lists/Alerts/OrderNotificationRow';
@@ -53,9 +53,7 @@ import {
   getLocalCloseAllPositions,
   getLocalPlaceOrders,
 } from '@/state/localOrdersSelectors';
-import { getSelectedLocale } from '@/state/localizationSelectors';
 import { getCustomNotifications } from '@/state/notificationsSelectors';
-import { selectTransfersByAddress } from '@/state/transfersSelectors';
 import { selectIsKeplrConnected } from '@/state/walletSelectors';
 
 import { assertNever } from '@/lib/assertNever';
@@ -70,11 +68,8 @@ import { getAverageFillPrice } from '@/lib/orders';
 import { isPresent, orEmptyObj, orEmptyRecord } from '@/lib/typeUtils';
 
 import { useAccounts } from './useAccounts';
-import { useAffiliateMetadata } from './useAffiliatesInfo';
 import { useApiState } from './useApiState';
 import { useAutomatedDepositNotifications } from './useAutomatedDepositNotifications';
-import { useLocaleSeparators } from './useLocaleSeparators';
-import { useAppSelectorWithArgs } from './useParameterizedSelector';
 import { useAllStatsigDynamicConfigValues } from './useStatsig';
 import { useStringGetter } from './useStringGetter';
 import { useURLConfigs } from './useURLConfigs';
@@ -515,45 +510,6 @@ export const notificationTypes: NotificationTypeConfig[] = [
         trigger,
         statusPage,
       ]);
-    },
-    useNotificationAction: () => {
-      return () => {};
-    },
-  },
-  {
-    type: NotificationType.AffiliatesAlert,
-    useTrigger: ({ trigger }) => {
-      const stringGetter = useStringGetter();
-      const { data } = useAffiliateMetadata();
-      const isAffiliate = !!data?.metadata?.isAffiliate;
-
-      useEffect(() => {
-        if (isAffiliate) {
-          trigger({
-            id: NotificationType.AffiliatesAlert,
-            displayData: {
-              title: stringGetter({ key: STRING_KEYS.AFFILIATE_BOOSTER_TITLE }),
-              body: stringGetter({
-                key: STRING_KEYS.AFFILIATE_BOOSTER_BODY,
-                params: {
-                  HERE_LINK: (
-                    <Link
-                      isInline
-                      isAccent
-                      href="https://www.dydx.xyz/blog/introducing-the-dydx-affiliate-booster-program"
-                    >
-                      {stringGetter({ key: STRING_KEYS.HERE })}
-                    </Link>
-                  ),
-                },
-              }),
-              toastSensitivity: 'foreground',
-              groupKey: NotificationType.AffiliatesAlert,
-            },
-            updateKey: ['boosted-affiliates-june-2025'],
-          });
-        }
-      }, [isAffiliate, stringGetter, trigger]);
     },
     useNotificationAction: () => {
       return () => {};

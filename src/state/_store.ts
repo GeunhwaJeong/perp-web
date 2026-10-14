@@ -11,7 +11,6 @@ import { transformOntologyObject } from '@/lib/transformOntology';
 
 import { accountSlice } from './account';
 import { accountUiMemorySlice } from './accountUiMemory';
-import { affiliatesSlice } from './affiliates';
 import { appSlice } from './app';
 import appMiddleware from './appMiddleware';
 import { appUiConfigsSlice } from './appUiConfigs';
@@ -37,7 +36,6 @@ import { walletEphemeralSlice, walletSlice } from './wallet';
 
 const reducers = {
   account: accountSlice.reducer,
-  affiliates: affiliatesSlice.reducer,
   app: appSlice.reducer,
   appUiConfigs: appUiConfigsSlice.reducer,
   accountUiMemory: accountUiMemorySlice.reducer,
@@ -66,7 +64,6 @@ const persistConfig = {
   version: 6,
   storage,
   whitelist: [
-    'affiliates',
     'dismissable',
     'tradingView',
     'transfers',

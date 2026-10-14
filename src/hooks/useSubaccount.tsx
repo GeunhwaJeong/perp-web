@@ -18,18 +18,15 @@ import { BonsaiCore } from '@/bonsai/ontology';
 import { IndexedTx } from '@cosmjs/stargate';
 import { Method } from '@cosmjs/tendermint-rpc';
 import { SubaccountClient, type LocalWallet } from '@dydxprotocol/v4-client-js';
-import { useMutation } from '@tanstack/react-query';
 import Long from 'long';
 import { parseUnits } from 'viem';
 
-import { AMOUNT_RESERVED_FOR_GAS_USDC, AMOUNT_USDC_BEFORE_REBALANCE } from '@/constants/account';
+import { AMOUNT_RESERVED_FOR_GAS_USDC } from '@/constants/account';
 import { AnalyticsEvents, DEFAULT_TRANSACTION_MEMO, TransactionMemo } from '@/constants/analytics';
 import { DialogTypes } from '@/constants/dialogs';
 import { QUANTUM_MULTIPLIER } from '@/constants/numbers';
 import { DydxAddress, WalletType } from '@/constants/wallets';
 
-import { removeLatestReferrer } from '@/state/affiliates';
-import { getLatestReferrer } from '@/state/affiliatesSelector';
 import { appQueryClient } from '@/state/appQueryClient';
 import { useAppDispatch, useAppSelector } from '@/state/appTypes';
 import { openDialog } from '@/state/dialogs';
@@ -45,7 +42,6 @@ import { sleep } from '@/lib/timeUtils';
 
 import { useAccounts } from './useAccounts';
 import { useDydxClient } from './useDydxClient';
-import { useReferredBy } from './useReferredBy';
 import { useTokenConfigs } from './useTokenConfigs';
 
 const AUTHORIZED_KEY_UPDATE_DELAY = 1700;
@@ -384,82 +380,6 @@ const useSubaccountContext = ({ localDydxWallet }: { localDydxWallet?: LocalWall
     [compositeClient, localDydxWallet, subaccountClient]
   );
 
-  const registerAffiliate = useCallback(
-    async (affiliate: string) => {
-      if (!compositeClient) {
-        throw new Error('client not initialized');
-      }
-      if (!localDydxWallet?.address || !subaccountClient) {
-        throw new Error('wallet not initialized');
-      }
-      if (affiliate === localDydxWallet.address) {
-        throw new Error('affiliate can not be the same as referree');
-      }
-      try {
-        const response = await compositeClient.validatorClient.post.registerAffiliate(
-          subaccountClient,
-          affiliate
-        );
-        return response;
-      } catch (error) {
-        log('useSubaccount/registerAffiliate', error);
-        throw error;
-      }
-    },
-    [compositeClient, localDydxWallet, subaccountClient]
-  );
-
-  const latestReferrer = useAppSelector(getLatestReferrer);
-  const { data: referredBy, isFetched: isReferredByFetched } = useReferredBy();
-
-  const { mutateAsync: registerAffiliateMutate, isPending: isRegisterAffiliatePending } =
-    useMutation({
-      mutationFn: async (affiliateAddress: string) => {
-        const tx = await registerAffiliate(affiliateAddress);
-        dispatch(removeLatestReferrer());
-        track(AnalyticsEvents.AffiliateRegistration({ affiliateAddress }));
-        return tx;
-      },
-    });
-
-  useEffect(() => {
-    if (!subaccountClient) return;
-
-    if (dydxAddress === latestReferrer) {
-      dispatch(removeLatestReferrer());
-      return;
-    }
-    if (
-      compositeClient &&
-      latestReferrer &&
-      dydxAddress &&
-      usdcCoinBalance &&
-      parseFloat(usdcCoinBalance) > AMOUNT_USDC_BEFORE_REBALANCE &&
-      isReferredByFetched &&
-      !referredBy?.affiliateAddress &&
-      !isRegisterAffiliatePending
-    ) {
-      registerAffiliateMutate(latestReferrer);
-    }
-  }, [
-    compositeClient,
-    latestReferrer,
-    dydxAddress,
-    registerAffiliateMutate,
-    usdcCoinBalance,
-    subaccountClient,
-    isReferredByFetched,
-    referredBy?.affiliateAddress,
-    dispatch,
-    isRegisterAffiliatePending,
-  ]);
-
-  useEffect(() => {
-    if (referredBy?.affiliateAddress && latestReferrer) {
-      dispatch(removeLatestReferrer());
-    }
-  }, [referredBy?.affiliateAddress, dispatch, latestReferrer]);
-
   const getVaultAccountInfo = useCallback(async () => {
     if (!compositeClient?.validatorClient) {
       throw new Error('client not initialized');
@@ -793,10 +713,6 @@ const useSubaccountContext = ({ localDydxWallet }: { localDydxWallet?: LocalWall
     getUndelegateFee,
     withdrawReward,
     getWithdrawRewardFee,
-
-    // affiliates
-    registerAffiliate,
-    referredBy: referredBy?.affiliateAddress,
 
     // vaults
     getVaultAccountInfo,

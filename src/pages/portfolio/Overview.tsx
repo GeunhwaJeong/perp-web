@@ -5,18 +5,17 @@ import styled from 'styled-components';
 
 import { STRING_KEYS } from '@/constants/localization';
 import { AppRoute, PortfolioRoute } from '@/constants/routes';
-import { StatsigDynamicConfigs, StatsigFlags } from '@/constants/statsig';
+import { StatsigDynamicConfigs } from '@/constants/statsig';
 
 import { useAccounts } from '@/hooks/useAccounts';
 import { useBreakpoints } from '@/hooks/useBreakpoints';
 import { useAppSelectorWithArgs } from '@/hooks/useParameterizedSelector';
 import { useShouldShowTriggers } from '@/hooks/useShouldShowTriggers';
-import { useAllStatsigDynamicConfigValues, useStatsigGateValue } from '@/hooks/useStatsig';
+import { useAllStatsigDynamicConfigValues } from '@/hooks/useStatsig';
 import { useStringGetter } from '@/hooks/useStringGetter';
 
 import { AttachedExpandingSection, DetachedSection } from '@/components/ContentSection';
 import { ContentSectionHeader } from '@/components/ContentSectionHeader';
-import { AffiliatesBanner } from '@/views/AffiliatesBanner';
 import { TelegramInviteBanner } from '@/views/TelegramInviteBanner';
 import { PositionsTable, PositionsTableColumnKey } from '@/views/tables/PositionsTable';
 
@@ -39,7 +38,6 @@ export const Overview = () => {
   const feedbackRequestWalletAddresses = dynamicConfigs[StatsigDynamicConfigs.dcHighestVolumeUsers];
   const shouldShowTelegramInvite =
     dydxAddress && feedbackRequestWalletAddresses?.includes(dydxAddress);
-  const affiliatesEnabled = useStatsigGateValue(StatsigFlags.ffEnableAffiliates);
 
   const handleViewUnopenedIsolatedOrders = useCallback(() => {
     navigate(`${AppRoute.Portfolio}/${PortfolioRoute.Orders}`, {
@@ -65,12 +63,6 @@ export const Overview = () => {
       <DetachedSection>
         <AccountDetailsAndHistory />
       </DetachedSection>
-
-      {affiliatesEnabled && isTablet && (
-        <DetachedSection>
-          <AffiliatesBanner showLink />
-        </DetachedSection>
-      )}
 
       <AttachedExpandingSection tw="mt-1">
         <$PortfolioContentSectionHeader title={stringGetter({ key: STRING_KEYS.OPEN_POSITIONS })} />
