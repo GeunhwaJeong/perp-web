@@ -137,7 +137,7 @@ export function calculateTradeInfo(
                 );
               }
             ),
-            feeRate: accountData.userFeeStats.takerFeeRate ?? 0,
+            feeRate: accountData.userFeeStats.takerFeeRate ?? marketTakerFee(accountData) ?? 0,
             transferToSubaccountAmount: calculateIsolatedTransferAmount(
               trade,
               calculated.summary?.size?.size ?? 0,
@@ -212,7 +212,7 @@ export function calculateTradeInfo(
 
           const size = calculated.marketOrder?.size;
           const usdcSize = mapIfPresent(price, size, (p, s) => p * s);
-          const feeRate = accountData.userFeeStats.takerFeeRate ?? 0;
+          const feeRate = accountData.userFeeStats.takerFeeRate ?? marketTakerFee(accountData) ?? 0;
           const totalFees = calculateTradeFeeAfterDiscounts(
             accountData,
             mapIfPresent(usdcSize, (u) => u * feeRate)
@@ -279,8 +279,8 @@ export function calculateTradeInfo(
           const isMaker = timeInForce === TimeInForce.GTT || execution === ExecutionType.POST_ONLY;
 
           const feeRate = isMaker
-            ? accountData.userFeeStats.makerFeeRate
-            : accountData.userFeeStats.takerFeeRate;
+            ? (accountData.userFeeStats.makerFeeRate ?? marketMakerFee(accountData))
+            : (accountData.userFeeStats.takerFeeRate ?? marketTakerFee(accountData));
 
           const startPrice = AttemptNumber(trade.scaleStartPrice);
           const endPrice = AttemptNumber(trade.scaleEndPrice);
@@ -359,8 +359,8 @@ export function calculateTradeInfo(
             execution === ExecutionType.POST_ONLY;
 
           const feeRate = isMaker
-            ? accountData.userFeeStats.makerFeeRate
-            : accountData.userFeeStats.takerFeeRate;
+            ? (accountData.userFeeStats.makerFeeRate ?? marketMakerFee(accountData))
+            : (accountData.userFeeStats.takerFeeRate ?? marketTakerFee(accountData));
           const price = AttemptNumber(trade.limitPrice);
           const inputSummary = calculateLimitOrderInputSummary(
             trade.size,
@@ -1293,6 +1293,13 @@ function generateGeometricWeights(
   }
   return { weights, totalWeight };
 }
+
+// The engine charges each market's base rates; the account's tier multipliers are applied on
+// chain and are not indexed yet, so the base rate is the estimate when no tier is known.
+const marketTakerFee = (accountData: TradeFormInputData) =>
+  AttemptNumber(accountData.currentTradeMarketSummary?.takerFee);
+const marketMakerFee = (accountData: TradeFormInputData) =>
+  AttemptNumber(accountData.currentTradeMarketSummary?.makerFee);
 
 function calculateTradeFeeAfterDiscounts(
   accountData: TradeFormInputData,

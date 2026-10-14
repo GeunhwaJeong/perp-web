@@ -1548,6 +1548,9 @@ export interface IndexerPerpetualMarketResponseObject {
   indexPrice?: string | null;
   nextFundingAt?: string | null;
   fundingPeriodMs?: number | null;
+  /** The market's base maker and taker fee rates, as fractions of the notional. */
+  makerFee?: string | null;
+  takerFee?: string | null;
 }
 /**
  *

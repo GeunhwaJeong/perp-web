@@ -28,6 +28,8 @@ export const FeePageHeader = () => {
   const currentStakingDiscountLevel: number | undefined = useStakingTierLevel();
 
   const feeTierOne = feeTiers?.[0];
+  // Until the fee schedule is indexed, the base rates of the first listed market stand in.
+  const baseMarket = Object.values(useAppSelector(BonsaiCore.markets.markets.data) ?? {})[0];
   const accountStakingTier = useAppSelector(BonsaiCore.account.stakingTier.data);
   const stakedTokens = accountStakingTier?.stakedBaseTokens;
   const stakingTierDiscountPercent = accountStakingTier?.discountPercent;
@@ -102,7 +104,7 @@ export const FeePageHeader = () => {
               <Output
                 tw="text-color-accent"
                 type={OutputType.SmallPercent}
-                value={userStats.makerFeeRate ?? feeTierOne?.maker}
+                value={userStats.makerFeeRate ?? baseMarket?.makerFee ?? feeTierOne?.maker}
               />
             ),
           },
@@ -113,7 +115,7 @@ export const FeePageHeader = () => {
               <Output
                 tw="text-color-accent"
                 type={OutputType.SmallPercent}
-                value={userStats.takerFeeRate ?? feeTierOne?.taker}
+                value={userStats.takerFeeRate ?? baseMarket?.takerFee ?? feeTierOne?.taker}
               />
             ),
           },
