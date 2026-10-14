@@ -5,18 +5,35 @@
  *
  * HaneulNS on mainnet has no public registration path (the payments package is not
  * deployed), so names are issued by the operator: this service holds the ns-ops key,
- * applies the free-name rules, signs `admin::reserve_domain` and sends the registration
- * NFT to the account's address. The page only ever posts the (name, address) pair.
+ * applies the free-name rules and signs one transaction per account that
+ *
+ *   1. reserves `name.haneul` for NAME_YEARS (`admin::reserve_domain`),
+ *   2. points the name at the account (`controller::set_target_address`), which is what
+ *      lets the account later sign `set_reverse_lookup` so explorers show the name,
+ *   3. splits GAS_GRANT_HANEUL off the operator's gas coin, the account's first gas, and
+ *   4. transfers the registration NFT and the gas to the account.
+ *
+ * The page only ever posts the (name, address) pair.
  *
  *   NAME_ISSUER_KEY=haneulprivkey1... pnpm exec tsx scripts/haneul-mainnet/name-issuer.ts
+ *
+ * Step 2 goes through the controller app, which the mainnet deployment never authorized.
+ * Once, before the first issue, run the one-time admin transaction (a dry run unless
+ * `--execute` is given):
+ *
+ *   NAME_ISSUER_KEY=... pnpm exec tsx scripts/haneul-mainnet/name-issuer.ts authorize [--execute]
  *
  * Environment:
  *   NAME_ISSUER_KEY      bech32 secret key of the wallet holding the HaneulNS AdminCap (required)
  *   HANEUL_GRPC_URL      default https://rpc.haneul.io
  *   HANEULNS_ADMIN_CAP   default: the mainnet AdminCap
  *   PORT                 default 8787
- *   ALLOWED_ORIGIN       CORS origin, default https://sigma.exchange
+ *   ALLOWED_ORIGIN       CORS origin, default https://sigma.haneul.io
  *   FREE_MIN_LENGTH      shortest name issued for free, default 6
+ *   NAME_YEARS           how long a free name is reserved, default 20 (the operator cannot
+ *                        renew a name it no longer holds, so issue it long)
+ *   GAS_GRANT_HANEUL     HANEUL sent along with the name, default 1 (about 150 to 500
+ *                        transactions at the mainnet gas price); 0 sends none
  *   LEDGER_PATH          where issued names are recorded, default .name-issuer/issued.json
  *
  * Rules enforced here, because the chain cannot: one name per address, a minimum length
@@ -47,8 +64,10 @@ const env = {
     process.env.HANEULNS_ADMIN_CAP ??
     '0x343c3ae3be240b1ecec92326bed9c81155e3b1063b4dee137b6e4f1019a601ad',
   port: Number(process.env.PORT ?? 8787),
-  allowedOrigin: process.env.ALLOWED_ORIGIN ?? 'https://sigma.exchange',
+  allowedOrigin: process.env.ALLOWED_ORIGIN ?? 'https://sigma.haneul.io',
   freeMinLength: Number(process.env.FREE_MIN_LENGTH ?? 6),
+  nameYears: Number(process.env.NAME_YEARS ?? 20),
+  gasGrantHaneul: Number(process.env.GAS_GRANT_HANEUL ?? 1),
   ledgerPath: process.env.LEDGER_PATH ?? join(ROOT, '.name-issuer', 'issued.json'),
 };
 
@@ -57,15 +76,30 @@ if (!env.key) {
   process.exit(1);
 }
 
+if (!Number.isInteger(env.nameYears) || env.nameYears < 1 || env.nameYears > 255) {
+  console.error('NAME_YEARS must be a whole number from 1 to 255');
+  process.exit(1);
+}
+if (!(env.gasGrantHaneul >= 0)) {
+  console.error('GAS_GRANT_HANEUL must be zero or more');
+  process.exit(1);
+}
+
 const config = NAME_SERVICE_CONFIGS.mainnet!;
 const CLOCK = '0x6';
-const YEARS = 1;
 const RATE_LIMIT_PER_HOUR = 5;
 const GAS_BUDGET = 50_000_000n;
+const GEUNHWA_PER_HANEUL = 1_000_000_000;
+const CONTROLLER_APP = `${config.packageId}::controller::ControllerV2`;
+const gasGrant = BigInt(Math.round(env.gasGrantHaneul * GEUNHWA_PER_HANEUL));
 
 const client = new HaneulGrpcClient({ network: 'mainnet', baseUrl: env.grpcUrl });
 const signer = Ed25519Keypair.fromSecretKey(env.key);
-console.log('issuer address', signer.getPublicKey().toHaneulAddress());
+const issuerAddress = signer.getPublicKey().toHaneulAddress();
+console.log('issuer address', issuerAddress);
+console.log(
+  `names reserved for ${env.nameYears} years, ${env.gasGrantHaneul} HANEUL sent with each`
+);
 
 /* ------------------------------------------------------------------ ledger */
 
@@ -128,7 +162,7 @@ const issue = async ({ name, address }: { name: string; address: string }) => {
   if (availability !== 'available') throw new IssueError(409, 'Username unavailable.');
 
   const tx = new Transaction();
-  tx.setSender(signer.getPublicKey().toHaneulAddress());
+  tx.setSender(issuerAddress);
   tx.setGasBudget(GAS_BUDGET);
   const registration = tx.moveCall({
     target: `${config.packageId}::admin::reserve_domain`,
@@ -136,11 +170,25 @@ const issue = async ({ name, address }: { name: string; address: string }) => {
       tx.object(env.adminCap),
       tx.object(config.haneulNs),
       tx.pure.string(fullName(label)),
-      tx.pure.u8(YEARS),
+      tx.pure.u8(env.nameYears),
       tx.object(CLOCK),
     ],
   });
-  tx.transferObjects([registration], address);
+  // A fresh record has no target, and set_reverse_lookup requires the target to be the
+  // sender; the issuer still holds the NFT inside this transaction, so it sets it here.
+  tx.moveCall({
+    target: `${config.packageId}::controller::set_target_address`,
+    arguments: [
+      tx.object(config.haneulNs),
+      registration,
+      tx.pure.option('address', address),
+      tx.object(CLOCK),
+    ],
+  });
+  // The account's first gas: enough for the reverse lookup and its first orders.
+  const delivered = [registration];
+  if (gasGrant > 0n) delivered.push(tx.splitCoins(tx.gas, [tx.pure.u64(gasGrant)]));
+  tx.transferObjects(delivered, address);
 
   const result = await signer.signAndExecuteTransaction({ transaction: tx, client });
   if (result.FailedTransaction) {
@@ -152,6 +200,51 @@ const issue = async ({ name, address }: { name: string; address: string }) => {
   console.log('issued', fullName(label), 'to', address, digest);
   return { digest };
 };
+
+/* --------------------------------------------------------------- authorize */
+
+/**
+ * The one-time admin step: authorize the controller app so `set_target_address` (here)
+ * and `set_reverse_lookup` (signed by accounts) may write the registry. Dry run unless
+ * `--execute` is given.
+ */
+const authorizeController = async (execute: boolean) => {
+  const tx = new Transaction();
+  tx.setSender(issuerAddress);
+  tx.setGasBudget(GAS_BUDGET);
+  tx.moveCall({
+    target: `${config.packageId}::haneulns::authorize_app`,
+    typeArguments: [CONTROLLER_APP],
+    arguments: [tx.object(env.adminCap), tx.object(config.haneulNs)],
+  });
+  let dry;
+  try {
+    dry = await client.core.simulateTransaction({ transaction: tx, include: { effects: true } });
+  } catch (error) {
+    // The node refuses the inputs before executing anything, typically because the key
+    // given is not the one that holds the AdminCap.
+    console.error('dry run rejected:', error instanceof Error ? error.message : error);
+    process.exit(1);
+  }
+  const status = (dry.Transaction ?? dry.FailedTransaction).effects.status;
+  console.log('dry run', JSON.stringify(status));
+  if (!status.success) process.exit(1);
+  if (!execute) {
+    console.log('dry run only; pass --execute to authorize the controller on mainnet');
+    return;
+  }
+  const result = await signer.signAndExecuteTransaction({ transaction: tx, client });
+  if (result.FailedTransaction) {
+    console.error('authorize failed on chain:', result.FailedTransaction.digest);
+    process.exit(1);
+  }
+  console.log('controller authorized', result.Transaction!.digest);
+};
+
+if (process.argv[2] === 'authorize') {
+  await authorizeController(process.argv.includes('--execute'));
+  process.exit(0);
+}
 
 /* ------------------------------------------------------------------ server */
 
