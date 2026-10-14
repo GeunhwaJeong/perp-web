@@ -6,8 +6,8 @@ import { articleMixins } from '@/styles/articleMixins';
 const TermsOfUsePage = () => (
   <$Article>
     <header>
-      <h1>Sample Terms of Use</h1>
-      <span />
+      <h1>Terms of Use</h1>
+      <span>Last updated: October 14, 2026</span>
     </header>
     <div>
       <p>
@@ -450,12 +450,13 @@ const TermsOfUsePage = () => (
           7.1. You acknowledge that certain aspects of the Services may use, incorporate or link to
           certain open-source components and that your use of the Services is subject to, and you
           will comply with, any applicable open-source licenses and terms of use that govern any
-          such open-source components, including terms of use with respect to v4 software, available
-          at https://dydx.exchange/legal (collectively, the “Open-Source Licenses”). Without
-          limiting the generality of the foregoing, you may not (a) resell, lease, lend, share,
-          distribute, or otherwise permit any third party to use the Services; (b) use the Services
-          for time-sharing or service bureau purposes; or (c) otherwise use the Services in a manner
-          that violates the Open-Source Licenses.
+          such open-source components, including the AGPL-3.0 license of the dYdX v4 web software
+          the Interface is derived from, whose source is available at
+          https://github.com/GeunhwaJeong/perp-web (collectively, the “Open-Source Licenses”).
+          Without limiting the generality of the foregoing, you may not (a) resell, lease, lend,
+          share, distribute, or otherwise permit any third party to use the Services; (b) use the
+          Services for time-sharing or service bureau purposes; or (c) otherwise use the Services in
+          a manner that violates the Open-Source Licenses.
         </li>
       </ul>
       <ul>
