@@ -5,7 +5,7 @@ import { OnboardingState } from '@/constants/account';
 import { ButtonAction, ButtonShape, ButtonSize } from '@/constants/buttons';
 import { ComplianceStates } from '@/constants/compliance';
 import { DialogTypes } from '@/constants/dialogs';
-import { STRING_KEYS } from '@/constants/localization';
+import { STRING_KEYS, SUPPORTED_LOCALES } from '@/constants/localization';
 import { AppRoute } from '@/constants/routes';
 import { StatsigFlags } from '@/constants/statsig';
 
@@ -175,10 +175,14 @@ export const HeaderDesktop = () => {
       <VerticalSeparator />
 
       <$NavBefore>
-        <$LanguageSelector sideOffset={16}>
-          <Icon iconName={IconName.Translate} size="1.25em" />
-        </$LanguageSelector>
-        <VerticalSeparator />
+        {SUPPORTED_LOCALES.length > 1 && (
+          <>
+            <$LanguageSelector sideOffset={16}>
+              <Icon iconName={IconName.Translate} size="1.25em" />
+            </$LanguageSelector>
+            <VerticalSeparator />
+          </>
+        )}
         <NetworkSelectMenu sideOffset={16} />
       </$NavBefore>
 

@@ -119,6 +119,10 @@ try {
     'platform authenticator reported available',
     await page.evaluate(() => PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable())
   );
+  // The deployment is English only, whatever the browser's language: the nav reads in
+  // English and nothing on the page is in Korean, the language this Mac's Chrome runs in.
+  const chrome = await page.locator('body').innerText();
+  check('interface is English only', /Portfolio/.test(chrome) && !/[가-힣]/.test(chrome));
   await toConnectScreen();
   await button(/^create account$/i).click();
   await page.getByText('Welcome to Sigma').waitFor({ timeout: 10000 });

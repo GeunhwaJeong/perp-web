@@ -34,13 +34,18 @@ const SettingsPage = () => {
   const selectedNetworkConfig = networks.find((network) => network.value === selectedNetwork);
 
   const mainMenuItems = [
-    {
-      value: 'language-nav-item',
-      type: PageMenuItemType.Navigation,
-      href: `${AppRoute.Settings}/${MobileSettingsRoute.Language}`,
-      label: stringGetter({ key: STRING_KEYS.LANGUAGE }),
-      labelRight: SUPPORTED_LOCALES.find(({ locale }) => locale === selectedLocale)?.label,
-    },
+    // A deployment restricted to one language has nothing to choose here.
+    ...(SUPPORTED_LOCALES.length > 1
+      ? [
+          {
+            value: 'language-nav-item',
+            type: PageMenuItemType.Navigation,
+            href: `${AppRoute.Settings}/${MobileSettingsRoute.Language}`,
+            label: stringGetter({ key: STRING_KEYS.LANGUAGE }),
+            labelRight: SUPPORTED_LOCALES.find(({ locale }) => locale === selectedLocale)?.label,
+          },
+        ]
+      : []),
     {
       value: 'network-nav-item',
       type: PageMenuItemType.Navigation,
