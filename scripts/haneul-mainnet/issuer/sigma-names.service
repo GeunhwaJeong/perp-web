@@ -1,0 +1,26 @@
+# /etc/systemd/system/sigma-names.service on the Sigma VPS: the HaneulNS name issuer.
+# The bundle is built from scripts/haneul-mainnet/name-issuer.ts (see README.md next to
+# this file) and installed at /opt/sigma/bin/name-issuer.mjs.
+[Unit]
+Description=Sigma name issuer (username.haneul for new accounts)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=sigma
+WorkingDirectory=/opt/sigma
+# NAME_ISSUER_KEY (the ns-ops secret), PORT, ALLOWED_ORIGIN, LEDGER_PATH, NAME_YEARS,
+# GAS_GRANT_HANEUL. Root-owned, group sigma, mode 640.
+EnvironmentFile=/etc/sigma/name-issuer.env
+ExecStart=/usr/bin/node /opt/sigma/bin/name-issuer.mjs
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+# The only thing it writes: the ledger of issued names.
+ReadWritePaths=/var/lib/sigma/name-issuer
+
+[Install]
+WantedBy=multi-user.target

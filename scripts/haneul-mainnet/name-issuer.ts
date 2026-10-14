@@ -47,13 +47,11 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { dirname, join } from 'node:path';
 
-import {
-  checkNameAvailability,
-  fullName,
-  getNameFormatError,
-  NAME_SERVICE_CONFIGS,
-  normalizeName,
-} from '../../src/haneul/names';
+// Leaf modules only: the names index also exports the browser-side linking code, which
+// pulls in the account stores and must not be bundled into a server.
+import { checkNameAvailability } from '../../src/haneul/names/availability';
+import { NAME_SERVICE_CONFIGS } from '../../src/haneul/names/config';
+import { fullName, getNameFormatError, normalizeName } from '../../src/haneul/names/format';
 
 const ROOT = join(import.meta.dirname, '..', '..');
 
