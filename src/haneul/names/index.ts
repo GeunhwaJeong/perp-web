@@ -1,4 +1,10 @@
-export { checkNameAvailability, lookupPrimaryName, type NameAvailability } from './availability';
+export {
+  checkNameAvailability,
+  lookupName,
+  lookupOwnedName,
+  lookupPrimaryName,
+  type NameAvailability,
+} from './availability';
 export { NAME_ISSUER_URL, NAME_SERVICE_CONFIGS, NAME_TLD, type NameServiceConfig } from './config';
 export {
   fullName,

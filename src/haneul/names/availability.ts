@@ -46,6 +46,56 @@ export const lookupPrimaryName = async ({
   }
 };
 
+const RegistrationBcs = bcs.struct('HaneulnsRegistration', {
+  id: bcs.Address,
+  domain: DomainBcs,
+  domain_name: bcs.string(),
+  expiration_timestamp_ms: bcs.u64(),
+  image_url: bcs.string(),
+});
+
+/**
+ * The name whose registration NFT the address holds, without the TLD. The issuer hands the
+ * NFT to the address when it writes the name, so this is answered as soon as the name is on
+ * chain, before (or without) the address ever signing a reverse lookup. An address holding
+ * several names gets the one that expires last.
+ */
+export const lookupOwnedName = async ({
+  client,
+  config,
+  address,
+}: {
+  client: ClientWithCoreApi;
+  config: NameServiceConfig;
+  address: string;
+}): Promise<string | undefined> => {
+  const { objects } = await client.core.listOwnedObjects({
+    owner: address,
+    type: `${config.packageId}::haneulns_registration::HaneulnsRegistration`,
+    include: { content: true },
+    limit: 50,
+  });
+  const now = BigInt(Date.now());
+  const names = objects
+    .map((object) => RegistrationBcs.parse(object.content))
+    .filter(
+      ({ domain, expiration_timestamp_ms: expiry }) =>
+        domain.labels.length === 2 && domain.labels[0] === NAME_TLD && BigInt(expiry) > now
+    )
+    .sort((a, b) => Number(BigInt(b.expiration_timestamp_ms) - BigInt(a.expiration_timestamp_ms)));
+  return names[0]?.domain.labels[1];
+};
+
+/**
+ * The name to put back on a restored account: the primary name the address chose, else the
+ * name it holds. Undefined when it has neither; throws when the chain could not be asked.
+ */
+export const lookupName = async (args: {
+  client: ClientWithCoreApi;
+  config: NameServiceConfig;
+  address: string;
+}): Promise<string | undefined> => (await lookupPrimaryName(args)) ?? (await lookupOwnedName(args));
+
 /** True when the table has an entry under `name`, false when it does not; throws otherwise. */
 const hasField = async ({
   client,

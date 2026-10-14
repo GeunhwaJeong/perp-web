@@ -11,7 +11,7 @@ import {
   SIGMA_PASSKEY_WALLET_NAME,
 } from '@/haneul/account';
 import { dAppKit, type HaneulNetwork } from '@/haneul/dAppKit';
-import { lookupPrimaryName, NAME_SERVICE_CONFIGS, requestNameIssue } from '@/haneul/names';
+import { lookupName, NAME_SERVICE_CONFIGS, requestNameIssue } from '@/haneul/names';
 
 import { DialogProps, OnboardingDialogProps } from '@/constants/dialogs';
 import { type WalletInfo } from '@/constants/wallets';
@@ -182,14 +182,24 @@ export const AccountDialog = ({ setIsOpen: setIsOpenRaw }: DialogProps<Onboardin
     [store]
   );
 
-  /** A restored account gets its name back from the reverse registry, when it has one. */
+  /**
+   * A restored account gets its name back from the chain: the primary name it set, or the
+   * registration it holds. Nothing to do on a network without a name service.
+   */
   const recoverName = useCallback(
-    (address: string) => {
+    (address: string, target: 'local' | 'passkey') => {
       const client = dAppKit.getClient();
       const config = NAME_SERVICE_CONFIGS[client.network as HaneulNetwork];
       if (!config) return;
-      lookupPrimaryName({ client, config, address })
-        .then((name) => name && store.setName({ username: name, status: 'claimed' }))
+      lookupName({ client, config, address })
+        .then(
+          (name) =>
+            name &&
+            (target === 'local' ? store : passkeyAccountStore).setName({
+              username: name,
+              status: 'claimed',
+            })
+        )
         .catch((lookupError: unknown) => log('AccountDialog/recoverName', asError(lookupError)));
     },
     [store]
@@ -246,7 +256,7 @@ export const AccountDialog = ({ setIsOpen: setIsOpenRaw }: DialogProps<Onboardin
       const record = await recoverPasskeyAccount();
       passkeyAccountStore.set(record);
       await connectPasskeyWallet();
-      recoverName(record.address);
+      recoverName(record.address, 'passkey');
     });
 
   const onImport = (password: string) =>
@@ -255,7 +265,7 @@ export const AccountDialog = ({ setIsOpen: setIsOpenRaw }: DialogProps<Onboardin
       await store.import({ mnemonic: pendingMnemonic, password });
       setPendingMnemonic(undefined);
       await connectSigmaWallet();
-      if (store.address) recoverName(store.address);
+      if (store.address) recoverName(store.address, 'local');
     }, password);
 
   const onEnableBiometric = async () => {
