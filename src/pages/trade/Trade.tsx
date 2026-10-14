@@ -27,7 +27,6 @@ import { getSelectedTradeLayout } from '@/state/layoutSelectors';
 
 import { HorizontalPanel } from './HorizontalPanel';
 import { InnerPanel } from './InnerPanel';
-import LaunchableMarket from './LaunchableMarket';
 import { MarketSelectorAndStats } from './MarketSelectorAndStats';
 import { MobileBottomPanel } from './MobileBottomPanel';
 import { TradeDialogTrigger } from './TradeDialogTrigger';
@@ -38,7 +37,7 @@ import { useResizablePanel } from './useResizablePanel';
 const TradePage = () => {
   const tradePageRef = useRef<HTMLDivElement>(null);
 
-  const { isViewingUnlaunchedMarket } = useCurrentMarketId();
+  useCurrentMarketId();
   const { isTablet } = useBreakpoints();
   const tradeLayout = useAppSelector(getSelectedTradeLayout);
   const canAccountTrade = useAppSelector(calculateCanAccountTrade);
@@ -62,10 +61,6 @@ const TradePage = () => {
   const [isHorizontalPanelOpen, setIsHorizontalPanelOpen] = useState(true);
 
   usePageTitlePriceUpdates();
-
-  if (isViewingUnlaunchedMarket) {
-    return <LaunchableMarket />;
-  }
 
   return isTablet ? (
     <$TradeLayoutMobile>

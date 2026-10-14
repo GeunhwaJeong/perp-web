@@ -25,23 +25,18 @@ import { useAppDispatch, useAppSelector } from '@/state/appTypes';
 import { tradeFormActions } from '@/state/tradeForm';
 
 import { HorizontalPanel } from '../HorizontalPanel';
-import LaunchableMarket from '../LaunchableMarket';
 import { MobileTopPanel } from '../MobileTopPanel';
 import { TradeHeaderMobile } from './TradeHeader';
 
 const TradePage = () => {
   const dispatch = useAppDispatch();
-  const { isViewingUnlaunchedMarket } = useCurrentMarketId();
+  useCurrentMarketId();
   const { complianceState } = useComplianceState();
   const canAccountTrade = useAppSelector(calculateCanAccountTrade);
   const stringGetter = useStringGetter();
   const navigate = useNavigate();
 
   usePageTitlePriceUpdates();
-
-  if (isViewingUnlaunchedMarket) {
-    return <LaunchableMarket />;
-  }
 
   const isDisabled = complianceState !== ComplianceStates.FULL_ACCESS;
 

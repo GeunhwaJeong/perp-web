@@ -1,8 +1,6 @@
 import { useMemo } from 'react';
 
 import { BonsaiCore } from '@/bonsai/ontology';
-import { AssetData } from '@/bonsai/types/summaryTypes';
-import { shallowEqual } from 'react-redux';
 
 import { HIDDEN_MARKETS } from '@/constants/hiddenMarkets';
 import {
@@ -16,13 +14,9 @@ import { StatsigFlags } from '@/constants/statsig';
 import { useStatsigGateValue } from '@/hooks/useStatsig';
 
 import { useAppSelector } from '@/state/appTypes';
-import { getFavoritedMarkets, getShouldHideLaunchableMarkets } from '@/state/appUiConfigsSelectors';
 
 import { isTruthy } from '@/lib/isTruthy';
-import {
-  getMarketDataFromAsset,
-  getMarketDataFromPerpetualMarketSummary,
-} from '@/lib/marketsHelpers';
+import { getMarketDataFromPerpetualMarketSummary } from '@/lib/marketsHelpers';
 import { MustBigNumber } from '@/lib/numbers';
 import { objectKeys } from '@/lib/objectHelpers';
 import { matchesSearchFilter } from '@/lib/search';
@@ -73,26 +67,14 @@ const filterFunctions: Record<MarketFilters, (market: MarketData) => boolean | u
       market.sectorTags?.includes(MarketFilters.RWA) && !RWA_EXCLUSION_LIST.has(market.assetId)
     );
   },
-  [MarketFilters.LAUNCHABLE]: (market) => {
-    return market.isUnlaunched;
-  },
 };
 
-const sortByMarketCap = (a: AssetData, b: AssetData) => {
-  return (b.marketCap ?? 0) - (a.marketCap ?? 0);
-};
-
-const ASSETS_TO_REMOVE = new Set(['USDC', 'USDT', 'USD1', 'USDE']);
 export const useMarketsData = ({
   filter = MarketFilters.ALL,
   searchFilter,
-  forceHideUnlaunchedMarkets,
-  forceShowUnlaunchedMarkets,
 }: {
   filter: MarketFilters;
   searchFilter?: string;
-  forceHideUnlaunchedMarkets?: boolean;
-  forceShowUnlaunchedMarkets?: boolean;
 }): {
   markets: MarketData[];
   filteredMarkets: MarketData[];
@@ -101,26 +83,11 @@ export const useMarketsData = ({
   hasResults: boolean;
 } => {
   const perpetualMarkets = orEmptyObj(useAppSelector(BonsaiCore.markets.markets.data));
-  const assets = orEmptyObj(useAppSelector(BonsaiCore.markets.assets.data));
 
-  const shouldHideLaunchableMarkets =
-    useAppSelector(getShouldHideLaunchableMarkets) || forceHideUnlaunchedMarkets;
-  const favoritedMarkets = useAppSelector(getFavoritedMarkets, shallowEqual);
   const hasMarketIds = Object.keys(perpetualMarkets).length > 0;
 
   const shouldFilterHiddenMarkets = useStatsigGateValue(StatsigFlags.ffHideMarketsFilter);
   const shouldFilterOpenInterest = useStatsigGateValue(StatsigFlags.ffOpenInterestFilter);
-
-  // AssetIds from existing PerpetualMarkets
-  const marketsAssetIdSet = useMemo(
-    () =>
-      new Set(
-        Object.values(perpetualMarkets)
-          .filter(isTruthy)
-          .map((m) => m.assetId)
-      ),
-    [perpetualMarkets]
-  );
 
   const markets: MarketData[] = useMemo(() => {
     const listOfMarkets = Object.values(perpetualMarkets)
@@ -135,36 +102,8 @@ export const useMarketsData = ({
       .filter((m) => !shouldFilterHiddenMarkets || !HIDDEN_MARKETS.has(m.assetId))
       .map(getMarketDataFromPerpetualMarketSummary);
 
-    const unlaunchedMarketsData =
-      !!forceShowUnlaunchedMarkets || !shouldHideLaunchableMarkets
-        ? Object.values(assets)
-            .filter(isTruthy)
-            .filter((a) => !ASSETS_TO_REMOVE.has(a.assetId))
-            // filter out hidden markets (when gate is enabled)
-            .filter((a) => !shouldFilterHiddenMarkets || !HIDDEN_MARKETS.has(a.assetId))
-            .sort(sortByMarketCap)
-            .map((asset) => {
-              // Remove assets that are already in the list of markets from Indexer a long with assets that have no price or a negative price
-              if (marketsAssetIdSet.has(asset.assetId) || MustBigNumber(asset.price).lte(0)) {
-                return null;
-              }
-
-              return getMarketDataFromAsset(asset, favoritedMarkets);
-            })
-            .filter(isTruthy)
-        : [];
-
-    return [...listOfMarkets, ...unlaunchedMarketsData];
-  }, [
-    perpetualMarkets,
-    forceShowUnlaunchedMarkets,
-    shouldHideLaunchableMarkets,
-    assets,
-    shouldFilterOpenInterest,
-    shouldFilterHiddenMarkets,
-    marketsAssetIdSet,
-    favoritedMarkets,
-  ]);
+    return listOfMarkets;
+  }, [perpetualMarkets, shouldFilterOpenInterest, shouldFilterHiddenMarkets]);
 
   const filteredMarkets = useMemo(() => {
     const filtered = markets.filter((m) => filterFunctions[filter](m));

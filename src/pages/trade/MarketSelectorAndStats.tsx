@@ -1,54 +1,32 @@
 import { BonsaiHelpers } from '@/bonsai/ontology';
 import styled from 'styled-components';
 
-import { useAppSelectorWithArgs } from '@/hooks/useParameterizedSelector';
-
 import { layoutMixins } from '@/styles/layoutMixins';
 
 import { VerticalSeparator } from '@/components/Separator';
-import { LaunchableMarketStatsDetails } from '@/views/LaunchableMarketStatsDetails';
 import { MarketStatsDetails } from '@/views/MarketStatsDetails';
 import { MarketsDropdown } from '@/views/MarketsDropdown';
 
 import { useAppSelector } from '@/state/appTypes';
 import { getCurrentMarketDisplayId } from '@/state/perpetualsSelectors';
 
-import { getAssetFromMarketId, getDisplayableTickerFromMarket } from '@/lib/assetUtils';
-import { mapIfPresent } from '@/lib/do';
+import { getAssetFromMarketId } from '@/lib/assetUtils';
 
-export const MarketSelectorAndStats = ({
-  className,
-  launchableMarketId,
-}: {
-  className?: string;
-  launchableMarketId?: string;
-}) => {
-  const launchableImageUrl = useAppSelectorWithArgs(
-    BonsaiHelpers.assets.selectAssetLogo,
-    mapIfPresent(launchableMarketId, getAssetFromMarketId)
-  );
-  const launchableId = mapIfPresent(launchableMarketId, getDisplayableTickerFromMarket);
-
-  const tradeableImageUrl = useAppSelector(BonsaiHelpers.currentMarket.assetLogo);
-  const tradeableMarketId = useAppSelector(getCurrentMarketDisplayId) ?? '';
-  const assetId = getAssetFromMarketId(launchableMarketId ?? tradeableMarketId);
+export const MarketSelectorAndStats = ({ className }: { className?: string }) => {
+  const imageUrl = useAppSelector(BonsaiHelpers.currentMarket.assetLogo);
+  const marketId = useAppSelector(getCurrentMarketDisplayId) ?? '';
 
   return (
     <$Container className={className}>
       <MarketsDropdown
-        launchableMarketId={launchableMarketId}
-        currentMarketId={launchableId ?? tradeableMarketId}
-        logoUrl={launchableImageUrl ?? tradeableImageUrl}
-        assetId={assetId}
+        currentMarketId={marketId}
+        logoUrl={imageUrl}
+        assetId={getAssetFromMarketId(marketId)}
       />
 
       <VerticalSeparator fullHeight />
 
-      {launchableMarketId ? (
-        <LaunchableMarketStatsDetails launchableMarketId={launchableMarketId} />
-      ) : (
-        <MarketStatsDetails />
-      )}
+      <MarketStatsDetails />
     </$Container>
   );
 };

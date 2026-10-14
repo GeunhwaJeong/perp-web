@@ -24,7 +24,6 @@ export const MarketsStats = (props: MarketsStatsProps) => {
 
   const { hasResults: hasNewMarkets } = useMarketsData({
     filter: MarketFilters.NEW,
-    forceHideUnlaunchedMarkets: true,
   });
 
   return (

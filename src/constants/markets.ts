@@ -68,7 +68,6 @@ export enum MarketFilters {
   GAMING = 'gaming',
   MEMES = 'memes',
   RWA = 'tokenized-assets',
-  LAUNCHABLE = 'launchable',
 }
 export enum HiddenMarketFilterTags {
   DEX = 'decentralized-exchange-dex-token',
@@ -90,10 +89,6 @@ export const MARKET_FILTER_OPTIONS: Record<
   },
   [MarketFilters.NEW]: {
     labelStringKey: STRING_KEYS.RECENTLY_LISTED,
-  },
-  [MarketFilters.LAUNCHABLE]: {
-    labelStringKey: STRING_KEYS.LAUNCHABLE,
-    isNew: true,
   },
   [MarketFilters.MEMES]: {
     labelStringKey: STRING_KEYS.MEME,

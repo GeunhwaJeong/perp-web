@@ -1,4 +1,4 @@
-import { ForwardedRef, forwardRef, useCallback, useMemo } from 'react';
+import { ForwardedRef, forwardRef } from 'react';
 
 import styled, { css } from 'styled-components';
 
@@ -12,15 +12,8 @@ import breakpoints from '@/styles/breakpoints';
 
 import { Icon } from '@/components/Icon';
 import { SearchInput } from '@/components/SearchInput';
-import { Switch } from '@/components/Switch';
 import { NewTag } from '@/components/Tag';
 import { ToggleGroup } from '@/components/ToggleGroup';
-import { WithLabel } from '@/components/WithLabel';
-
-import { useAppDispatch, useAppSelector } from '@/state/appTypes';
-import { setShouldHideLaunchableMarkets } from '@/state/appUiConfigs';
-import { getShouldHideLaunchableMarkets } from '@/state/appUiConfigsSelectors';
-import { setMarketFilter } from '@/state/perpetuals';
 
 type MarketFilterProps = {
   selectedFilter: MarketFilters;
@@ -44,37 +37,6 @@ export const MarketFilter = forwardRef(
     ref: ForwardedRef<HTMLDivElement>
   ) => {
     const stringGetter = useStringGetter();
-    const dispatch = useAppDispatch();
-    const shouldHideLaunchableMarkets = useAppSelector(getShouldHideLaunchableMarkets);
-
-    const onShouldHideLaunchableMarkets = useCallback(
-      (shouldHide: boolean) => {
-        dispatch(setShouldHideLaunchableMarkets(!shouldHide));
-
-        if (!shouldHide && selectedFilter === MarketFilters.LAUNCHABLE) {
-          dispatch(setMarketFilter(MarketFilters.ALL));
-        }
-      },
-      [dispatch, selectedFilter]
-    );
-
-    const unlaunchedMarketSwitch = useMemo(
-      () => (
-        <WithLabel
-          label={stringGetter({ key: STRING_KEYS.SHOW_LAUNCHABLE_MARKETS })}
-          tw="flex flex-row items-center"
-        >
-          <Switch
-            name="show-launchable"
-            checked={!shouldHideLaunchableMarkets}
-            onCheckedChange={onShouldHideLaunchableMarkets}
-            tw="font-mini-book"
-          />
-        </WithLabel>
-      ),
-      [stringGetter, onShouldHideLaunchableMarkets, shouldHideLaunchableMarkets]
-    );
-
     const filterToggles = (
       <$ToggleGroup
         items={
@@ -97,7 +59,6 @@ export const MarketFilter = forwardRef(
         value={selectedFilter}
         onValueChange={onChangeFilter}
         overflow="wrap"
-        slotBefore={unlaunchedMarketSwitch}
       />
     );
 

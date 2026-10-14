@@ -6,12 +6,10 @@ import { useStringGetter } from '@/hooks/useStringGetter';
 
 import { Tabs } from '@/components/Tabs';
 import { CurrentMarketDetails } from '@/views/MarketDetails/CurrentMarketDetails';
-import { LaunchableMarketDetails } from '@/views/MarketDetails/LaunchableMarketDetails';
 import { MarketLinks } from '@/views/MarketLinks';
 import { DepthChart } from '@/views/charts/DepthChart';
 import { FundingChart } from '@/views/charts/FundingChart';
 import { TvChart } from '@/views/charts/TradingView/TvChart';
-import { TvChartLaunchable } from '@/views/charts/TradingView/TvChartLaunchable';
 
 import { useAppDispatch, useAppSelector } from '@/state/appTypes';
 import { getSelectedLocale } from '@/state/localizationSelectors';
@@ -26,7 +24,7 @@ enum Tab {
   Details = 'Details',
 }
 
-export const InnerPanel = ({ launchableMarketId }: { launchableMarketId?: string }) => {
+export const InnerPanel = () => {
   const stringGetter = useStringGetter();
   const selectedLocale = useAppSelector(getSelectedLocale);
   const dispatch = useAppDispatch();
@@ -34,21 +32,6 @@ export const InnerPanel = ({ launchableMarketId }: { launchableMarketId?: string
   const [value, setValue] = useState(Tab.Price);
 
   const innerPanelItems = useMemo(() => {
-    if (launchableMarketId) {
-      return [
-        {
-          content: <TvChartLaunchable marketId={launchableMarketId} />,
-          forceMount: true,
-          label: stringGetter({ key: STRING_KEYS.PRICE_CHART_SHORT }),
-          value: Tab.Price,
-        },
-        {
-          content: <LaunchableMarketDetails launchableMarketId={launchableMarketId} />,
-          label: stringGetter({ key: STRING_KEYS.DETAILS }),
-          value: Tab.Details,
-        },
-      ];
-    }
     return [
       {
         content: <TvChart />,
@@ -82,7 +65,7 @@ export const InnerPanel = ({ launchableMarketId }: { launchableMarketId?: string
         value: Tab.Details,
       },
     ];
-  }, [dispatch, launchableMarketId, selectedLocale, stringGetter]);
+  }, [dispatch, selectedLocale, stringGetter]);
 
   return (
     <Tabs
@@ -90,7 +73,7 @@ export const InnerPanel = ({ launchableMarketId }: { launchableMarketId?: string
       onValueChange={setValue}
       dividerStyle="underline"
       items={innerPanelItems}
-      slotToolbar={<MarketLinks launchableMarketId={launchableMarketId} />}
+      slotToolbar={<MarketLinks />}
       withTransitions={false}
     />
   );

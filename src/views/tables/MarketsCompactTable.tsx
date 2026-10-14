@@ -43,7 +43,6 @@ export const MarketsCompactTable = ({
 
   const { filteredMarkets } = useMarketsData({
     filter: sorting === MarketSorting.RECENTLY_LISTED ? MarketFilters.NEW : MarketFilters.ALL,
-    forceHideUnlaunchedMarkets: true,
   });
 
   const columns = useMemo(() => {

@@ -1,6 +1,5 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 
-import { LaunchMarketStatus } from '@/constants/launchableMarkets';
 import { LocalStorageKey } from '@/constants/localStorage';
 import { DEFAULT_MARKETID, MarketFilters } from '@/constants/markets';
 
@@ -11,14 +10,12 @@ export interface PerpetualsState {
   // if user is viewing is a live, tradeable market: its id; otherwise: undefined
   currentMarketIdIfTradeable?: string;
   marketFilter: MarketFilters;
-  launchMarketIds: string[];
 }
 
 const initialState: PerpetualsState = {
   currentMarketId: undefined,
   currentMarketIdIfTradeable: undefined,
   marketFilter: MarketFilters.ALL,
-  launchMarketIds: [],
 };
 
 export const perpetualsSlice = createSlice({
@@ -43,17 +40,6 @@ export const perpetualsSlice = createSlice({
         currentMarketId:
           getLocalStorage({ key: LocalStorageKey.LastViewedMarket }) ?? DEFAULT_MARKETID,
       }) satisfies PerpetualsState,
-    setLaunchMarketIds: (
-      state: PerpetualsState,
-      action: PayloadAction<{ launchedMarketId: string; launchStatus: LaunchMarketStatus }>
-    ) => {
-      const { launchedMarketId, launchStatus } = action.payload;
-      if (launchStatus === LaunchMarketStatus.PENDING) {
-        state.launchMarketIds = [...state.launchMarketIds, launchedMarketId];
-      } else {
-        state.launchMarketIds = state.launchMarketIds.filter((id) => id !== launchedMarketId);
-      }
-    },
   },
 });
 
@@ -62,5 +48,4 @@ export const {
   setCurrentMarketIdIfTradeable,
   resetPerpetualsState,
   setMarketFilter,
-  setLaunchMarketIds,
 } = perpetualsSlice.actions;

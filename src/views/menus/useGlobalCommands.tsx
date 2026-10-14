@@ -25,7 +25,6 @@ export const useGlobalCommands = (): MenuConfig<string | number, string | number
   const { isVaultEnabled } = useEnvFeatures();
 
   const { markets } = useMarketsData({
-    forceShowUnlaunchedMarkets: true,
     filter: MarketFilters.ALL,
   });
 
