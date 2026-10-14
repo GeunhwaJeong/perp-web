@@ -73,7 +73,7 @@ export const AccountDrawer = ({ trigger }: { trigger: ReactNode }) => {
   const { nativeTokenBalance, usdcBalance } = useAccountBalance();
   const { usdcLabel } = useTokenConfigs();
   const themeSetting = useAppSelector(getAppThemeSetting);
-  const { copy } = useCopyValue({ value: dydxAddress });
+  const { copy, copied } = useCopyValue({ value: dydxAddress });
 
   const [open, setOpen] = useState(false);
   const [panel, setPanel] = useState<Panel>('main');
@@ -119,6 +119,7 @@ export const AccountDrawer = ({ trigger }: { trigger: ReactNode }) => {
               walletCollateral={usdcBalance}
               collateralLabel={usdcLabel}
               onCopyAddress={copy}
+              addressCopied={copied}
               onSettings={() => setPanel('settings')}
               onDisconnect={() => show(DialogTypes.DisconnectWallet())}
               onDeposit={() => show(DialogTypes.Deposit2({}))}
@@ -156,6 +157,7 @@ export const AccountDrawer = ({ trigger }: { trigger: ReactNode }) => {
               address={dydxAddress}
               name={record?.username}
               onCopy={copy}
+              copied={copied}
               onBack={() => setPanel('main')}
             />
           </Pager>

@@ -18,6 +18,7 @@ import { BalanceNumber } from './BalanceNumber';
 import {
   ArrowDownCircleIcon,
   ArrowUpCircleIcon,
+  CheckCircleIcon,
   CopyIcon,
   GearIcon,
   PowerIcon,
@@ -95,6 +96,9 @@ const $Address = styled.button`
   > svg {
     width: ${icons.i12}px;
     height: ${icons.i12}px;
+  }
+  > svg.copied {
+    color: ${colors.success};
   }
 `;
 
@@ -198,6 +202,8 @@ export type MainPanelProps = {
   walletCollateral: number;
   collateralLabel: string;
   onCopyAddress: () => void;
+  /** True for a moment after a copy; the copy glyph becomes a green check, as Uniswap's. */
+  addressCopied: boolean;
   onSettings: () => void;
   onDisconnect: () => void;
   onDeposit: () => void;
@@ -217,6 +223,7 @@ export const MainPanel = ({
   walletCollateral,
   collateralLabel,
   onCopyAddress,
+  addressCopied,
   onSettings,
   onDisconnect,
   onDeposit,
@@ -255,7 +262,7 @@ export const MainPanel = ({
         </$Name>
         <$Address type="button" onClick={onCopyAddress}>
           {truncateAddress(address)}
-          <CopyIcon />
+          {addressCopied ? <CheckCircleIcon className="copied" /> : <CopyIcon />}
         </$Address>
         {name && nameStatus && <$Status>{STATUS_LABEL[nameStatus]}</$Status>}
       </$Identity>

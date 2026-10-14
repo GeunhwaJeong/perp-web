@@ -147,3 +147,10 @@ export const SigmaBadgeIcon = ({ size = 16, ...props }: IconProps) => (
     <path d="M5 4.5h6v1.4H7.1L9.6 8l-2.5 2.1H11v1.4H5v-1.2L7.6 8 5 5.7z" fill="#fff" />
   </svg>
 );
+
+/** Uniswap's copied state: a filled green circle with a check. */
+export const CheckCircleIcon = ({ size = 12, ...props }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" {...props}>
+    <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm4.7 7.7-5.5 5.5a1 1 0 0 1-1.4 0l-2.5-2.5a1 1 0 1 1 1.4-1.4l1.8 1.8 4.8-4.8a1 1 0 1 1 1.4 1.4z" />
+  </svg>
+);

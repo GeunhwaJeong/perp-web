@@ -70,17 +70,22 @@ const $AddressBox = styled.button`
     transform: translateX(-50%);
     white-space: nowrap;
   }
+  > span.copied {
+    color: ${colors.success};
+  }
 `;
 
 export const ReceivePanel = ({
   address,
   name,
   onCopy,
+  copied,
   onBack,
 }: {
   address: string;
   name?: string;
   onCopy: () => void;
+  copied: boolean;
   onBack: () => void;
 }) => (
   <SlideOut title="Receive" onBack={onBack}>
@@ -93,7 +98,9 @@ export const ReceivePanel = ({
         </$Mark>
       </$Qr>
       <$AddressBox type="button" onClick={onCopy}>
-        <span>Your Haneul address</span>
+        <span className={copied ? 'copied' : undefined}>
+          {copied ? 'Copied' : 'Your Haneul address'}
+        </span>
         {address}
       </$AddressBox>
     </$Body>
