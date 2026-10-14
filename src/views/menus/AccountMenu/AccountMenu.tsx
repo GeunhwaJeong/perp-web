@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 
-import { SIGMA_ACCOUNT_WALLET_NAME } from '@/haneul/account';
+import { SIGMA_ACCOUNT_WALLET_NAME, SIGMA_PASSKEY_WALLET_NAME } from '@/haneul/account';
 import styled, { css } from 'styled-components';
 import tw from 'twin.macro';
 
@@ -20,6 +20,7 @@ import { useComplianceState } from '@/hooks/useComplianceState';
 import { useEnvFeatures } from '@/hooks/useEnvFeatures';
 import { useLocalAccount } from '@/hooks/useLocalAccount';
 import { useMobileAppUrl } from '@/hooks/useMobileAppUrl';
+import { usePasskeyAccount } from '@/hooks/usePasskeyAccount';
 import { useStatsigGateValue } from '@/hooks/useStatsig';
 import { useStringGetter } from '@/hooks/useStringGetter';
 import { useSubaccount } from '@/hooks/useSubaccount';
@@ -73,7 +74,16 @@ export const AccountMenu = () => {
   } = useAccounts();
   const { registerAffiliate } = useSubaccount();
   const { account: localAccount, store: localAccountStore } = useLocalAccount();
+  const passkeyAccount = usePasskeyAccount();
   const isSigmaAccount = walletInfo?.name === SIGMA_ACCOUNT_WALLET_NAME && localAccount !== null;
+  // The name stands in for the address once the account has one; the address stays a copy
+  // button inside the menu. Only Sigma's own accounts carry a name.
+  const accountName =
+    walletInfo?.name === SIGMA_ACCOUNT_WALLET_NAME
+      ? localAccount?.username
+      : walletInfo?.name === SIGMA_PASSKEY_WALLET_NAME
+        ? passkeyAccount?.username
+        : undefined;
 
   const onRecoverKeys = () => {
     dispatch(openDialog(DialogTypes.Onboarding()));
@@ -354,7 +364,9 @@ export const AccountMenu = () => {
       sideOffset={16}
     >
       {walletIcon}
-      {!isTablet && <$Address>{truncateAddress(dydxAddress)}</$Address>}
+      {!isTablet && (
+        <$Address>{accountName ? `${accountName}.haneul` : truncateAddress(dydxAddress)}</$Address>
+      )}
     </$DropdownMenu>
   );
 };
