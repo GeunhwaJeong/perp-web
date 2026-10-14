@@ -277,6 +277,8 @@ export type TradeFormInputData = {
   // Trading rewards were a dYdX token emission; there is no reward program on this engine.
   rewardParams: RewardParamsSummary | undefined;
   equityTiers: EquityTiersSummary | undefined;
+  /** The user's market-order slippage cap, as a fraction. */
+  marketOrderMaxSlippage: number;
 };
 
 export type TradeAccountDetails = {

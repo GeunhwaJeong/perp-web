@@ -253,7 +253,6 @@ export const getWidgetOptions = (
       'remove_library_container_border',
       'hide_last_na_study_output',
       'dont_show_boolean_study_arguments',
-      'hide_left_toolbar_by_default',
       'hide_right_toolbar',
       ...tabletFeatures,
     ],

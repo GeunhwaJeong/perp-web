@@ -2,6 +2,7 @@ import { forwardRef, useCallback, useMemo, useRef } from 'react';
 
 import { TradeFormType } from '@/bonsai/forms/trade/types';
 import { BonsaiHelpers } from '@/bonsai/ontology';
+import { OrderbookLine } from '@/bonsai/types/orderbookTypes';
 import styled, { css } from 'styled-components';
 import tw from 'twin.macro';
 
@@ -271,6 +272,7 @@ export const CanvasOrderbook = forwardRef(
                   tickSizeDecimals={tickSizeDecimals}
                 />
               )}
+              <OrderbookRatioBar bids={bids} asks={asks} />
             </>
           ) : (
             <div tw="grid grid-cols-[1fr_1fr] overflow-y-auto">
@@ -284,6 +286,51 @@ export const CanvasOrderbook = forwardRef(
     );
   }
 );
+/** Resting bid size against ask size over the shown levels: a reading of which side is heavier. */
+const OrderbookRatioBar = ({ bids, asks }: { bids: OrderbookLine[]; asks: OrderbookLine[] }) => {
+  const bidSize = bids.reduce((sum, row) => sum + (row.size ?? 0), 0);
+  const askSize = asks.reduce((sum, row) => sum + (row.size ?? 0), 0);
+  const total = bidSize + askSize;
+  if (!(total > 0)) return null;
+  const bidShare = bidSize / total;
+  return (
+    <$RatioBar>
+      <span tw="text-color-positive">B {(bidShare * 100).toFixed(1)}%</span>
+      <$RatioTrack>
+        <$RatioFill $share={bidShare} />
+      </$RatioTrack>
+      <span tw="text-color-negative">{((1 - bidShare) * 100).toFixed(1)}% S</span>
+    </$RatioBar>
+  );
+};
+
+const $RatioBar = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+  height: 1.5rem;
+  padding: 0 0.5rem;
+  font: var(--font-mini-book);
+  font-feature-settings: var(--fontFeature-monoNumbers);
+  border-top: var(--border);
+`;
+
+const $RatioTrack = styled.div`
+  flex: 1;
+  height: 0.25rem;
+  border-radius: 0.125rem;
+  background-color: var(--color-negative-20);
+  overflow: hidden;
+`;
+
+const $RatioFill = styled.div<{ $share: number }>`
+  height: 100%;
+  width: ${({ $share }) => `${Math.round($share * 1000) / 10}%`};
+  background-color: var(--color-positive);
+  opacity: 0.6;
+`;
+
 const $OrderbookContent = styled.div<{ $isLoading?: boolean }>`
   min-height: 100%;
   max-height: 100%;

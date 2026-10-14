@@ -45,7 +45,6 @@ import {
   TradeSummary,
 } from './types';
 
-const MARKET_ORDER_MAX_SLIPPAGE = 0.05;
 const STOP_MARKET_ORDER_SLIPPAGE_BUFFER_MAJOR_MARKET = 0.05;
 const STOP_MARKET_ORDER_SLIPPAGE_BUFFER = 0.1;
 const MAX_TARGET_LEVERAGE_BUFFER_PERCENT = 0.98;
@@ -102,9 +101,9 @@ export function calculateTradeInfo(
             subaccountNumber: subaccountToUse,
             payloadPrice: mapIfPresent(calculated.marketOrder?.averagePrice, (price) => {
               if (trade.side == null || trade.side === OrderSide.BUY) {
-                return price * (1 + MARKET_ORDER_MAX_SLIPPAGE);
+                return price * (1 + accountData.marketOrderMaxSlippage);
               }
-              return price * (1 - MARKET_ORDER_MAX_SLIPPAGE);
+              return price * (1 - accountData.marketOrderMaxSlippage);
             }),
             startPrice: undefined,
             endPrice: undefined,

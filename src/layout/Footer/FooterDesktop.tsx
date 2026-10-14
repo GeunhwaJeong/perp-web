@@ -1,6 +1,7 @@
 import { ApiStatus } from '@/bonsai/types/summaryTypes';
 import styled, { css } from 'styled-components';
 
+import { OnboardingState } from '@/constants/account';
 import { ButtonSize, ButtonType } from '@/constants/buttons';
 import { DialogTypes } from '@/constants/dialogs';
 import { STRING_KEYS } from '@/constants/localization';
@@ -20,7 +21,8 @@ import { Link } from '@/components/Link';
 import { Output, OutputType } from '@/components/Output';
 import { WithTooltip } from '@/components/WithTooltip';
 
-import { useAppDispatch } from '@/state/appTypes';
+import { getOnboardingState } from '@/state/accountSelectors';
+import { useAppDispatch, useAppSelector } from '@/state/appTypes';
 import { openDialog } from '@/state/dialogs';
 
 import { isPresent } from '@/lib/typeUtils';
@@ -43,6 +45,12 @@ export const FooterDesktop = () => {
   const { statusPage } = useURLConfigs();
 
   const isStatusLoading = !status && !statusErrorMessage;
+  const onboardingState = useAppSelector(getOnboardingState);
+  const walletConnected = onboardingState === OnboardingState.AccountConnected;
+  const chainLive = (height ?? 0) > 0;
+  // The indexer trails the chain by a block or two while healthy; more than that is a lag.
+  const indexerLag =
+    chainLive && indexerHeight != null ? Math.max(0, (height ?? 0) - indexerHeight) : undefined;
 
   const { exchangeStatus, label } = isStatusLoading
     ? {
@@ -83,6 +91,26 @@ export const FooterDesktop = () => {
           </$FooterButton>
         </WithTooltip>
 
+        <$FooterItem>
+          <$Dot $tone={chainLive ? 'ok' : 'off'} />
+          Mainnet
+          {chainLive && (
+            <Output
+              useGrouping
+              type={OutputType.Number}
+              value={height}
+              tw="ml-0.25 text-color-text-1"
+            />
+          )}
+        </$FooterItem>
+        <$FooterItem>
+          <$Dot $tone={indexerLag == null ? 'off' : indexerLag > 3 ? 'warn' : 'ok'} />
+          Indexer
+        </$FooterItem>
+        <$FooterItem>
+          <$Dot $tone={walletConnected ? 'ok' : 'off'} />
+          {walletConnected ? 'Wallet connected' : 'Wallet disconnected'}
+        </$FooterItem>
         <$FooterItem>
           {stringGetter({
             key: STRING_KEYS.SITE_OPERATED_BY_SHORT,
@@ -161,6 +189,17 @@ const $StatusDot = styled.div<{ exchangeStatus?: ExchangeStatus }>`
     }[exchangeStatus]};
 `;
 
+const $Dot = styled.span<{ $tone: 'ok' | 'warn' | 'off' }>`
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  margin-right: 0.375rem;
+  background-color: ${({ $tone }) =>
+    ({ ok: 'var(--color-success)', warn: 'var(--color-warning)', off: 'var(--color-text-0)' })[
+      $tone
+    ]};
+`;
+
 const $FooterButton = styled(Button)`
   --button-height: 1.5rem;
   --button-radius: 0.25rem;
@@ -183,6 +222,7 @@ const $FooterItem = styled.div`
   color: var(--color-text-0);
 
   display: inline-flex;
+  align-items: center;
   padding: 0 0.625rem;
 `;
 

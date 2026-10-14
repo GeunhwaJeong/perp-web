@@ -40,6 +40,8 @@ import { isTruthy } from '@/lib/isTruthy';
 import { getDoubleValuesHasDiff } from '@/lib/tradeData';
 import { orEmptyObj } from '@/lib/typeUtils';
 
+import { MaxSlippageSetting } from './MaxSlippageSetting';
+
 type ConfirmButtonConfig = {
   stringKey: string;
   buttonTextStringKey: string;
@@ -101,6 +103,7 @@ export const PlaceOrderButtonAndReceipt = ({
   const { fee, inputSummary, startPrice, endPrice } = orEmptyObj(tradeInfo);
   const expectedPrice = inputSummary?.averageFillPrice;
   const isScaleOrder = effectiveTrade.type === TradeFormType.SCALE;
+  const isMarketOrder = effectiveTrade.type === TradeFormType.MARKET;
 
   // approximation for whether inputs are filled by whether summary has been calculated
   const areInputsFilled = tradePayload != null;
@@ -227,6 +230,11 @@ export const PlaceOrderButtonAndReceipt = ({
           </span>
         ),
         value: <Output type={OutputType.Fiat} value={fee} useGrouping />,
+      },
+      isMarketOrder && {
+        key: 'max-slippage',
+        label: 'Max slippage',
+        value: <MaxSlippageSetting />,
       },
     ] satisfies Array<DetailsItem | false | undefined>
   ).filter(isTruthy);

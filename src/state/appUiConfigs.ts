@@ -40,6 +40,8 @@ export interface AppUIConfigsState {
   shouldHideLaunchableMarkets: boolean;
   favoritedMarkets: string[];
   horizontalPanelHeightPx: number;
+  /** How far past the quoted average a market order may fill, as a fraction (0.01 = 1%). */
+  marketOrderMaxSlippage: number;
   tablePageSizes: { [tableKey: string]: number };
   isChatEnabled: boolean;
   simpleUI: {
@@ -56,7 +58,8 @@ export const initialState: AppUIConfigsState = {
   displayUnit: DisplayUnit.Asset,
   shouldHideLaunchableMarkets: false,
   favoritedMarkets: [],
-  horizontalPanelHeightPx: 288,
+  horizontalPanelHeightPx: 208,
+  marketOrderMaxSlippage: 0.01,
   tablePageSizes: {},
   isChatEnabled: true,
   simpleUI: {
@@ -89,6 +92,9 @@ export const appUiConfigsSlice = createSlice({
     },
     setHorizontalPanelHeightPx: (state: AppUIConfigsState, { payload }: PayloadAction<number>) => {
       state.horizontalPanelHeightPx = payload;
+    },
+    setMarketOrderMaxSlippage: (state: AppUIConfigsState, { payload }: PayloadAction<number>) => {
+      state.marketOrderMaxSlippage = payload;
     },
     setShouldHideLaunchableMarkets: (
       state: AppUIConfigsState,
@@ -158,6 +164,7 @@ export const {
   favoriteMarket,
   unfavoriteMarket,
   setHorizontalPanelHeightPx,
+  setMarketOrderMaxSlippage,
   setTablePageSize,
   setSimpleUISortMarketsBy,
   setSimpleUISortPositionsBy,

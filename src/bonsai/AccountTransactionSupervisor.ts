@@ -40,7 +40,7 @@ import type { ClientWithCoreApi } from '@haneullabs/haneul/client';
 import { AnalyticsEvents, TradeMetadataSource } from '@/constants/analytics';
 import { STRING_KEYS } from '@/constants/localization';
 import { isDev } from '@/constants/networks';
-import { MARKET_ORDER_MAX_SLIPPAGE, PlaceOrderStatuses } from '@/constants/trade';
+import { PlaceOrderStatuses } from '@/constants/trade';
 import { DydxChainAsset } from '@/constants/wallets';
 
 import { selectTokenConfigs } from '@/hooks/useTokenConfigs';
@@ -49,6 +49,7 @@ import type { RootStore } from '@/state/_store';
 import { store as reduxStore } from '@/state/_store';
 import { getUserWalletAddress } from '@/state/accountInfoSelectors';
 import { appQueryClient } from '@/state/appQueryClient';
+import { getMarketOrderMaxSlippage } from '@/state/appUiConfigsSelectors';
 import {
   cancelAllSubmitted,
   cancelOrderConfirmed,
@@ -550,6 +551,7 @@ export class AccountTransactionSupervisor {
     if (unpriced) {
       return failure(`No market price for ${unpriced.market} to bound the close`);
     }
+    const maxSlippage = getMarketOrderMaxSlippage(this.store.getState());
     const payloads: PlaceOrderPayload[] = open.map((p) => ({
       subaccountNumber: p.subaccountNumber,
       transferToSubaccountAmount: undefined,
@@ -560,7 +562,7 @@ export class AccountTransactionSupervisor {
       // Closing a long sells, so its worst price sits below the market price; a short buys above.
       price:
         Number(markets![p.market]!.oraclePrice) *
-        (p.side === 'LONG' ? 1 - MARKET_ORDER_MAX_SLIPPAGE : 1 + MARKET_ORDER_MAX_SLIPPAGE),
+        (p.side === 'LONG' ? 1 - maxSlippage : 1 + maxSlippage),
       size: p.unsignedSize.toNumber(),
       clientId: Math.floor(Math.random() * 2 ** 31),
       timeInForce: undefined,

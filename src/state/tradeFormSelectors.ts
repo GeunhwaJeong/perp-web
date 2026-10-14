@@ -17,6 +17,7 @@ import { isPresent } from '@/lib/typeUtils';
 
 import { type RootState } from './_store';
 import { createAppSelector } from './appTypes';
+import { getMarketOrderMaxSlippage } from './appUiConfigsSelectors';
 import { getCurrentMarketIdIfTradeable } from './currentMarketSelectors';
 import { getActiveDialog, getActiveTradeBoxDialog } from './dialogsSelectors';
 
@@ -40,6 +41,7 @@ const getTradeFormInputData = createAppSelector(
     selectRawOrderbook,
     BonsaiRaw.currentMarket,
     BonsaiCore.configs.equityTiers,
+    getMarketOrderMaxSlippage,
   ],
   (
     userFeeStats,
@@ -52,7 +54,8 @@ const getTradeFormInputData = createAppSelector(
     currentTradeMarketSummary,
     currentTradeMarketOrderbook,
     currentTradeMarket,
-    equityTiers
+    equityTiers,
+    marketOrderMaxSlippage
   ): TradeFormInputData => ({
     rawParentSubaccountData,
     rawRelevantMarkets,
@@ -69,6 +72,7 @@ const getTradeFormInputData = createAppSelector(
     feeTiers,
     rewardParams: undefined,
     equityTiers,
+    marketOrderMaxSlippage,
   })
 );
 

@@ -58,6 +58,9 @@ export const getFavoritedMarkets = (state: RootState) => state.appUiConfigs.favo
 export const getHorizontalPanelHeightPx = (state: RootState) =>
   state.appUiConfigs.horizontalPanelHeightPx;
 
+export const getMarketOrderMaxSlippage = (state: RootState) =>
+  state.appUiConfigs.marketOrderMaxSlippage;
+
 export const getIsMarketFavorited = createAppSelector(
   [getFavoritedMarkets, (s: RootState, marketId: string) => marketId],
   (favoritedMarkets, marketId) => favoritedMarkets.includes(marketId)
