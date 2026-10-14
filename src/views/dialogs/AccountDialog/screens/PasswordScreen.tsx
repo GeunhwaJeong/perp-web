@@ -83,6 +83,7 @@ export const PasswordScreen = ({
           <Column $gap={spacing.s8}>
             <PasswordField
               placeholder="New password"
+              autoComplete="new-password"
               value={password}
               error={tooShort}
               autoFocus
@@ -99,6 +100,7 @@ export const PasswordScreen = ({
           </Column>
           <PasswordField
             placeholder="Confirm password"
+            autoComplete="new-password"
             value={confirm}
             error={mismatch}
             onChange={(event) => setConfirm(event.target.value)}

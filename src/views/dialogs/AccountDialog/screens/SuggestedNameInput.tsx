@@ -219,7 +219,7 @@ export const SuggestedNameInput = ({
           <PersonIcon size={28} />
         </$Avatar>
         <$Field $error={Boolean(error)} onClick={() => inputRef.current?.focus()}>
-          <Label>Username</Label>
+          <Label>Name</Label>
           <$ValueRow ref={rowRef}>
             <$Swap $hidden={isFadedOut}>
               <$Measure $fontSize={fontSize}>
@@ -231,10 +231,16 @@ export const SuggestedNameInput = ({
                   $fontSize={fontSize}
                   value={rendered}
                   placeholder="yourname"
+                  // Not a login field: keep password managers (and their key icon, which
+                  // paints over the name) away from it.
+                  name="haneul-name"
                   autoCapitalize="none"
                   autoComplete="off"
                   autoCorrect="off"
                   spellCheck={false}
+                  data-1p-ignore
+                  data-lpignore="true"
+                  data-bwignore
                   maxLength={MAX_NAME_LENGTH}
                   autoFocus={autoFocus}
                   onChange={(event) => {

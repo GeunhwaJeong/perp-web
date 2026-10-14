@@ -52,6 +52,7 @@ export const VerifyScreen = ({
         <Column $gap={spacing.s8}>
           <PasswordField
             placeholder="Password"
+            autoComplete="current-password"
             value={password}
             error={Boolean(error)}
             autoFocus
