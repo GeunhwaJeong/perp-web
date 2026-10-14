@@ -4,7 +4,6 @@ import { OrderSide } from '@/bonsai/forms/trade/types';
 import { PositionUniqueId, SubaccountPosition } from '@/bonsai/types/summaryTypes';
 import { TagsOf, UnionOf, ofType, unionize } from 'unionize';
 
-import { BigNumberish } from '@/lib/numbers';
 import { Nullable } from '@/lib/typeUtils';
 
 import { DydxChainAsset } from './wallets';
@@ -80,8 +79,6 @@ export type SimpleUiTradeDialogProps =
       isClosingPosition: true;
       side?: undefined;
     };
-export type StakeDialogProps = {};
-export type StakingRewardDialogProps = { usdcRewards: BigNumberish; validators: string[] };
 export type TradeDialogProps = {
   isOpen?: boolean;
   slotTrigger?: React.ReactNode;
@@ -94,7 +91,6 @@ export type TriggersDialogProps = {
 };
 export type TransferDialogProps = { selectedAsset?: DydxChainAsset };
 export type TradingKeysDialogProps = {};
-export type UnstakeDialogProps = {};
 export type VaultDepositWithdrawDialogProps = { initialType?: 'DEPOSIT' | 'WITHDRAW' };
 export type WithdrawDialog2Props = {};
 export type DepositDialog2Props = {};
@@ -137,13 +133,10 @@ export const DialogTypes = unionize(
     SetupPasskey: ofType<SetupPasskeyDialogProps>(),
     SharePNLAnalytics: ofType<SharePNLAnalyticsDialogProps>(),
     SimpleUiTrade: ofType<SimpleUiTradeDialogProps>(),
-    Stake: ofType<StakeDialogProps>(),
-    StakingReward: ofType<StakingRewardDialogProps>(),
     Trade: ofType<TradeDialogProps>(),
     Transfer: ofType<TransferDialogProps>(),
     TradingKeys: ofType<TradingKeysDialogProps>(),
     Triggers: ofType<TriggersDialogProps>(),
-    Unstake: ofType<UnstakeDialogProps>(),
     VaultDepositWithdraw: ofType<VaultDepositWithdrawDialogProps>(),
     Withdraw2: ofType<WithdrawDialog2Props>(),
     WithdrawalGated: ofType<WithdrawalGatedDialogProps>(),

@@ -52,7 +52,6 @@ import { useLocalStorage } from './hooks/useLocalStorage';
 import { useMobileWebEnabled } from './hooks/useMobileWebEnabled';
 import { useShouldShowFooter } from './hooks/useShouldShowFooter';
 import { useSimpleUiEnabled } from './hooks/useSimpleUiEnabled';
-import { useTokenConfigs } from './hooks/useTokenConfigs';
 import { WalletConnectionProvider } from './hooks/useWalletConnection';
 import { isTruthy } from './lib/isTruthy';
 import { persistor } from './state/_store';
@@ -73,7 +72,6 @@ const SettingsPage = lazy(() => import('@/pages/settings/Settings'));
 const TradePage = lazy(() => import('@/pages/trade/Trade'));
 const TermsOfUsePage = lazy(() => import('@/pages/TermsOfUsePage'));
 const PrivacyPolicyPage = lazy(() => import('@/pages/PrivacyPolicyPage'));
-const RewardsPage = lazy(() => import('@/pages/token/RewardsPage'));
 const VaultPage = lazy(() => import('@/pages/vaults/VaultPage'));
 
 // Simple UI
@@ -92,7 +90,6 @@ const Content = () => {
   useOpenDepositIfRelevant();
 
   const { isTablet, isNotTablet } = useBreakpoints();
-  const { chainTokenLabel } = useTokenConfigs();
 
   const location = useLocation();
   const dispatch = useAppDispatch();
@@ -211,8 +208,6 @@ const Content = () => {
               <Route path={AppRoute.Markets}>
                 <Route path={AppRoute.Markets} element={<MarketsPage />} />
               </Route>
-
-              <Route path={`/${chainTokenLabel}/*`} element={<RewardsPage />} />
 
               <Route element={<GuardedMobileRoute />}>
                 <Route path={`${AppRoute.Portfolio}/*`} element={<PortfolioPage />} />

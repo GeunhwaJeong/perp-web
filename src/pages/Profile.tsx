@@ -33,10 +33,6 @@ import { openDialog } from '@/state/dialogs';
 import { isTruthy } from '@/lib/isTruthy';
 import { truncateAddress } from '@/lib/wallet';
 
-import { GovernancePanel } from './token/GovernancePanel';
-import { LaunchIncentivesPanel } from './token/LaunchIncentivesPanel';
-import { SwapAndStakingPanel } from './token/SwapAndStakingPanel';
-
 const ENS_CHAIN_ID = 1; // Ethereum
 
 type Action = {
@@ -179,8 +175,6 @@ const Profile = () => {
         tw="[grid-area:help]"
       />
 
-      <SwapAndStakingPanel tw="[grid-area:staking]" />
-
       <Panel
         slotHeaderContent={stringGetter({ key: STRING_KEYS.FEES })}
         href={`${AppRoute.Portfolio}/${PortfolioRoute.Fees}`}
@@ -213,7 +207,6 @@ const Profile = () => {
           initialPageSize={5}
         />
       </$HistoryPanel>
-      <LaunchIncentivesPanel tw="[grid-area:incentives]" />
       <Panel tw="text-color-text-0 [grid-area:legal]">
         {stringGetter({
           key: STRING_KEYS.SITE_OPERATED_BY_SHORT,
@@ -227,7 +220,6 @@ const Profile = () => {
           },
         })}
       </Panel>
-      <GovernancePanel tw="[grid-area:governance]" />
     </$MobileProfileLayout>
   );
 };
@@ -247,11 +239,8 @@ const $MobileProfileLayout = styled.div`
     'header header'
     'actions actions'
     'settings help'
-    'staking staking'
     'fees fees'
     'history history'
-    'governance governance'
-    'incentives incentives'
     'legal legal';
 
   @media ${breakpoints.mobile} {
@@ -259,11 +248,8 @@ const $MobileProfileLayout = styled.div`
       'header header'
       'actions actions'
       'settings help'
-      'staking staking'
       'fees fees'
       'history history'
-      'governance governance'
-      'incentives incentives'
       'legal legal';
   }
 `;

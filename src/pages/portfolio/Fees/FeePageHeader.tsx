@@ -3,35 +3,26 @@ import { useMemo } from 'react';
 import { BonsaiCore } from '@/bonsai/ontology';
 import styled from 'styled-components';
 
-import { ButtonAction, ButtonShape } from '@/constants/buttons';
-import { DialogTypes } from '@/constants/dialogs';
 import { STRING_KEYS } from '@/constants/localization';
 
-import { useAccounts } from '@/hooks/useAccounts';
 import { useLocaleSeparators } from '@/hooks/useLocaleSeparators';
 import { useStakingTierLevel } from '@/hooks/useStakingTierLevel';
 import { useStringGetter } from '@/hooks/useStringGetter';
 
 import { layoutMixins } from '@/styles/layoutMixins';
 
-import { AssetIcon } from '@/components/AssetIcon';
-import { Button } from '@/components/Button';
 import { Details } from '@/components/Details';
-import { Icon, IconName } from '@/components/Icon';
 import { formatNumberOutput, Output, OutputType } from '@/components/Output';
 
-import { useAppDispatch, useAppSelector } from '@/state/appTypes';
-import { openDialog } from '@/state/dialogs';
+import { useAppSelector } from '@/state/appTypes';
 import { getSelectedLocale } from '@/state/localizationSelectors';
 
 export const FeePageHeader = () => {
-  const dispatch = useAppDispatch();
   const stringGetter = useStringGetter();
   const userStats = useAppSelector(BonsaiCore.account.stats.data);
   const feeTiers = useAppSelector(BonsaiCore.configs.feeTiers);
   const stakingTiers = useAppSelector(BonsaiCore.configs.stakingTiers);
   const hasStakingTiers = stakingTiers != null && stakingTiers.length > 0;
-  const { dydxAddress } = useAccounts();
   const { decimal: decimalSeparator, group: groupSeparator } = useLocaleSeparators();
   const selectedLocale = useAppSelector(getSelectedLocale);
   const currentStakingDiscountLevel: number | undefined = useStakingTierLevel();
@@ -49,10 +40,6 @@ export const FeePageHeader = () => {
   }, [userStats]);
 
   const userFeeTier = userStats.feeTierId;
-
-  const onStakeMore = () => {
-    dispatch(openDialog(DialogTypes.Stake()));
-  };
 
   const stakingTierDetails = hasStakingTiers ? (
     <div tw="flex flex-row">
@@ -87,33 +74,18 @@ export const FeePageHeader = () => {
           },
           {
             key: 'staked-dydx',
-            label: stringGetter({ key: STRING_KEYS.STAKED_DYDX }),
+            label: 'Staked HANEUL',
             value: (
               <Output
                 tw="row gap-0.25"
                 type={OutputType.Asset}
                 value={stakedTokens}
                 fractionDigits={2}
-                slotLeft={stakedTokens ? <AssetIcon symbol="DYDX" /> : undefined}
               />
             ),
           },
         ]}
       />
-      <div tw="row rounded-[0.625rem] rounded-l-0 bg-color-layer-3 pr-1.5">
-        <Button
-          shape={ButtonShape.Pill}
-          action={ButtonAction.Primary}
-          css={{
-            color: dydxAddress == null ? 'var(--color-text-0)' : 'var(--color-layer-0)',
-          }}
-          onClick={onStakeMore}
-          state={{ isDisabled: dydxAddress == null }}
-        >
-          <Icon iconName={IconName.Deposit2} />
-          {stringGetter({ key: STRING_KEYS.STAKE_MORE })}
-        </Button>
-      </div>
     </div>
   ) : null;
 

@@ -37,13 +37,10 @@ import { SetMarketLeverageDialog } from '@/views/dialogs/SetMarketLeverageDialog
 import { SetupPasskeyDialog } from '@/views/dialogs/SetupPasskeyDialog';
 import { SharePNLAnalyticsDialog } from '@/views/dialogs/SharePNLAnalyticsDialog';
 import { SimpleUiTradeDialog } from '@/views/dialogs/SimpleUiTradeDialog/SimpleUiTradeDialog';
-import { StakeDialog } from '@/views/dialogs/StakeDialog';
-import { StakingRewardDialog } from '@/views/dialogs/StakingRewardDialog';
 import { TradeDialog } from '@/views/dialogs/TradeDialog';
 import { TradingKeysDialog } from '@/views/dialogs/TradingKeysDialog';
 import { TransferDialog } from '@/views/dialogs/TransferDialog';
 import { TriggersDialog } from '@/views/dialogs/TriggersDialog';
-import { UnstakeDialog } from '@/views/dialogs/UnstakeDialog';
 import { VaultDepositWithdrawDialog } from '@/views/dialogs/VaultDepositWithdrawDialog';
 import { WithdrawFromSubaccountDialog } from '@/views/dialogs/WithdrawFromSubaccountDialog';
 import { WithdrawalGateDialog } from '@/views/dialogs/WithdrawalGateDialog';
@@ -105,13 +102,10 @@ export const DialogManager = React.memo(() => {
     SetupPasskey: (args) => <SetupPasskeyDialog {...args} {...modalProps} />,
     SharePNLAnalytics: (args) => <SharePNLAnalyticsDialog {...args} {...modalProps} />,
     SimpleUiTrade: (args) => <SimpleUiTradeDialog {...args} {...modalProps} />,
-    Stake: (args) => <StakeDialog {...args} {...modalProps} />,
-    StakingReward: (args) => <StakingRewardDialog {...args} {...modalProps} />,
     Trade: (args) => <TradeDialog {...args} {...modalProps} />,
     Triggers: (args) => <TriggersDialog {...args} {...modalProps} />,
     Transfer: (args) => <TransferDialog {...args} {...modalProps} />,
     TradingKeys: (args) => <TradingKeysDialog {...args} {...modalProps} />,
-    Unstake: (args) => <UnstakeDialog {...args} {...modalProps} />,
     VaultDepositWithdraw: (args) => <VaultDepositWithdrawDialog {...args} {...modalProps} />,
     Withdraw2: (args) => <CollateralWithdrawDialog {...args} {...modalProps} />,
     WithdrawalGated: (args) => <WithdrawalGateDialog {...args} {...modalProps} />,

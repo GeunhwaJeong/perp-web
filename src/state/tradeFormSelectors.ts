@@ -30,7 +30,6 @@ const selectRawOrderbook = BonsaiHelpers.currentMarket.orderbook.selectGroupedDa
 const getTradeFormInputData = createAppSelector(
   [
     BonsaiCore.account.stats.data,
-    BonsaiCore.rewardParams.data,
     BonsaiCore.configs.feeTiers,
     BonsaiRaw.parentSubaccountBase,
     BonsaiRaw.parentSubaccountRelevantMarkets,
@@ -44,7 +43,6 @@ const getTradeFormInputData = createAppSelector(
   ],
   (
     userFeeStats,
-    rewardParams,
     feeTiers,
     rawParentSubaccountData,
     rawRelevantMarkets,
@@ -69,7 +67,7 @@ const getTradeFormInputData = createAppSelector(
 
     userFeeStats,
     feeTiers,
-    rewardParams,
+    rewardParams: undefined,
     equityTiers,
   })
 );

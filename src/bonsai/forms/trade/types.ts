@@ -274,7 +274,8 @@ export type TradeFormInputData = {
   currentTradeMarketSummary: PerpetualMarketSummary | undefined;
   currentTradeMarketOrderbook: OrderbookProcessedData | undefined;
   feeTiers: FeeTierSummary[] | undefined;
-  rewardParams: RewardParamsSummary;
+  // Trading rewards were a dYdX token emission; there is no reward program on this engine.
+  rewardParams: RewardParamsSummary | undefined;
   equityTiers: EquityTiersSummary | undefined;
 };
 

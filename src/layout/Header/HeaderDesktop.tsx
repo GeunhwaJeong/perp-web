@@ -12,7 +12,6 @@ import { useAccounts } from '@/hooks/useAccounts';
 import { useComplianceState } from '@/hooks/useComplianceState';
 import { useEnvFeatures } from '@/hooks/useEnvFeatures';
 import { useStringGetter } from '@/hooks/useStringGetter';
-import { useTokenConfigs } from '@/hooks/useTokenConfigs';
 import { useURLConfigs } from '@/hooks/useURLConfigs';
 
 import { BellStrokeIcon } from '@/icons';
@@ -34,7 +33,6 @@ import { NotificationsMenu } from '@/views/menus/NotificationsMenu';
 
 import { getOnboardingState } from '@/state/accountSelectors';
 import { useAppDispatch, useAppSelector } from '@/state/appTypes';
-import { getHasSeenLaunchIncentives } from '@/state/appUiConfigsSelectors';
 import { openDialog } from '@/state/dialogs';
 
 import { isTruthy } from '@/lib/isTruthy';
@@ -44,13 +42,10 @@ export const HeaderDesktop = () => {
   const { documentation, community, mintscanBase, exchangeStats, fundingComparison } =
     useURLConfigs();
   const dispatch = useAppDispatch();
-  const { chainTokenLabel } = useTokenConfigs();
   const { dydxAccounts } = useAccounts();
   const onboardingState = useAppSelector(getOnboardingState);
   const { complianceState } = useComplianceState();
-  const { isVaultEnabled, isChainTokenPageEnabled } = useEnvFeatures();
-
-  const hasSeenLaunchIncentives = useAppSelector(getHasSeenLaunchIncentives);
+  const { isVaultEnabled } = useEnvFeatures();
 
   const navItems = [
     {
@@ -75,14 +70,6 @@ export const HeaderDesktop = () => {
           value: 'VAULT',
           label: stringGetter({ key: STRING_KEYS.MEGAVAULT }),
           href: AppRoute.Vault,
-        },
-        isChainTokenPageEnabled && {
-          value: chainTokenLabel,
-          label: chainTokenLabel,
-          href: `/${chainTokenLabel}`,
-          slotAfter: !hasSeenLaunchIncentives && (
-            <div tw="h-[0.4375rem] w-[0.4375rem] rounded-[50%] bg-color-accent" />
-          ),
         },
         {
           value: 'MORE',

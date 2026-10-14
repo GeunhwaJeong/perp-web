@@ -83,8 +83,6 @@ export const selectRawSolanaAddressScreen = (state: RootState) =>
   state.raw.compliance.solanaAddressScreen;
 export const selectRawGeo = (state: RootState) => state.raw.compliance.geo;
 export const selectRawGeoHeaders = (state: RootState) => state.raw.compliance.geoHeaders;
-export const selectRawRewardParams = (state: RootState) => state.raw.rewards.data.data;
-export const selectRawRewardPrice = (state: RootState) => state.raw.rewards.price.data;
 
 export const selectRawSelectedMarketLeverages = (state: RootState) =>
   state.raw.markets.selectedMarketLeverages;

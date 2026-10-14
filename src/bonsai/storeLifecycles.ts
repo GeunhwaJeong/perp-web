@@ -16,7 +16,6 @@ import { setUpUserLeverageParamsQuery } from './rest/leverage';
 import { alwaysUseCurrentNetworkClient } from './rest/lib/compositeClientManager';
 import { setUpOrderTicketsQuery } from './rest/orderTickets';
 import { setUpOrdersQuery } from './rest/orders';
-import { setUpRewardsParamsQuery, setUpRewardsTokenPriceQuery } from './rest/rewards';
 import { setUpSparklinesQuery } from './rest/sparklines';
 import { setUpTradeHistoryQuery } from './rest/tradeHistory';
 import { setUpTransfersQuery } from './rest/transfers';
@@ -58,8 +57,6 @@ export const storeLifecycles = [
   setUpIndexerSourceAddressScreenV2Query,
   setUpIndexerLocalAddressScreenV2Query,
   setUpIndexerSolanaAddressScreenQuery,
-  setUpRewardsParamsQuery,
-  setUpRewardsTokenPriceQuery,
   setUpCancelOrphanedTriggerOrdersLifecycle,
   setUpReclaimChildSubaccountBalancesLifecycle,
   setUpMarketsFeeDiscountQuery,

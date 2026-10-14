@@ -13,8 +13,6 @@ import {
   ConfigTiers,
   GeoState,
   PerpetualMarketFeeDiscount,
-  RewardsParams,
-  TokenPriceResponse,
   UserFeeTier,
   UserStakingTier,
 } from '@/bonsai/types/summaryTypes';
@@ -114,10 +112,6 @@ export interface RawDataState {
   };
   configs: Loadable<ConfigTiers>;
   compliance: ComplianceState;
-  rewards: {
-    data: Loadable<RewardsParams | undefined>;
-    price: Loadable<TokenPriceResponse | undefined>;
-  };
 }
 
 const initialState: RawDataState = {
@@ -156,10 +150,6 @@ const initialState: RawDataState = {
     localAddressScreenV2: loadableIdle(),
     sourceAddressScreenV2: loadableIdle(),
     solanaAddressScreen: loadableIdle(),
-  },
-  rewards: {
-    data: loadableIdle(),
-    price: loadableIdle(),
   },
 };
 
@@ -290,15 +280,6 @@ export const rawSlice = createSlice({
       ) => {
         state.compliance.solanaAddressScreen = action.payload;
       },
-      setRewardsParams: (state, action: PayloadAction<Loadable<RewardsParams | undefined>>) => {
-        state.rewards.data = action.payload;
-      },
-      setRewardsTokenPrice: (
-        state,
-        action: PayloadAction<Loadable<TokenPriceResponse | undefined>>
-      ) => {
-        state.rewards.price = action.payload;
-      },
       setSelectedMarketLeverage: (
         state,
         action: PayloadAction<{ marketId: string; leverage: number }>
@@ -401,8 +382,6 @@ export const {
   setLocalAddressScreenV2Raw,
   setSourceAddressScreenV2Raw,
   setSolanaAddressScreenRaw,
-  setRewardsParams,
-  setRewardsTokenPrice,
   setSelectedMarketLeverage,
   setSelectedMarketLeverages,
 } = rawSlice.actions;

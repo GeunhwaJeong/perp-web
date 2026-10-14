@@ -9,7 +9,6 @@ import { AppRoute } from '@/constants/routes';
 import { useEnvFeatures } from '@/hooks/useEnvFeatures';
 import { useMarketsData } from '@/hooks/useMarketsData';
 import { useStringGetter } from '@/hooks/useStringGetter';
-import { useTokenConfigs } from '@/hooks/useTokenConfigs';
 
 import { AssetIcon } from '@/components/AssetIcon';
 import { Icon, IconName } from '@/components/Icon';
@@ -23,8 +22,7 @@ export const useGlobalCommands = (): MenuConfig<string | number, string | number
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const stringGetter = useStringGetter();
-  const { chainTokenLabel } = useTokenConfigs();
-  const { isVaultEnabled, isChainTokenPageEnabled } = useEnvFeatures();
+  const { isVaultEnabled } = useEnvFeatures();
 
   const { markets } = useMarketsData({
     forceShowUnlaunchedMarkets: true,
@@ -53,12 +51,6 @@ export const useGlobalCommands = (): MenuConfig<string | number, string | number
           slotBefore: <Icon iconName={IconName.Markets} />,
           label: stringGetter({ key: STRING_KEYS.MARKETS }),
           onSelect: () => navigate(AppRoute.Markets),
-        },
-        isChainTokenPageEnabled && {
-          value: 'token',
-          slotBefore: <Icon iconName={IconName.Coins} />,
-          label: chainTokenLabel,
-          onSelect: () => navigate(`/${chainTokenLabel}`),
         },
         isVaultEnabled && {
           value: 'vaults',
