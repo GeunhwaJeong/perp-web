@@ -37,6 +37,7 @@ import { MARKET_ORDER_MAX_SLIPPAGE, PlaceOrderStatuses } from '@/constants/trade
 import type { RootStore } from '@/state/_store';
 import { store as reduxStore } from '@/state/_store';
 import { getUserWalletAddress } from '@/state/accountInfoSelectors';
+import { appQueryClient } from '@/state/appQueryClient';
 import {
   cancelAllSubmitted,
   cancelOrderConfirmed,
@@ -671,6 +672,9 @@ export class AccountTransactionSupervisor {
         : builder.createAccount({ sender: address, coins: ids, amount: units });
       const result = await signAndExecute(tx);
       this.forgetWalletAccount(deployment, address);
+      appQueryClient
+        .invalidateQueries({ queryKey: ['validator', 'accountBalances'] })
+        .catch(() => undefined);
       logBonsaiInfo(FN, 'collateral deposited', {
         digest: result.digest,
         amount,
@@ -707,6 +711,9 @@ export class AccountTransactionSupervisor {
       });
       const result = await signAndExecute(tx);
       this.forgetWalletAccount(deployment, address);
+      appQueryClient
+        .invalidateQueries({ queryKey: ['validator', 'accountBalances'] })
+        .catch(() => undefined);
       logBonsaiInfo(FN, 'collateral withdrawn', { digest: result.digest, amount });
       return wrapOperationSuccess({ digest: result.digest });
     } catch (error) {
