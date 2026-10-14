@@ -20,6 +20,8 @@ export const selectRawParentSubaccountData = (state: RootState) =>
 
 export const selectRawFillsRestData = (state: RootState) => state.raw.account.fills.data;
 export const selectRawOrdersRestData = (state: RootState) => state.raw.account.orders.data;
+export const selectRawOrderTicketsRestData = (state: RootState) =>
+  state.raw.account.orderTickets.data;
 export const selectRawTradeHistoryRestData = (state: RootState) =>
   state.raw.account.tradeHistory.data;
 export const selectRawTransfersRestData = (state: RootState) => state.raw.account.transfers.data;
@@ -50,6 +52,7 @@ export const selectRawValidatorHeightDataLoadable = (state: RootState) =>
 
 export const selectRawFillsRest = (state: RootState) => state.raw.account.fills;
 export const selectRawOrdersRest = (state: RootState) => state.raw.account.orders;
+export const selectRawOrderTicketsRest = (state: RootState) => state.raw.account.orderTickets;
 export const selectRawTradeHistoryRest = (state: RootState) => state.raw.account.tradeHistory;
 export const selectRawTransfersRest = (state: RootState) => state.raw.account.transfers;
 export const selectRawBlockTradingRewardsRest = (state: RootState) =>

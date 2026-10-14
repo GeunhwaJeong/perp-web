@@ -17,6 +17,7 @@ import { setUpIndexerHeightQuery, setUpValidatorHeightQuery } from './rest/heigh
 import { setUpUserLeverageParamsQuery } from './rest/leverage';
 import { alwaysUseCurrentNetworkClient } from './rest/lib/compositeClientManager';
 import { setUpNobleBalanceQuery } from './rest/nobleBalance';
+import { setUpOrderTicketsQuery } from './rest/orderTickets';
 import { setUpOrdersQuery } from './rest/orders';
 import { setUpRewardsParamsQuery, setUpRewardsTokenPriceQuery } from './rest/rewards';
 import { setUpSparklinesQuery } from './rest/sparklines';
@@ -42,6 +43,7 @@ export const storeLifecycles = [
   setUpFillsQuery,
   setUpUserLeverageParamsQuery,
   setUpOrdersQuery,
+  setUpOrderTicketsQuery,
   setUpTradeHistoryQuery,
   setUpTransfersQuery,
   setUpBlockTradingRewardsQuery,

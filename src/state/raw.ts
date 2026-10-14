@@ -33,6 +33,7 @@ import {
   IndexerCompositeFillResponse,
   IndexerCompositeTradeHistoryResponse,
   IndexerSparklineResponseObject,
+  IndexerOrderTicket,
 } from '@/types/indexer/indexerManual';
 
 import { calc } from '@/lib/do';
@@ -99,6 +100,7 @@ export interface RawDataState {
     parentSubaccount: Loadable<ParentSubaccountData>;
     fills: Loadable<IndexerCompositeFillResponse>;
     orders: Loadable<OrdersData>;
+    orderTickets: Loadable<IndexerOrderTicket[]>;
     tradeHistory: Loadable<IndexerCompositeTradeHistoryResponse>;
     transfers: Loadable<IndexerParentSubaccountTransferResponse>;
     blockTradingRewards: Loadable<IndexerHistoricalBlockTradingRewardsResponse>;
@@ -137,6 +139,7 @@ const initialState: RawDataState = {
     stakingTier: loadableIdle(),
     fills: loadableIdle(),
     orders: loadableIdle(),
+    orderTickets: loadableIdle(),
     tradeHistory: loadableIdle(),
     transfers: loadableIdle(),
     blockTradingRewards: loadableIdle(),
@@ -228,6 +231,9 @@ export const rawSlice = createSlice({
       },
       setAccountOrdersRaw: (state, action: PayloadAction<Loadable<OrdersData>>) => {
         state.account.orders = action.payload;
+      },
+      setAccountOrderTicketsRaw: (state, action: PayloadAction<Loadable<IndexerOrderTicket[]>>) => {
+        state.account.orderTickets = action.payload;
       },
       setIndexerHeightRaw: (state, action: PayloadAction<Loadable<HeightEntry>>) => {
         appendToHeight(state.heights.indexerHeight, action.payload);
@@ -380,6 +386,7 @@ export const {
   setAccountTradesRaw,
   setAccountNobleUsdcBalanceRaw,
   setAccountOrdersRaw,
+  setAccountOrderTicketsRaw,
   setAccountTransfersRaw,
   setAccountBlockTradingRewardsRaw,
   setNetworkStateRaw,

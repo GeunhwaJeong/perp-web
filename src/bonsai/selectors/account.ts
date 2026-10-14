@@ -4,6 +4,7 @@ import { shallowEqual } from 'react-redux';
 
 import { EMPTY_ARR } from '@/constants/objects';
 import { IndexerPerpetualPositionStatus } from '@/types/indexer/indexerApiGen';
+import { IndexerOrderTicket } from '@/types/indexer/indexerManual';
 
 import { createAppSelector } from '@/state/appTypes';
 import { getCurrentMarketIdIfTradeable } from '@/state/currentMarketSelectors';
@@ -47,6 +48,8 @@ import {
   selectRawMarkets,
   selectRawMarketsData,
   selectRawOrdersLiveData,
+  selectRawOrderTicketsRest,
+  selectRawOrderTicketsRestData,
   selectRawOrdersRest,
   selectRawOrdersRestData,
   selectRawParentSubaccount,
@@ -313,6 +316,18 @@ export const selectAccountTransfers = createAppSelector(
 
 export const selectAccountTransfersLoading = createAppSelector(
   [selectRawTransfersRest, selectRawParentSubaccount],
+  mergeLoadableStatus
+);
+
+// Stop and TWAP tickets come from the indexer's REST endpoint only: the account channel does
+// not carry them, so they are as fresh as the query's refetch.
+export const selectAccountOrderTickets = createAppSelector(
+  [selectRawOrderTicketsRestData],
+  (tickets): IndexerOrderTicket[] => tickets ?? EMPTY_ARR
+);
+
+export const selectAccountOrderTicketsLoading = createAppSelector(
+  [selectRawOrderTicketsRest, selectRawParentSubaccount],
   mergeLoadableStatus
 );
 

@@ -7,7 +7,7 @@ import {
   IndexerFundingPaymentResponseObject,
   IndexerHistoricalBlockTradingReward,
 } from '@/types/indexer/indexerApiGen';
-import { IndexerWsTradesUpdateObject } from '@/types/indexer/indexerManual';
+import { IndexerOrderTicket, IndexerWsTradesUpdateObject } from '@/types/indexer/indexerManual';
 
 import { type RootState } from '@/state/_store';
 import { getCurrentMarketId } from '@/state/currentMarketSelectors';
@@ -40,6 +40,8 @@ import {
   selectAccountFillsLoading,
   selectAccountOrders,
   selectAccountOrdersLoading,
+  selectAccountOrderTickets,
+  selectAccountOrderTicketsLoading,
   selectAccountStakingTier,
   selectAccountTradesWithLeverage,
   selectAccountTradeHistoryLoading,
@@ -166,6 +168,10 @@ interface BonsaiCoreShape {
       data: BasicSelector<SubaccountOrder[]>;
       loading: BasicSelector<LoadableStatus>;
     };
+    orderTickets: {
+      data: BasicSelector<IndexerOrderTicket[]>;
+      loading: BasicSelector<LoadableStatus>;
+    };
     allOrders: {
       data: BasicSelector<SubaccountOrder[]>;
       loading: BasicSelector<LoadableStatus>;
@@ -266,6 +272,10 @@ export const BonsaiCore: BonsaiCoreShape = {
     orderHistory: {
       data: selectOrderHistory,
       loading: selectAccountOrdersLoading,
+    },
+    orderTickets: {
+      data: selectAccountOrderTickets,
+      loading: selectAccountOrderTicketsLoading,
     },
     activeTwapOrders: {
       data: selectActiveTWAPOrders,

@@ -25,6 +25,7 @@ import {
 } from '@/pages/funding/FundingPaymentsTable';
 import { FillsTable, FillsTableColumnKey } from '@/views/tables/FillsTable';
 import { MobilePositionsTable } from '@/views/tables/MobilePositionsTable';
+import { OrderTicketsTable } from '@/views/tables/OrderTicketsTable';
 import { OrdersTable, OrdersTableColumnKey } from '@/views/tables/OrdersTable';
 import { PositionsTable, PositionsTableColumnKey } from '@/views/tables/PositionsTable';
 
@@ -48,7 +49,6 @@ import { isTruthy } from '@/lib/isTruthy';
 import { shortenNumberForDisplay } from '@/lib/numbers';
 import { orEmptyObj } from '@/lib/typeUtils';
 
-import { TWAPTable } from '../twap/TWAPTable';
 import MarketStats from './MarketStats';
 import { TradeTableSettings } from './TradeTableSettings';
 import { MaybeUnopenedIsolatedPositionsDrawer } from './UnopenedIsolatedPositions';
@@ -58,6 +58,7 @@ enum InfoSection {
   Details = 'Details',
   Position = 'Position',
   Orders = 'Orders',
+  StopOrders = 'StopOrders',
   Twap = 'Twap',
   OrderHistory = 'OrderHistory',
   Fills = 'Fills',
@@ -114,7 +115,15 @@ export const HorizontalPanel = ({ isOpen = true, setIsOpen, handleStartResize }:
     useAppSelector(BonsaiCore.account.parentSubaccountPositions.data) ?? EMPTY_ARR
   ).length;
 
-  const numActiveTwapOrders = useAppSelector(BonsaiCore.account.activeTwapOrders.data).length;
+  // Stop and TWAP orders are tickets on this engine, read from the indexer; the dYdX order
+  // flags never apply. The counts are of tickets still open.
+  const orderTickets = useAppSelector(BonsaiCore.account.orderTickets.data);
+  const numOpenStopTickets = orderTickets.filter(
+    (t) => t.type === 'STOP' && t.status === 'OPEN'
+  ).length;
+  const numOpenTwapTickets = orderTickets.filter(
+    (t) => t.type === 'TWAP' && t.status === 'OPEN'
+  ).length;
 
   const numUnseenFills = useAppSelectorWithArgs(
     createGetUnseenFillsCount,
@@ -411,17 +420,42 @@ export const HorizontalPanel = ({ isOpen = true, setIsOpen, handleStartResize }:
     [stringGetter, showCurrentMarket, isTablet, initialPageSize, currentMarketId]
   );
 
+  const stopOrdersTabItem = useMemo(
+    () => ({
+      asChild: true,
+      value: InfoSection.StopOrders,
+      label: 'Stop Orders',
+      slotRight: numOpenStopTickets > 0 && (
+        <Tag type={TagType.Number}>{shortenNumberForDisplay(numOpenStopTickets)}</Tag>
+      ),
+      content: (
+        <OrderTicketsTable
+          ticketType="STOP"
+          currentMarket={showCurrentMarket ? currentMarketId : undefined}
+          initialPageSize={initialPageSize}
+        />
+      ),
+    }),
+    [numOpenStopTickets, showCurrentMarket, currentMarketId, initialPageSize]
+  );
+
   const twapTabItem = useMemo(
     () => ({
       asChild: true,
       value: InfoSection.Twap,
       label: stringGetter({ key: STRING_KEYS.TWAP }),
-      slotRight: numActiveTwapOrders > 0 && (
-        <Tag type={TagType.Number}>{shortenNumberForDisplay(numActiveTwapOrders)}</Tag>
+      slotRight: numOpenTwapTickets > 0 && (
+        <Tag type={TagType.Number}>{shortenNumberForDisplay(numOpenTwapTickets)}</Tag>
       ),
-      content: <TWAPTable />,
+      content: (
+        <OrderTicketsTable
+          ticketType="TWAP"
+          currentMarket={showCurrentMarket ? currentMarketId : undefined}
+          initialPageSize={initialPageSize}
+        />
+      ),
     }),
-    [numActiveTwapOrders, stringGetter]
+    [numOpenTwapTickets, stringGetter, showCurrentMarket, currentMarketId, initialPageSize]
   );
 
   const tabItems = useMemo(
@@ -429,6 +463,7 @@ export const HorizontalPanel = ({ isOpen = true, setIsOpen, handleStartResize }:
       ...(isTablet ? [detailsTabItem] : []),
       positionTabItem,
       ordersTabItem,
+      stopOrdersTabItem,
       fillsTabItem,
       orderHistoryTabItem,
       paymentsTabItem,
@@ -439,6 +474,7 @@ export const HorizontalPanel = ({ isOpen = true, setIsOpen, handleStartResize }:
       positionTabItem,
       fillsTabItem,
       ordersTabItem,
+      stopOrdersTabItem,
       orderHistoryTabItem,
       paymentsTabItem,
       twapTabItem,
@@ -452,6 +488,7 @@ export const HorizontalPanel = ({ isOpen = true, setIsOpen, handleStartResize }:
       <MaybeUnopenedIsolatedPositionsDrawer onViewOrders={onViewOrders} tw="mt-auto" />
     ),
     [InfoSection.Orders]: null,
+    [InfoSection.StopOrders]: null,
     [InfoSection.OrderHistory]: null,
     [InfoSection.Fills]: null,
     [InfoSection.Payments]: null,

@@ -245,3 +245,44 @@ export type IndexerWsCandleResponseObject = Omit<IndexerCandleResponseObject, 'i
 export interface IndexerWsCandleResponse {
   candles: Array<IndexerWsCandleResponseObject>;
 }
+
+// Stop and TWAP order tickets, served by the Sigma indexer at
+// `/v4/orderTickets/parentSubaccountNumber`. The engine holds a ticket's order details
+// encrypted, so a ticket says what state it is in, who may execute it, what gas it carries and,
+// for a TWAP, how far it has run; the details themselves are the client's to keep.
+export type IndexerOrderTicketType = 'STOP' | 'TWAP';
+export type IndexerOrderTicketStatus = 'OPEN' | 'EXECUTED' | 'FINALIZED' | 'CANCELED' | 'DELETED';
+
+export interface IndexerTwapProgress {
+  executionAmount: string;
+  filledAmount: string;
+  remainder: string;
+  processedAmount: string;
+  scheduledAmount: string;
+  lastAttemptAt?: string | null;
+  lastExecutionAt?: string | null;
+}
+
+export interface IndexerOrderTicket {
+  id: string;
+  type: IndexerOrderTicketType;
+  status: IndexerOrderTicketStatus;
+  /** A TWAP names its market when created; a stop order only when executed. */
+  ticker?: string | null;
+  stopOrderType?: string | null;
+  executors: string[];
+  executionDomain?: string | null;
+  /** HANEUL deposited for the executors' gas. */
+  gas: string;
+  encryptedDetails: string;
+  twapProgress?: IndexerTwapProgress | null;
+  createdAt: IndexerIsoString;
+  createdAtHeight: string;
+  updatedAt: IndexerIsoString;
+  updatedAtHeight: string;
+  subaccountNumber: number;
+}
+
+export interface IndexerOrderTicketsResponse {
+  tickets: IndexerOrderTicket[];
+}
