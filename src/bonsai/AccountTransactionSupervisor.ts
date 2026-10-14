@@ -63,9 +63,11 @@ import {
 
 import { track } from '@/lib/analytics/analytics';
 import { operationFailureToErrorParams, wrapSimpleError } from '@/lib/errorHelpers';
+import { isTruthy } from '@/lib/isTruthy';
 
 import { TradeFormPayload } from './forms/trade/types';
 import { PlaceOrderPayload } from './forms/triggers/types';
+import { unsupportedOrderTypeReason } from './lib/engineOrderSupport';
 import {
   isOperationFailure,
   isOperationSuccess,
@@ -89,12 +91,6 @@ type Context = {
 type PlacedOrder = { clientId: string; orderId?: string; filled: boolean };
 
 const isMarketOrder = (payload: PlaceOrderPayload) => payload.type === OrderType.MARKET;
-
-const isTriggerOrder = (payload: PlaceOrderPayload) =>
-  payload.type === OrderType.STOP_LIMIT ||
-  payload.type === OrderType.STOP_MARKET ||
-  payload.type === OrderType.TAKE_PROFIT_LIMIT ||
-  payload.type === OrderType.TAKE_PROFIT_MARKET;
 
 /** Maps the form's time-in-force and execution options onto the engine's order type code. */
 const orderTypeCode = (payload: PlaceOrderPayload) => {
@@ -348,8 +344,9 @@ export class AccountTransactionSupervisor {
     payload: PlaceOrderPayload,
     source: TradeMetadataSource
   ): Promise<OperationResult<any>> {
-    if (isTriggerOrder(payload)) {
-      return failure('Conditional orders are not available yet');
+    const unsupported = unsupportedOrderTypeReason(payload.type);
+    if (unsupported) {
+      return failure(unsupported);
     }
     this.store.dispatch(
       placeOrderSubmitted({
@@ -379,6 +376,10 @@ export class AccountTransactionSupervisor {
       return failure('Conditional orders are not available yet');
     }
     const payloads = [main, ...scale].filter((p): p is PlaceOrderPayload => p != null);
+    const unsupported = payloads.map((p) => unsupportedOrderTypeReason(p.type)).find(isTruthy);
+    if (unsupported) {
+      return failure(unsupported);
+    }
     if (payloads.length === 0) return wrapOperationSuccess(true);
     if (payloads.length === 1) return this.placeOrder(payloads[0]!, source);
 

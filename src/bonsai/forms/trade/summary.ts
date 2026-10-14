@@ -528,7 +528,7 @@ const orderTypeOptions: SelectionOption<TradeFormType>[] = [
   { value: TradeFormType.TRIGGER_LIMIT, stringKey: 'APP.TRADE.STOP_LIMIT' },
   { value: TradeFormType.TRIGGER_MARKET, stringKey: 'APP.TRADE.STOP_MARKET' },
   { value: TradeFormType.SCALE, stringKey: 'APP.TRADE.SCALE' },
-  { value: TradeFormType.TWAP, stringKey: 'APP.TRADE.TWAP' },
+  // TWAP is left out until the ticket keeper runs; the write path refuses it as well.
 ];
 
 const goodTilUnitOptions: SelectionOption<TimeUnit>[] = [
