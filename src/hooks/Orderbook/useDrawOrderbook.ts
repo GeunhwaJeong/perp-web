@@ -96,7 +96,7 @@ export const useDrawOrderbook = ({
 
       if (ctx) {
         ctx.scale(currentRatio, currentRatio);
-        ctx.font = '12px Switzer';
+        ctx.font = "12px 'JetBrains Mono', monospace";
         ctx.textAlign = 'right';
         ctx.textBaseline = 'middle';
         ctx.imageSmoothingQuality = 'high';

@@ -242,7 +242,7 @@ const $Header = styled.header`
     --navBefore-width: 7rem;
   }
 
-  font-size: 0.9375rem;
+  font-size: var(--fontSize-base);
 `;
 
 const $NavigationScrollBar = styled.div`

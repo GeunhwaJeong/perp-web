@@ -26,3 +26,30 @@
   font-display: swap;
   src: url('/fonts/switzer/Switzer-VariableItalic.woff2') format('woff2');
 }
+
+/**
+ * @license
+ *
+ * Font Family: JetBrains Mono
+ * © The JetBrains Mono Project Authors, SIL Open Font License 1.1 (see
+ * public/fonts/jetbrains-mono/LICENSE). Latin subset of the variable cuts (weight 100–800).
+ *
+ * Every number the interface prints is set in it, so prices, sizes and balances line up
+ * column by column; the text face stays Switzer.
+ */
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-weight: 100 800;
+  font-style: normal;
+  font-display: swap;
+  src: url('/fonts/jetbrains-mono/jetbrains-mono-latin-wght-normal.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-weight: 100 800;
+  font-style: italic;
+  font-display: swap;
+  src: url('/fonts/jetbrains-mono/jetbrains-mono-latin-wght-italic.woff2') format('woff2');
+}

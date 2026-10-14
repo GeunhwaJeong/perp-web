@@ -595,7 +595,9 @@ const $Number = styled($Text)<{ withBaseFont?: boolean; valueColor?: NumberSign 
   ${({ withBaseFont }) =>
     !withBaseFont &&
     css`
+      font-family: var(--fontFamily-monospace);
       font-feature-settings: var(--fontFeature-monoNumbers);
+      letter-spacing: 0;
     `}
 
   ${({ valueColor }) =>
