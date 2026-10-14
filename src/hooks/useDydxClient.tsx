@@ -27,7 +27,7 @@ import { useRestrictions } from './useRestrictions';
 
 type DydxContextType = ReturnType<typeof useDydxClientContext>;
 const DydxContext = createContext<DydxContextType>({} as DydxContextType);
-DydxContext.displayName = 'dYdXClient';
+DydxContext.displayName = 'SigmaClient';
 
 export const DydxProvider = ({ ...props }) => (
   <DydxContext.Provider value={useDydxClientContext()} {...props} />

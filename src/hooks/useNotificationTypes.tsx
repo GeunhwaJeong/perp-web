@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect } from 'react';
 
 import { BonsaiCore } from '@/bonsai/ontology';
 import { OrderStatus, SubaccountFillType } from '@/bonsai/types/summaryTypes';
@@ -6,28 +6,20 @@ import { groupBy, max, pick } from 'lodash';
 import { shallowEqual } from 'react-redux';
 import tw from 'twin.macro';
 
-import { AMOUNT_RESERVED_FOR_GAS_USDC, AMOUNT_USDC_BEFORE_REBALANCE } from '@/constants/account';
-import { CHAIN_INFO } from '@/constants/chains';
 import { DialogTypes } from '@/constants/dialogs';
 import { STRING_KEYS } from '@/constants/localization';
 import {
-  CosmosWalletNotificationTypes,
   DEFAULT_TOAST_AUTO_CLOSE_MS,
-  FeedbackRequestNotificationIds,
   NotificationStatus,
   NotificationType,
   type NotificationTypeConfig,
 } from '@/constants/notifications';
-import { USD_DECIMALS } from '@/constants/numbers';
 import { EMPTY_ARR } from '@/constants/objects';
-import { StatsigDynamicConfigs } from '@/constants/statsig';
-import { timeUnits } from '@/constants/time';
 import { PlaceOrderStatuses } from '@/constants/trade';
 import { IndexerOrderSide, IndexerOrderType } from '@/types/indexer/indexerApiGen';
 
 import { Icon, IconName } from '@/components/Icon';
 import { Link } from '@/components/Link';
-import { Output, OutputType } from '@/components/Output';
 import { FillWithNoOrderNotificationRow } from '@/views/Lists/Alerts/FillWithNoOrderNotificationRow';
 import { OrderCancelNotificationRow } from '@/views/Lists/Alerts/OrderCancelNotificationRow';
 import { OrderNotificationRow } from '@/views/Lists/Alerts/OrderNotificationRow';
@@ -39,12 +31,6 @@ import { OrderCancelNotification } from '@/views/notifications/OrderCancelNotifi
 import { OrderStatusNotification } from '@/views/notifications/OrderStatusNotification';
 import { TradeNotification } from '@/views/notifications/TradeNotification';
 
-import {
-  getSubaccountFreeCollateral,
-  selectOrphanedTriggerOrders,
-  selectReclaimableChildSubaccountFunds,
-  selectShouldAccountRebalanceUsdc,
-} from '@/state/accountSelectors';
 import { useAppDispatch, useAppSelector } from '@/state/appTypes';
 import { openDialog } from '@/state/dialogs';
 import {
@@ -54,7 +40,6 @@ import {
   getLocalPlaceOrders,
 } from '@/state/localOrdersSelectors';
 import { getCustomNotifications } from '@/state/notificationsSelectors';
-import { selectIsKeplrConnected } from '@/state/walletSelectors';
 
 import { assertNever } from '@/lib/assertNever';
 import { calc, mapIfPresent } from '@/lib/do';
@@ -63,14 +48,10 @@ import {
   getIndexerOrderSideStringKey,
   getIndexerOrderTypeStringKey,
 } from '@/lib/enumToStringKeyHelpers';
-import { BIG_NUMBERS, MaybeBigNumber } from '@/lib/numbers';
 import { getAverageFillPrice } from '@/lib/orders';
-import { isPresent, orEmptyObj, orEmptyRecord } from '@/lib/typeUtils';
+import { orEmptyRecord } from '@/lib/typeUtils';
 
-import { useAccounts } from './useAccounts';
 import { useApiState } from './useApiState';
-import { useAutomatedDepositNotifications } from './useAutomatedDepositNotifications';
-import { useAllStatsigDynamicConfigValues } from './useStatsig';
 import { useStringGetter } from './useStringGetter';
 import { useURLConfigs } from './useURLConfigs';
 
@@ -299,172 +280,10 @@ export const notificationTypes: NotificationTypeConfig[] = [
   },
 
   {
-    type: NotificationType.ReleaseUpdates,
-    useTrigger: ({ trigger: _trigger }) => {},
-    useNotificationAction: () => {
-      return () => {};
-    },
-  },
-  {
     type: NotificationType.MarketUpdate,
     useTrigger: ({ trigger: _trigger }) => {},
     useNotificationAction: () => {
       return (_id) => {};
-    },
-  },
-  {
-    type: NotificationType.MarketWindDown,
-    useTrigger: ({ trigger }) => {
-      const stringGetter = useStringGetter();
-      const { contractLossMechanismLearnMore } = useURLConfigs();
-
-      const currentMarket = useAppSelector(BonsaiCore.markets.currentMarketId);
-      const positions = useAppSelector(BonsaiCore.account.parentSubaccountPositions.data);
-      const openOrders = useAppSelector(BonsaiCore.account.openOrders.data);
-      const windDownNotifDuration = timeUnits.week * 2;
-
-      const marketsRelevantToAccount = useMemo(
-        () =>
-          new Set(
-            [
-              currentMarket,
-              ...(positions?.map((p) => p.market) ?? []),
-              ...openOrders.map((o) => o.marketId),
-            ].filter(isPresent)
-          ),
-        [currentMarket, openOrders, positions]
-      );
-
-      const windDownObjects = useMemo(
-        (): Array<{
-          market: string;
-          windDownProposalLink?: string;
-          // date when proposal passes and final settlement happens
-          windDownDate: string;
-        }> => [
-          {
-            market: 'SKITTEN-USD',
-            windDownProposalLink: 'https://www.mintscan.io/dydx/proposals/247',
-            windDownDate: '2025-05-23T07:25:00.000Z',
-          },
-          {
-            market: 'EOS-USD',
-            windDownProposalLink: 'https://www.mintscan.io/dydx/proposals/247',
-            windDownDate: '2025-05-23T07:25:00.000Z',
-          },
-          {
-            market: 'BTRUMP-USD',
-            windDownProposalLink: 'https://www.mintscan.io/dydx/proposals/247',
-            windDownDate: '2025-05-23T07:25:00.000Z',
-          },
-        ],
-        []
-      );
-
-      useEffect(() => {
-        windDownObjects.forEach((obj) => {
-          const { market, windDownProposalLink, windDownDate } = obj;
-
-          const notificationProposalId = `market-wind-down-proposal-${market}`;
-          if (marketsRelevantToAccount.has(market) && new Date() <= new Date(windDownDate)) {
-            const outputDate = (
-              <Output tw="inline-block" type={OutputType.DateTime} value={windDownDate} />
-            );
-
-            trigger({
-              id: notificationProposalId,
-              displayData: {
-                title: stringGetter({
-                  key: 'NOTIFICATIONS.MARKET_WIND_DOWN_PROPOSAL.TITLE',
-                  params: {
-                    MARKET: market,
-                  },
-                }),
-                body: stringGetter({
-                  key: 'NOTIFICATIONS.MARKET_WIND_DOWN_PROPOSAL.BODY',
-                  params: {
-                    MARKET: market,
-                    DATE: outputDate,
-                    HERE_LINK:
-                      windDownProposalLink != null && windDownProposalLink !== '' ? (
-                        <Link isInline isAccent href={windDownProposalLink}>
-                          {stringGetter({ key: STRING_KEYS.HERE })}
-                        </Link>
-                      ) : (
-                        <span />
-                      ),
-                  },
-                }),
-                toastSensitivity: 'foreground',
-                groupKey: notificationProposalId,
-              },
-              updateKey: [],
-              shouldUnhide: market === currentMarket,
-            });
-          }
-        });
-      }, [currentMarket, marketsRelevantToAccount, stringGetter, trigger, windDownObjects]);
-
-      useEffect(() => {
-        windDownObjects.forEach((obj) => {
-          const { market, windDownDate } = obj;
-
-          const notificationWindDownId = `market-wind-down-${market}`;
-          const learnMoreLink = contractLossMechanismLearnMore;
-          const windDownExpirationDate = new Date(
-            new Date(windDownDate).getTime() + windDownNotifDuration
-          );
-          if (
-            marketsRelevantToAccount.has(market) &&
-            learnMoreLink &&
-            new Date() >= new Date(windDownDate) &&
-            new Date() <= new Date(windDownExpirationDate)
-          ) {
-            const outputDate = (
-              <Output tw="inline-block" type={OutputType.DateTime} value={windDownDate} />
-            );
-
-            trigger({
-              id: notificationWindDownId,
-              displayData: {
-                title: stringGetter({
-                  key: 'NOTIFICATIONS.MARKET_WIND_DOWN.TITLE',
-                  params: {
-                    MARKET: market,
-                  },
-                }),
-                body: stringGetter({
-                  key: 'NOTIFICATIONS.MARKET_WIND_DOWN.BODY',
-                  params: {
-                    MARKET: market,
-                    DATE: outputDate,
-                    HERE_LINK: (
-                      <Link isInline isAccent href={learnMoreLink}>
-                        {stringGetter({ key: STRING_KEYS.HERE })}
-                      </Link>
-                    ),
-                  },
-                }),
-                groupKey: notificationWindDownId,
-                toastSensitivity: 'foreground',
-              },
-              updateKey: [],
-              shouldUnhide: market === currentMarket,
-            });
-          }
-        });
-      }, [
-        contractLossMechanismLearnMore,
-        currentMarket,
-        marketsRelevantToAccount,
-        stringGetter,
-        trigger,
-        windDownNotifDuration,
-        windDownObjects,
-      ]);
-    },
-    useNotificationAction: () => {
-      return () => {};
     },
   },
   {
@@ -677,50 +496,6 @@ export const notificationTypes: NotificationTypeConfig[] = [
     },
   },
   {
-    type: NotificationType.FeedbackRequest,
-    useTrigger: ({ trigger }) => {
-      const { dydxAddress } = useAccounts();
-      const { getInTouch } = useURLConfigs();
-      const stringGetter = useStringGetter();
-
-      const dynamicConfigs = useAllStatsigDynamicConfigValues();
-      const feedbackRequestWalletAddresses =
-        dynamicConfigs[StatsigDynamicConfigs.dcHighestVolumeUsers];
-
-      useEffect(() => {
-        if (dydxAddress && feedbackRequestWalletAddresses?.includes(dydxAddress) && getInTouch) {
-          trigger({
-            id: FeedbackRequestNotificationIds.Top100UserSupport,
-            displayData: {
-              icon: <Icon iconName={IconName.SpeechBubble} />,
-              title: stringGetter({ key: STRING_KEYS.TOP_100_WALLET_ADDRESSES_TITLE }),
-              body: stringGetter({ key: STRING_KEYS.TOP_100_WALLET_ADDRESSES_BODY }),
-              toastSensitivity: 'foreground',
-              groupKey: NotificationType.FeedbackRequest,
-              toastDuration: Infinity,
-              withClose: false,
-              // our generate script only knows to generate string keys for title and body
-              actionAltText: stringGetter({ key: 'NOTIFICATIONS.TOP_100_WALLET_ADDRESSES.ACTION' }),
-              renderActionSlot: () => (
-                <Link href={getInTouch} isAccent>
-                  {stringGetter({ key: 'NOTIFICATIONS.TOP_100_WALLET_ADDRESSES.ACTION' })}
-                </Link>
-              ),
-            },
-            updateKey: ['feedback'],
-          });
-        }
-      }, [dydxAddress, feedbackRequestWalletAddresses, getInTouch, stringGetter, trigger]);
-    },
-
-    useNotificationAction: () => {
-      const { getInTouch } = useURLConfigs();
-      return () => {
-        window.open(getInTouch, '_blank', 'noopener, noreferrer');
-      };
-    },
-  },
-  {
     type: NotificationType.Custom,
     useTrigger: ({ trigger }) => {
       const customNotifications = useAppSelector(getCustomNotifications);
@@ -729,281 +504,6 @@ export const notificationTypes: NotificationTypeConfig[] = [
           trigger({ id: notification.id, displayData: notification.displayData });
         });
       }, [customNotifications, trigger]);
-    },
-  },
-  {
-    type: NotificationType.DepositAddressEvents,
-    useTrigger: ({ trigger }) => {
-      const stringGetter = useStringGetter();
-      const { usdcAmount } = useAppSelector(BonsaiCore.account.balances.data);
-      const subaccountFreeCollateral = useAppSelector(getSubaccountFreeCollateral);
-
-      const { newDeposits, setNewDeposits, prevDepositIdsRef, setEnabled } =
-        useAutomatedDepositNotifications();
-
-      const prevWalletBalanceRef = useRef<string | undefined>(undefined);
-      const prevSubaccountFreeCollateralRef = useRef<number | undefined>(undefined);
-      const lastNotificationTimeRef = useRef<number>(0);
-      const NOTIFICATION_DEBOUNCE = 1 * timeUnits.second; // 1 second
-
-      useEffect(() => {
-        if (newDeposits.length === 0) return;
-
-        const now = Date.now();
-        newDeposits.forEach((deposit) => {
-          if (
-            now - lastNotificationTimeRef.current > NOTIFICATION_DEBOUNCE &&
-            !prevDepositIdsRef.current.has(deposit.id)
-          ) {
-            trigger({
-              id: `automated-deposit-${deposit.id}`,
-              displayData: {
-                toastDuration: DEFAULT_TOAST_AUTO_CLOSE_MS * 2,
-                groupKey: NotificationType.DepositAddressEvents,
-                slotTitleLeft: (
-                  <Icon iconName={IconName.Signal} size="1.25rem" tw="text-color-success" />
-                ),
-                title: stringGetter({ key: STRING_KEYS.DEPOSIT_DETECTED_TITLE }),
-                body: stringGetter({ key: STRING_KEYS.DEPOSIT_DETECTED_BODY }),
-                toastSensitivity: 'foreground',
-                actionDescription: stringGetter({ key: STRING_KEYS.VIEW_TRANSACTION }),
-                renderActionSlot: () => {
-                  const chainInfo = CHAIN_INFO[deposit.chain_id];
-                  return (
-                    chainInfo?.explorerBaseUrl && (
-                      <Link
-                        href={`${chainInfo.explorerBaseUrl}/tx/${deposit.transaction_hash}`}
-                        isAccent
-                      >
-                        {stringGetter({ key: STRING_KEYS.VIEW_TRANSACTION })}
-                      </Link>
-                    )
-                  );
-                },
-              },
-              updateKey: [deposit.id],
-            });
-            prevDepositIdsRef.current.add(deposit.id);
-          }
-          lastNotificationTimeRef.current = now;
-        });
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-      }, [newDeposits, trigger, stringGetter]);
-
-      // Stage 2: Watch for wallet balance increases (after sweep/rebalance to subaccount)
-      useEffect(() => {
-        if (!usdcAmount) return;
-
-        const now = Date.now();
-        const prevWallet = prevWalletBalanceRef.current;
-        const prevSubaccountFreeCollateral = prevSubaccountFreeCollateralRef.current;
-
-        if (!prevSubaccountFreeCollateral) {
-          prevSubaccountFreeCollateralRef.current = subaccountFreeCollateral;
-        }
-
-        if (!prevWallet) {
-          prevWalletBalanceRef.current = usdcAmount;
-          return;
-        }
-
-        const prevWalletBalanceBN = MaybeBigNumber(prevWallet);
-        const usdcBalanceBN = MaybeBigNumber(usdcAmount);
-
-        if (prevWalletBalanceBN && usdcBalanceBN && usdcBalanceBN.gt(prevWalletBalanceBN)) {
-          const diff = usdcBalanceBN.minus(prevWalletBalanceBN);
-
-          const matchingDeposit = newDeposits.find((deposit) =>
-            prevDepositIdsRef.current.has(deposit.id)
-          );
-
-          if (!matchingDeposit) return;
-
-          if (diff.gt(0.01) && now - lastNotificationTimeRef.current > NOTIFICATION_DEBOUNCE) {
-            trigger({
-              id: `deposit-confirmed-${matchingDeposit.id}`,
-              displayData: {
-                toastDuration: DEFAULT_TOAST_AUTO_CLOSE_MS * 2, // 20 seconds
-                groupKey: NotificationType.DepositAddressEvents,
-                icon: <Icon iconName={IconName.CheckCircle} size="1.25rem" />,
-                title: stringGetter({ key: STRING_KEYS.DEPOSIT_CONFIRMED_TITLE }),
-                body: stringGetter({
-                  key: STRING_KEYS.DEPOSIT_CONFIRMED_BODY,
-                  params: {
-                    AMOUNT: diff.toFixed(USD_DECIMALS),
-                    ASSET: 'USDC',
-                  },
-                }),
-                toastSensitivity: 'foreground',
-              },
-            });
-            lastNotificationTimeRef.current = now;
-          }
-
-          const updatedDeposits = newDeposits.filter(
-            (deposit) => deposit.id !== matchingDeposit.id
-          );
-          setNewDeposits(updatedDeposits);
-          if (updatedDeposits.length === 0) {
-            setEnabled(false);
-          }
-        }
-
-        prevWalletBalanceRef.current = usdcAmount;
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-      }, [usdcAmount, subaccountFreeCollateral, trigger, stringGetter]);
-    },
-    useNotificationAction: () => {
-      return () => {};
-    },
-  },
-  {
-    type: NotificationType.CosmosWalletLifecycle,
-    useTrigger: ({ trigger, hideNotification }) => {
-      const dispatch = useAppDispatch();
-      const stringGetter = useStringGetter();
-      const isKeplr = useAppSelector(selectIsKeplrConnected);
-      const reclaimableChildSubaccountFunds = useAppSelector(selectReclaimableChildSubaccountFunds);
-      const { ordersToCancel } = orEmptyObj(useAppSelector(selectOrphanedTriggerOrders));
-      const maybeRebalanceAction = useAppSelector(selectShouldAccountRebalanceUsdc);
-
-      useEffect(() => {
-        if (!isKeplr) return;
-
-        if (reclaimableChildSubaccountFunds && reclaimableChildSubaccountFunds.length > 0) {
-          const amountBN = reclaimableChildSubaccountFunds.reduce(
-            (acc, curr) => acc.plus(curr.usdcBalance),
-            BIG_NUMBERS.ZERO
-          );
-
-          const amountUsdc = amountBN.toFixed(USD_DECIMALS);
-
-          trigger({
-            id: CosmosWalletNotificationTypes.ReclaimChildSubaccountFunds,
-            updateKey: [amountUsdc],
-            displayData: {
-              icon: <Icon iconName={IconName.CurrencySign} />,
-              title: stringGetter({ key: STRING_KEYS.RECLAIM_FUNDS }),
-              body: stringGetter({
-                key: STRING_KEYS.RECLAIM_FUNDS_DESCRIPTION,
-                params: {
-                  RECLAIM_AMOUNT: amountUsdc,
-                },
-              }),
-              toastSensitivity: 'background',
-              groupKey: CosmosWalletNotificationTypes.ReclaimChildSubaccountFunds,
-              toastDuration: Infinity,
-            },
-          });
-        } else {
-          hideNotification({
-            type: NotificationType.CosmosWalletLifecycle,
-            id: CosmosWalletNotificationTypes.ReclaimChildSubaccountFunds,
-          });
-        }
-      }, [
-        isKeplr,
-        dispatch,
-        trigger,
-        hideNotification,
-        stringGetter,
-        reclaimableChildSubaccountFunds,
-      ]);
-
-      useEffect(() => {
-        if (!isKeplr) return;
-
-        if (ordersToCancel && ordersToCancel.length > 0) {
-          trigger({
-            id: CosmosWalletNotificationTypes.CancelOrphanedTriggers,
-            updateKey: [ordersToCancel],
-            displayData: {
-              icon: <Icon iconName={IconName.Viewfinder} />,
-              title: stringGetter({ key: STRING_KEYS.CANCEL_OLD_TRIGGERS }),
-              body: stringGetter({
-                key: STRING_KEYS.CANCEL_OLD_TRIGGERS_BODY,
-              }),
-              toastSensitivity: 'background',
-              groupKey: CosmosWalletNotificationTypes.CancelOrphanedTriggers,
-              toastDuration: Infinity,
-              renderActionSlot: () => (
-                <Link
-                  isAccent
-                  onClick={(e) => {
-                    e.preventDefault();
-                  }}
-                >
-                  {stringGetter({ key: STRING_KEYS.CANCEL_EXTRA_ORDERS })} →
-                </Link>
-              ),
-            },
-          });
-        } else {
-          hideNotification({
-            type: NotificationType.CosmosWalletLifecycle,
-            id: CosmosWalletNotificationTypes.CancelOrphanedTriggers,
-          });
-        }
-      }, [ordersToCancel, isKeplr, dispatch, trigger, hideNotification, stringGetter]);
-
-      useEffect(() => {
-        if (!isKeplr) return;
-
-        if (maybeRebalanceAction?.requiredAction === 'withdraw') {
-          trigger({
-            id: CosmosWalletNotificationTypes.GasRebalance,
-            updateKey: [maybeRebalanceAction.amountToWithdraw],
-            displayData: {
-              icon: <Icon iconName={IconName.Lightning} />,
-              title: stringGetter({ key: STRING_KEYS.LOW_ON_GAS_TITLE }),
-              body: stringGetter({
-                key: STRING_KEYS.LOW_ON_GAS_BODY,
-                params: {
-                  MIN_RANGE: AMOUNT_USDC_BEFORE_REBALANCE,
-                  MAX_RANGE: AMOUNT_RESERVED_FOR_GAS_USDC,
-                },
-              }),
-              toastSensitivity: 'background',
-              groupKey: CosmosWalletNotificationTypes.GasRebalance,
-              toastDuration: Infinity,
-              renderActionSlot: () => (
-                <Link
-                  isAccent
-                  onClick={(e) => {
-                    e.preventDefault();
-                    dispatch(openDialog(DialogTypes.WithdrawFromSubaccount()));
-                  }}
-                >
-                  {stringGetter({ key: STRING_KEYS.TRANSFER })} →
-                </Link>
-              ),
-            },
-          });
-        } else {
-          hideNotification({
-            type: NotificationType.CosmosWalletLifecycle,
-            id: CosmosWalletNotificationTypes.GasRebalance,
-          });
-        }
-      }, [isKeplr, dispatch, trigger, hideNotification, stringGetter, maybeRebalanceAction]);
-    },
-    useNotificationAction: () => {
-      const dispatch = useAppDispatch();
-      return (id: string) => {
-        const notificationId = id; // CosmosWalletNotificationType
-
-        if (notificationId === CosmosWalletNotificationTypes.GasRebalance) {
-          dispatch(openDialog(DialogTypes.WithdrawFromSubaccount()));
-        }
-
-        if (notificationId === CosmosWalletNotificationTypes.ReclaimChildSubaccountFunds) {
-          dispatch(openDialog(DialogTypes.ReclaimChildSubaccountFunds()));
-        }
-
-        if (notificationId === CosmosWalletNotificationTypes.CancelOrphanedTriggers) {
-          dispatch(openDialog(DialogTypes.CancelOrphanedTriggers()));
-        }
-      };
     },
   },
 ];
