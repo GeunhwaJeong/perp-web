@@ -56,8 +56,12 @@ const SCREENS = [
 ] as const;
 type Screen = (typeof SCREENS)[number];
 
-// Screens the dialog must not auto-close out of once the wallet is connected.
+// Screens the dialog must not auto-close out of once the wallet is connected. The passkey
+// account connects while the name ('create') or passkey screen is still showing, so those
+// are held too; the password account only connects from the password screens.
 const HELD_OPEN: ReadonlySet<Screen> = new Set([
+  'create',
+  'passkey',
   'password',
   'importPassword',
   'biometric',
@@ -227,9 +231,10 @@ export const AccountDialog = ({ setIsOpen: setIsOpenRaw }: DialogProps<Onboardin
       if (username && address) issueName(username, address, 'local');
     }, password);
 
-  const onCreatePasskey = () =>
+  // Takes the name as an argument: it is called from the same handler that stores it, so
+  // reading `pendingName` here would see the previous render's value.
+  const onCreatePasskey = (username?: string) =>
     finish(async () => {
-      const username = pendingName;
       const record = await createPasskeyAccount(username);
       passkeyAccountStore.set(record);
       await connectPasskeyWallet();
@@ -379,7 +384,7 @@ export const AccountDialog = ({ setIsOpen: setIsOpenRaw }: DialogProps<Onboardin
           onContinue={(name) => {
             setPendingName(name);
             if (mode === 'passkey') {
-              inBackground(onCreatePasskey());
+              inBackground(onCreatePasskey(name));
             } else {
               go('password');
             }
@@ -421,6 +426,7 @@ export const AccountDialog = ({ setIsOpen: setIsOpenRaw }: DialogProps<Onboardin
           error={error}
         />
         <CompleteScreen
+          kind={mode === 'passkey' ? 'passkey' : 'password'}
           username={completed.username}
           address={completed.address}
           nameStatus={completed.nameStatus}

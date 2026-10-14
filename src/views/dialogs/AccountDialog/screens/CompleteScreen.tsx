@@ -47,12 +47,15 @@ const $Address = styled(CopyButton)`
  * the name has reached the chain yet.
  */
 export const CompleteScreen = ({
+  kind = 'password',
   username,
   address,
   nameStatus,
   onDone,
   onBackUp,
 }: {
+  /** A passkey account has no recovery phrase; the authenticator is the key. */
+  kind?: 'password' | 'passkey';
   username?: string;
   address: string;
   nameStatus?: 'pending' | 'claimed';
@@ -63,7 +66,9 @@ export const CompleteScreen = ({
     title="You're all set"
     subtext={
       <Subtext $maxWidth={386}>
-        Deposit to start trading. Your recovery phrase is in Settings whenever you want it.
+        {kind === 'passkey'
+          ? 'Deposit to start trading. Your passkey signs every order, so keep it on this device.'
+          : 'Deposit to start trading. Your recovery phrase is in Settings whenever you want it.'}
       </Subtext>
     }
     header={
@@ -87,9 +92,11 @@ export const CompleteScreen = ({
         <BrandedButton size="large" onClick={onDone} autoFocus>
           Start trading
         </BrandedButton>
-        <TextButton type="button" $muted onClick={onBackUp}>
-          Back up recovery phrase now
-        </TextButton>
+        {kind === 'password' && (
+          <TextButton type="button" $muted onClick={onBackUp}>
+            Back up recovery phrase now
+          </TextButton>
+        )}
       </Column>
     </Column>
   </ScreenFrame>
