@@ -11,6 +11,7 @@ export {
 export {
   createPasskeyAccount,
   passkeyAccountStore,
+  passkeySigner,
   recoverPasskeyAccount,
   type PasskeyAccountRecord,
 } from './passkey';

@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 
 import { SIGMA_ACCOUNT_WALLET_NAME, SIGMA_PASSKEY_WALLET_NAME } from '@/haneul/account';
+import { linkAccountName, type NameOwner } from '@/haneul/names';
 import styled, { css } from 'styled-components';
 import tw from 'twin.macro';
 
@@ -48,10 +49,13 @@ import { openDialog } from '@/state/dialogs';
 
 import { isTruthy } from '@/lib/isTruthy';
 import { MustBigNumber } from '@/lib/numbers';
+import { log } from '@/lib/telemetry';
 import { truncateAddress } from '@/lib/wallet';
 
 import { SubaccountActions } from './SubaccountActions';
 import { WalletActions } from './WalletActions';
+
+const asError = (error: unknown) => (error instanceof Error ? error : new Error(String(error)));
 
 export const AccountMenu = () => {
   const stringGetter = useStringGetter();
@@ -78,12 +82,29 @@ export const AccountMenu = () => {
   const isSigmaAccount = walletInfo?.name === SIGMA_ACCOUNT_WALLET_NAME && localAccount !== null;
   // The name stands in for the address once the account has one; the address stays a copy
   // button inside the menu. Only Sigma's own accounts carry a name.
-  const accountName =
+  const nameOwner: NameOwner | undefined =
     walletInfo?.name === SIGMA_ACCOUNT_WALLET_NAME
-      ? localAccount?.username
+      ? 'local'
       : walletInfo?.name === SIGMA_PASSKEY_WALLET_NAME
-        ? passkeyAccount?.username
+        ? 'passkey'
         : undefined;
+  const nameRecord =
+    nameOwner === 'local' ? localAccount : nameOwner === 'passkey' ? passkeyAccount : null;
+  const accountName = nameRecord?.username;
+  const nameStatus = nameRecord?.nameStatus;
+  const nameStatusLabel =
+    accountName &&
+    {
+      pending: 'Name saved on this device only',
+      claimed: 'Name issued, not yet linked to this address',
+      linked: 'Name linked on chain',
+    }[nameStatus ?? 'pending'];
+  const linkName = () => {
+    if (!nameOwner) return;
+    linkAccountName({ owner: nameOwner }).catch((linkError: unknown) =>
+      log('AccountMenu/linkName', asError(linkError))
+    );
+  };
 
   const onRecoverKeys = () => {
     dispatch(openDialog(DialogTypes.Onboarding()));
@@ -133,6 +154,7 @@ export const AccountMenu = () => {
                 {stringGetter({ key: STRING_KEYS.PERPETUALS })}
               </$AddressCopyButton>
             </div>
+            {nameStatusLabel && <$label>{nameStatusLabel}</$label>}
 
             <$Balances>
               <div>
@@ -252,6 +274,16 @@ export const AccountMenu = () => {
               dispatch(openDialog(DialogTypes.ShareAffiliate()));
             },
           },
+        ...(accountName && nameStatus === 'claimed'
+          ? [
+              {
+                value: 'LinkName',
+                icon: <Icon iconName={IconName.LinkOut} />,
+                label: 'Link name to this address',
+                onSelect: linkName,
+              },
+            ]
+          : []),
         ...(isSigmaAccount
           ? [
               {

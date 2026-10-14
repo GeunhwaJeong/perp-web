@@ -8,6 +8,7 @@ import {
 import { fromBase64, toBase64 } from '@haneullabs/haneul/utils';
 
 import { BiometricCancelledError } from './errors';
+import type { NameStatus } from './storage';
 
 /**
  * The chain-native passkey account (SIP-9): the WebAuthn credential *is* the signing key,
@@ -23,7 +24,7 @@ export type PasskeyAccountRecord = {
   /** Credential id, base64; constrains which passkey the browser offers when signing. */
   credentialId?: string;
   username?: string;
-  nameStatus?: 'pending' | 'claimed';
+  nameStatus?: NameStatus;
   createdAt: number;
 };
 
@@ -166,7 +167,7 @@ class PasskeyAccountStore {
     this.#listeners.forEach((listener) => listener());
   }
 
-  setName({ username, status }: { username: string; status: 'pending' | 'claimed' }) {
+  setName({ username, status }: { username: string; status: NameStatus }) {
     if (this.#record) this.set({ ...this.#record, username, nameStatus: status });
   }
 }

@@ -1,3 +1,4 @@
+import type { NameStatus } from '@/haneul/account';
 import styled from 'styled-components';
 
 import { CopyButton } from '@/components/CopyButton';
@@ -58,7 +59,7 @@ export const CompleteScreen = ({
   kind?: 'password' | 'passkey';
   username?: string;
   address: string;
-  nameStatus?: 'pending' | 'claimed';
+  nameStatus?: NameStatus;
   onDone: () => void;
   onBackUp: () => void;
 }) => (

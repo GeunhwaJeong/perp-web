@@ -4,7 +4,9 @@ export type NameStatus =
   /** Chosen at sign-up, not yet written to HaneulNS. */
   | 'pending'
   /** The on-chain record exists and points at this address. */
-  | 'claimed';
+  | 'claimed'
+  /** The address also points back at the name (reverse lookup), so explorers show it. */
+  | 'linked';
 
 export type BiometricUnlockRecord = {
   credentialId: string;

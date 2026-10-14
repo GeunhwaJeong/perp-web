@@ -87,14 +87,20 @@ export const lookupOwnedName = async ({
 };
 
 /**
- * The name to put back on a restored account: the primary name the address chose, else the
- * name it holds. Undefined when it has neither; throws when the chain could not be asked.
+ * The name to put back on a restored account: the primary name the address chose (linked),
+ * else the name it holds (claimed, not yet linked). Undefined when it has neither; throws
+ * when the chain could not be asked.
  */
 export const lookupName = async (args: {
   client: ClientWithCoreApi;
   config: NameServiceConfig;
   address: string;
-}): Promise<string | undefined> => (await lookupPrimaryName(args)) ?? (await lookupOwnedName(args));
+}): Promise<{ name: string; linked: boolean } | undefined> => {
+  const primary = await lookupPrimaryName(args);
+  if (primary) return { name: primary, linked: true };
+  const owned = await lookupOwnedName(args);
+  return owned ? { name: owned, linked: false } : undefined;
+};
 
 /** True when the table has an entry under `name`, false when it does not; throws otherwise. */
 const hasField = async ({

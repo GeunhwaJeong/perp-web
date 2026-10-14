@@ -201,6 +201,8 @@ try {
     'account menu lists Recovery phrase (Back up), Face ID toggle and Lock',
     ['Recovery phrase', 'Back up', 'Turn off Face ID unlock', 'Lock'].every((s) => menu.includes(s))
   );
+  // No name service on this network, so the name never leaves the device here.
+  check('account menu shows the name status', menu.includes('Name saved on this device only'));
   await page.getByText('Recovery phrase', { exact: false }).first().click();
   await page.getByText('Before you view it').waitFor({ timeout: 10000 });
   await button(/view phrase/i).click();

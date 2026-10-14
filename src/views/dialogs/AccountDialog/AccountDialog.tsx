@@ -11,7 +11,13 @@ import {
   SIGMA_PASSKEY_WALLET_NAME,
 } from '@/haneul/account';
 import { dAppKit, type HaneulNetwork } from '@/haneul/dAppKit';
-import { lookupName, NAME_SERVICE_CONFIGS, requestNameIssue } from '@/haneul/names';
+import {
+  linkAccountName,
+  lookupName,
+  NAME_SERVICE_CONFIGS,
+  requestNameIssue,
+  type NameOwner,
+} from '@/haneul/names';
 
 import { DialogProps, OnboardingDialogProps } from '@/constants/dialogs';
 import { type WalletInfo } from '@/constants/wallets';
@@ -167,16 +173,21 @@ export const AccountDialog = ({ setIsOpen: setIsOpenRaw }: DialogProps<Onboardin
     await selectWallet(passkeyWallet);
   }, [passkeyWallet, selectWallet]);
 
-  /** Writes the chosen name on chain through the issuer; the UI never waits on it. */
+  /**
+   * Writes the chosen name on chain through the issuer, then links the address back to it
+   * with the account's own signature (the issuer sent the gas). The UI never waits on it;
+   * a link that fails can be retried from the account menu.
+   */
   const issueName = useCallback(
-    (name: string, address: string, target: 'local' | 'passkey') => {
+    (name: string, address: string, owner: NameOwner) => {
       requestNameIssue({ name, address })
-        .then(() =>
-          (target === 'local' ? store : passkeyAccountStore).setName({
+        .then(({ digest }) => {
+          (owner === 'local' ? store : passkeyAccountStore).setName({
             username: name,
             status: 'claimed',
-          })
-        )
+          });
+          return linkAccountName({ owner, afterDigest: digest });
+        })
         .catch((issueError: unknown) => log('AccountDialog/issueName', asError(issueError)));
     },
     [store]
@@ -187,19 +198,20 @@ export const AccountDialog = ({ setIsOpen: setIsOpenRaw }: DialogProps<Onboardin
    * registration it holds. Nothing to do on a network without a name service.
    */
   const recoverName = useCallback(
-    (address: string, target: 'local' | 'passkey') => {
+    (address: string, owner: NameOwner) => {
       const client = dAppKit.getClient();
       const config = NAME_SERVICE_CONFIGS[client.network as HaneulNetwork];
       if (!config) return;
       lookupName({ client, config, address })
-        .then(
-          (name) =>
-            name &&
-            (target === 'local' ? store : passkeyAccountStore).setName({
-              username: name,
-              status: 'claimed',
-            })
-        )
+        .then((found) => {
+          if (!found) return undefined;
+          (owner === 'local' ? store : passkeyAccountStore).setName({
+            username: found.name,
+            status: found.linked ? 'linked' : 'claimed',
+          });
+          // A name issued but never linked (the link failed, or an older issuer) is linked now.
+          return found.linked ? undefined : linkAccountName({ owner });
+        })
         .catch((lookupError: unknown) => log('AccountDialog/recoverName', asError(lookupError)));
     },
     [store]
