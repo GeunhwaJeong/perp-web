@@ -36,15 +36,18 @@ type ElementProps = {
 };
 
 enum MarketStats {
-  OraclePrice = 'OraclePrice',
+  MarkPrice = 'MarkPrice',
+  IndexPrice = 'IndexPrice',
   PriceChange24H = 'PriceChange24H',
   Volume24H = 'Volume24H',
   Trades24H = 'Trades24H',
   OpenInterest = 'OpenInterest',
-  Funding1H = 'Funding1H',
+  Funding = 'Funding',
   NextFunding = 'NextFunding',
   MaxLeverage = 'MaxLeverage',
 }
+
+const HOUR_MS = 3_600_000;
 
 export const MarketStatsDetails = ({
   showMidMarketPrice = true,
@@ -61,7 +64,11 @@ export const MarketStatsDetails = ({
   const {
     displayableAsset,
     effectiveInitialMarginFraction,
+    fundingPeriodMs,
+    indexPrice,
     initialMarginFraction,
+    markPrice,
+    nextFundingAt,
     nextFundingRate,
     openInterest,
     openInterestUSDC,
@@ -75,10 +82,25 @@ export const MarketStatsDetails = ({
 
   const displayUnit = useAppSelector(getSelectedDisplayUnit);
 
+  // The indexer serves the funding rate per hour, but the engine charges it over a period (eight
+  // hours on the BTC market), so the header shows the period's rate under a label that names it.
+  const fundingPeriodHours =
+    fundingPeriodMs != null && fundingPeriodMs > 0 ? fundingPeriodMs / HOUR_MS : 1;
+  const fundingRateForPeriod =
+    nextFundingRate != null
+      ? MustBigNumber(nextFundingRate).times(fundingPeriodHours).toString()
+      : nextFundingRate;
+  const fundingPeriodLabel = Number.isInteger(fundingPeriodHours)
+    ? `${fundingPeriodHours}h`
+    : `${fundingPeriodHours.toFixed(1)}h`;
+
   const valueMap = {
-    [MarketStats.OraclePrice]: oraclePrice,
-    [MarketStats.NextFunding]: undefined, // hardcoded
-    [MarketStats.Funding1H]: nextFundingRate,
+    // The indexer's `oraclePrice` is the mark price under the protocol's name; `markPrice`
+    // carries it explicitly where the indexer is new enough to send it.
+    [MarketStats.MarkPrice]: markPrice ?? oraclePrice,
+    [MarketStats.IndexPrice]: indexPrice,
+    [MarketStats.NextFunding]: undefined, // a countdown, rendered from `nextFundingAt`
+    [MarketStats.Funding]: fundingRateForPeriod,
     [MarketStats.OpenInterest]: displayUnit === DisplayUnit.Fiat ? openInterestUSDC : openInterest,
     [MarketStats.PriceChange24H]: priceChange24H,
     [MarketStats.Trades24H]: trades24H,
@@ -87,9 +109,10 @@ export const MarketStatsDetails = ({
   };
 
   const labelMap = {
-    [MarketStats.OraclePrice]: stringGetter({ key: STRING_KEYS.ORACLE_PRICE }),
+    [MarketStats.MarkPrice]: stringGetter({ key: STRING_KEYS.MARK_PRICE }),
+    [MarketStats.IndexPrice]: 'Index Price',
     [MarketStats.NextFunding]: stringGetter({ key: STRING_KEYS.NEXT_FUNDING }),
-    [MarketStats.Funding1H]: stringGetter({ key: STRING_KEYS.FUNDING_RATE_1H_SHORT }),
+    [MarketStats.Funding]: `Funding (${fundingPeriodLabel})`,
     [MarketStats.OpenInterest]: stringGetter({ key: STRING_KEYS.OPEN_INTEREST }),
     [MarketStats.PriceChange24H]: stringGetter({ key: STRING_KEYS.CHANGE_24H }),
     [MarketStats.Trades24H]: stringGetter({ key: STRING_KEYS.TRADES_24H }),
@@ -127,6 +150,8 @@ export const MarketStatsDetails = ({
               effectiveInitialMarginFraction={effectiveInitialMarginFraction}
               useFiatDisplayUnit={displayUnit === DisplayUnit.Fiat}
               withSubscript={withSubscript}
+              fundingPeriodHours={fundingPeriodHours}
+              nextFundingAt={nextFundingAt}
             />
           ),
         }))}
@@ -227,6 +252,8 @@ const DetailsItem = ({
   effectiveInitialMarginFraction,
   useFiatDisplayUnit,
   withSubscript = true,
+  fundingPeriodHours,
+  nextFundingAt,
 }: {
   value: string | number | null | undefined;
   stat: MarketStats;
@@ -238,6 +265,8 @@ const DetailsItem = ({
   effectiveInitialMarginFraction: number | null | undefined;
   useFiatDisplayUnit: boolean;
   withSubscript?: boolean;
+  fundingPeriodHours: number;
+  nextFundingAt: string | null | undefined;
 }) => {
   const valueBN = MustBigNumber(value);
   const stringGetter = useStringGetter();
@@ -245,7 +274,8 @@ const DetailsItem = ({
   const color = valueBN.isNegative() ? 'var(--color-negative)' : 'var(--color-positive)';
 
   switch (stat) {
-    case MarketStats.OraclePrice: {
+    case MarketStats.MarkPrice:
+    case MarketStats.IndexPrice: {
       return (
         <$Output
           withSubscript={withSubscript}
@@ -267,7 +297,7 @@ const DetailsItem = ({
         />
       );
     }
-    case MarketStats.Funding1H: {
+    case MarketStats.Funding: {
       return (
         <WithTooltip
           slotTooltip={
@@ -277,7 +307,7 @@ const DetailsItem = ({
                 <Output
                   tw="ml-0.25"
                   type={OutputType.Percent}
-                  value={MustBigNumber(value).times(24 * 365)}
+                  value={MustBigNumber(value).times((24 / fundingPeriodHours) * 365)}
                   fractionDigits={0}
                 />
               </dd>
@@ -294,7 +324,7 @@ const DetailsItem = ({
       );
     }
     case MarketStats.NextFunding: {
-      return <NextFundingTimer />;
+      return <NextFundingTimer nextFundingAt={nextFundingAt} />;
     }
     case MarketStats.PriceChange24H: {
       return (

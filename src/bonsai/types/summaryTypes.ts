@@ -331,6 +331,9 @@ export type PerpetualMarketSummaries = {
 
 export const unstableMarketSummaryFields = [
   'oraclePrice',
+  'markPrice',
+  'indexPrice',
+  'nextFundingAt',
   'priceChange24H',
   'percentChange24h',
   'nextFundingRate',

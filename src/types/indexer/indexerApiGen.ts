@@ -1541,6 +1541,13 @@ export interface IndexerPerpetualMarketResponseObject {
    * @memberof PerpetualMarketResponseObject
    */
   defaultFundingRate1H?: string | null;
+  // Served by the Sigma indexer beside the dYdX fields. `oraclePrice` above is the engine's mark
+  // price under the protocol's name; these carry the mark and the index (oracle) price under
+  // their own, and when funding is next updated and how long one funding period is.
+  markPrice?: string | null;
+  indexPrice?: string | null;
+  nextFundingAt?: string | null;
+  fundingPeriodMs?: number | null;
 }
 /**
  *

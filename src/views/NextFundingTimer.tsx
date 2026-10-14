@@ -6,12 +6,20 @@ import { Output, OutputType } from '@/components/Output';
 
 import { formatSeconds, getTimeTillNextUnit } from '@/lib/timeUtils';
 
-export const NextFundingTimer = () => {
+// Counts down to the engine's next funding update, which the indexer reports as
+// `nextFundingAt`; without it, to the top of the hour, which is the update schedule of every
+// market so far.
+export const NextFundingTimer = ({ nextFundingAt }: { nextFundingAt?: string | null }) => {
   const [secondsLeft, setSecondsLeft] = useState<number | undefined>();
 
   const updateSecondsLeft = useCallback(() => {
-    setSecondsLeft(getTimeTillNextUnit('hour'));
-  }, []);
+    const target = nextFundingAt != null ? Date.parse(nextFundingAt) : NaN;
+    setSecondsLeft(
+      Number.isNaN(target)
+        ? getTimeTillNextUnit('hour')
+        : Math.max(0, Math.floor((target - Date.now()) / 1000))
+    );
+  }, [nextFundingAt]);
 
   useInterval({ callback: updateSecondsLeft });
 
