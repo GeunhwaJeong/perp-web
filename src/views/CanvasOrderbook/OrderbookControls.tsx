@@ -122,7 +122,7 @@ const $ButtonGroup = styled.div`
   display: flex;
   gap: 0.25rem;
   > button {
-    --button-font: var(--font-base-book);
+    --button-font: var(--font-medium-book);
 
     --button-textColor: var(--color-text-2);
     --button-padding: 0 0.5rem;

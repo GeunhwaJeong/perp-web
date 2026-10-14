@@ -37,9 +37,9 @@ const $Details = styled(Details)`
 
   // for some reason at .33 and .35 tooltip underlines get hidden in some children labels
   // it must have to do with some kind of rounding issue with rem and pixels
-  --details-item-vertical-padding: 0.3125rem;
+  --details-item-vertical-padding: 0.37rem;
 
   padding: 0.375rem 0.75rem 0.25rem;
 
-  font-size: var(--details-item-fontSize, var(--fontSize-mini));
+  font-size: var(--details-item-fontSize, 0.8125em);
 `;

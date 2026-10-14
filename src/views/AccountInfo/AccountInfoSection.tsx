@@ -264,7 +264,7 @@ const $Details = styled(Details)`
 const $Container = styled.div`
   display: flex;
   flex-direction: column;
-  padding: 0.75rem 0.625rem 0.5rem;
+  padding: 1rem 1rem;
 `;
 
 const $StackContainer = styled.div<{ $isTablet: boolean }>`

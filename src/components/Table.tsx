@@ -815,7 +815,7 @@ const $TableWrapper = styled.div<{
   // Params
   --tableStickyRow-textColor: var(--color-text-0, inherit);
   --tableStickyRow-backgroundColor: inherit;
-  --table-header-height: 1.75rem;
+  --table-header-height: 2rem;
   --table-footer-height: 0rem;
 
   --tableRow-hover-backgroundColor: var(--color-layer-3);
@@ -824,7 +824,7 @@ const $TableWrapper = styled.div<{
   --table-cell-align: start; // start | center | end
   --table-firstColumn-cell-align: start; // start | center | end | var(--table-cell-align)
   --table-lastColumn-cell-align: end; // start | center | end | var(--table-cell-align)
-  --tableCell-padding: 0 0.75rem;
+  --tableCell-padding: 0 1rem;
 
   // Rules
 

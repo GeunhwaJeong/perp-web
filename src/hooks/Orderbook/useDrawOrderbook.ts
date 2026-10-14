@@ -149,7 +149,7 @@ export const useDrawOrderbook = ({
       histogramSide: 'left' | 'right';
       rekt: Rekt;
     }) => {
-      const { x1, x2, y1 } = rekt;
+      const { x1, x2, y1, y2 } = rekt;
 
       // X values
       const maxHistogramBarWidth = x2 - x1 - 2;
@@ -157,16 +157,24 @@ export const useDrawOrderbook = ({
         ? Math.min((value / histogramRange) * maxHistogramBarWidth, maxHistogramBarWidth)
         : 0;
 
-      const { bar } = getHistogramXValues({
+      const { gradient, bar } = getHistogramXValues({
         barWidth,
         canvasWidth,
         gradientMultiplier,
         histogramSide: inHistogramSide,
       });
 
-      // A flat tint of the side's color: the bar's length is the information, so it does not
-      // fade across its own width.
-      ctx.fillStyle = histogramAccentColor;
+      // Gradient
+      let linearGradient;
+
+      try {
+        linearGradient = ctx.createLinearGradient(gradient.x1, y1, gradient.x2, y2);
+        linearGradient.addColorStop(0, histogramAccentColor);
+        linearGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = linearGradient;
+      } catch (err) {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0)';
+      }
 
       ctx.beginPath();
 

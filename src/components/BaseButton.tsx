@@ -115,7 +115,7 @@ const buttonSizeVariants = {
   `,
   [ButtonSize.Base]: css`
     --button-font: var(--font-base-book);
-    --button-height: 2.5rem;
+    --button-height: 2.75rem;
   `,
   [ButtonSize.BasePlus]: css`
     --button-font: var(--font-base-book);

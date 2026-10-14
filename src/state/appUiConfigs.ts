@@ -58,7 +58,7 @@ export const initialState: AppUIConfigsState = {
   displayUnit: DisplayUnit.Asset,
   shouldHideLaunchableMarkets: false,
   favoritedMarkets: [],
-  horizontalPanelHeightPx: 208,
+  horizontalPanelHeightPx: 288,
   marketOrderMaxSlippage: 0.01,
   tablePageSizes: {},
   isChatEnabled: true,

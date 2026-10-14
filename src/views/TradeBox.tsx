@@ -62,10 +62,10 @@ export const TradeBox = () => {
   );
 };
 const $TradeBox = styled.section`
-  --tradeBox-content-paddingTop: 0.75rem;
-  --tradeBox-content-paddingRight: 0.625rem;
-  --tradeBox-content-paddingBottom: 0.625rem;
-  --tradeBox-content-paddingLeft: 0.625rem;
+  --tradeBox-content-paddingTop: 1rem;
+  --tradeBox-content-paddingRight: 1rem;
+  --tradeBox-content-paddingBottom: 1rem;
+  --tradeBox-content-paddingLeft: 1rem;
 
   ${layoutMixins.container}
   display: flex;

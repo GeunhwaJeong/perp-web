@@ -132,7 +132,7 @@ const $TradeLayout = styled.article<{
 
   /* prettier-ignore */
   --layout-default-desktopMedium:
-    'Top Top Side' auto
+    'Top Vertical Side' auto
     'Inner Vertical Side' minmax(0, 1fr)
     'Horizontal Horizontal Side' minmax(var(--tabs-height), var(--horizontalPanel-height))
     / 1fr minmax(0, var(--orderbook-trades-width)) var(--sidebar-width);
@@ -171,15 +171,7 @@ const $TradeLayout = styled.article<{
   display: grid;
   grid-template: var(--layout);
 
-  gap: var(--panel-gap);
-  padding: 0 var(--panel-gap) var(--panel-gap);
-  background-color: var(--color-layer-0);
-
-  > * {
-    background-color: var(--color-layer-2);
-    border-radius: var(--panel-radius);
-    overflow: hidden;
-  }
+  ${layoutMixins.withOuterAndInnerBorders}
 
   @media (prefers-reduced-motion: no-preference) {
     transition: grid-template 0.2s var(--ease-out-expo);
