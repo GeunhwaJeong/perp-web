@@ -63,5 +63,23 @@ export const leverageToImr = (leverage: number | string) =>
 export const imrToLeverage = (imr: bigint | string) =>
   new BigNumber(IFIXED_ONE.toString()).div(imr.toString()).toNumber();
 
+/** A margin fraction as the indexer writes it (e.g. "0.1") to an ifixed, rounded up. */
+export const fractionToIfixed = (fraction: number | string) =>
+  toBigInt(new BigNumber(fraction), IFIXED_ONE, undefined, BigNumber.ROUND_UP);
+
+/**
+ * The initial margin ratio a position is put back to after a temporary change: its own, or a
+ * market ratio when that is higher. The engine refuses a position ratio under the market's and
+ * margins at the higher of the two anyway, so this restores the same requirement without
+ * risking that refusal when the market ratio was raised after the position's was set.
+ */
+export const ratioToRestore = (positionImr: bigint, marketImrs: Array<bigint | undefined>) => {
+  const highest = marketImrs.reduce<bigint>(
+    (max, ratio) => (ratio != null && ratio > max ? ratio : max),
+    positionImr
+  );
+  return highest > IFIXED_ONE ? IFIXED_ONE : highest;
+};
+
 /** Human price to a u256 ifixed (stop triggers are compared against the index in ifixed). */
 export const priceToIfixed = (price: number | string) => toBigInt(new BigNumber(price), IFIXED_ONE);

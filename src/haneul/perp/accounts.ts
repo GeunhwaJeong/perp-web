@@ -140,6 +140,24 @@ export type PerpPositionState = {
   /** The position's own initial margin ratio (ifixed), i.e. 1 / the leverage it trades at. */
   initialMarginRatio: bigint;
   pendingOrders: bigint;
+  /** Signed base size as the raw ifixed two's complement `u256`; zero when flat. */
+  base: bigint;
+  /** Collateral allocated to the market, as the raw ifixed two's complement `u256`. */
+  collateral: bigint;
+};
+
+const IFIXED_SIGN_BIT = 2n ** 255n;
+
+/**
+ * The collateral, in coin units rounded down, that `deallocate_free_collateral` releases from a
+ * position with no size and no resting orders: all of it. Any other position, and a negative
+ * (bad debt) collateral, gives zero here; such collateral stays where it is.
+ */
+export const returnableCollateral = (position: PerpPositionState, collateralDecimals: number) => {
+  if (position.base !== 0n || position.pendingOrders !== 0n) return 0n;
+  if (position.collateral >= IFIXED_SIGN_BIT) return 0n;
+  // The engine keeps collateral as an ifixed of coin units, scaled by 10^(18 - decimals).
+  return position.collateral / 10n ** BigInt(18 - collateralDecimals);
 };
 
 /**
@@ -166,6 +184,8 @@ export const readPosition = async (
     return {
       initialMarginRatio: BigInt(position.initial_margin_ratio),
       pendingOrders: BigInt(position.pending_orders),
+      base: BigInt(position.base_asset_amount),
+      collateral: BigInt(position.collateral),
     };
   } catch {
     return undefined;

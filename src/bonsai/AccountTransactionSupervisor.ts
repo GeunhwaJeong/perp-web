@@ -11,6 +11,7 @@ import {
   eventsOf,
   fetchPriceUpdates,
   findPerpAccount,
+  fractionToIfixed,
   hasMarketPosition,
   HaneulTransactionError,
   imrToLeverage,
@@ -19,6 +20,8 @@ import {
   loadPerpDeployment,
   ORDER_TYPE,
   PerpTransactionBuilder,
+  ratioToRestore,
+  returnableCollateral,
   SIDE,
   collateralToUnits,
   limitPriceToUnits,
@@ -28,9 +31,12 @@ import {
   selectPriceUpdates,
   sizeToUnits,
   unitsToCollateral,
+  type CollateralReturn,
   type OrderSpec,
   type PerpAccount,
   type PerpDeployment,
+  type PerpPositionState,
+  type SignedPriceUpdate,
 } from '@/haneul/perp';
 import { signAndExecute } from '@/haneul/perp/executor';
 import { buildCoinSend, isGasCoinType, listCoins } from '@/haneul/transfer';
@@ -42,6 +48,7 @@ import { STRING_KEYS } from '@/constants/localization';
 import { isDev } from '@/constants/networks';
 import { PlaceOrderStatuses } from '@/constants/trade';
 import { DydxChainAsset } from '@/constants/wallets';
+import { IndexerPerpetualMarketStatus } from '@/types/indexer/indexerApiGen';
 
 import { selectTokenConfigs } from '@/hooks/useTokenConfigs';
 
@@ -89,6 +96,9 @@ type Context = {
 };
 
 type PlacedOrder = { clientId: string; orderId?: string; filled: boolean };
+
+/** A market holding collateral its position no longer needs: no size, no resting orders. */
+type ReturnableMarket = CollateralReturn & { units: bigint };
 
 const isMarketOrder = (payload: PlaceOrderPayload) => payload.type === OrderType.MARKET;
 
@@ -254,6 +264,68 @@ export class AccountTransactionSupervisor {
     return selected;
   }
 
+  /** Signed prices for several markets at once, each feed's update once. */
+  private async priceUpdatesForMarkets(ctx: Context, marketIds: string[]) {
+    if (!ctx.deployment.oracle || marketIds.length === 0) return [];
+    const served = await fetchPriceUpdates(ctx.deployment);
+    if (served.length === 0) return [];
+    const perMarket = await Promise.all(
+      marketIds.map((marketId) =>
+        selectPriceUpdates({
+          client: dAppKit.getClient(),
+          deployment: ctx.deployment,
+          market: ctx.deployment.markets[marketId]!,
+          updates: served,
+        })
+      )
+    );
+    const byFeed = new Map<string, SignedPriceUpdate>();
+    perMarket.flat().forEach((u) => byFeed.set(u.priceFeedStorageId, u));
+    return [...byFeed.values()];
+  }
+
+  /**
+   * The initial margin ratio to put a position back to after returning its idle collateral:
+   * its own, or the market's if that is higher (from the deployment and from the indexer, so a
+   * market ratio raised after the deployment file was written is still respected).
+   */
+  private restoreImrFor(
+    marketId: string,
+    market: PerpDeployment['markets'][string],
+    position: PerpPositionState
+  ) {
+    const indexed = BonsaiCore.markets.markets.data(this.store.getState())?.[marketId]
+      ?.initialMarginFraction;
+    return ratioToRestore(position.initialMarginRatio, [
+      BigInt(market.initialMarginRatio),
+      indexed != null ? fractionToIfixed(indexed) : undefined,
+    ]);
+  }
+
+  /**
+   * Markets where the account has collateral and nothing that needs it: no size and no resting
+   * orders. Only active markets count, since a paused one refuses the deallocation (a settled
+   * one pays out through settlement instead).
+   */
+  private async returnableMarkets(
+    client: ClientWithCoreApi,
+    deployment: PerpDeployment,
+    accountId: bigint
+  ): Promise<ReturnableMarket[]> {
+    const markets = BonsaiCore.markets.markets.data(this.store.getState()) ?? {};
+    const found = await Promise.all(
+      Object.entries(deployment.markets).map(async ([marketId, market]) => {
+        if (markets[marketId]?.status !== IndexerPerpetualMarketStatus.ACTIVE) return undefined;
+        const position = await readPosition(client, deployment, marketId, accountId);
+        if (position == null) return undefined;
+        const units = returnableCollateral(position, deployment.collateral.decimals);
+        if (units <= 0n) return undefined;
+        return { marketId, units, restoreImr: this.restoreImrFor(marketId, market, position) };
+      })
+    );
+    return found.filter(isTruthy);
+  }
+
   private markPosition(ctx: Context, marketId: string) {
     this.positions.add(`${ctx.deployment.network}:${ctx.account.account}:${marketId}`);
   }
@@ -284,10 +356,21 @@ export class AccountTransactionSupervisor {
     if (payloads.some((p) => isMarketOrder(p) && !(p.price > 0))) {
       return failure('Market order has no worst-price limit');
     }
-    const [createPosition, priceUpdates] = await Promise.all([
+    // A session of reduce-only orders closes some or all of the position. If it leaves the
+    // market empty, the collateral there goes back to the account balance in the same
+    // transaction; the chain decides whether it did (see `returnCollateralIfFlat`).
+    const closing = payloads.every((p) => p.reduceOnly === true);
+    const [createPosition, priceUpdates, position] = await Promise.all([
       this.ensurePosition(ctx, marketId),
       this.priceUpdatesFor(ctx, marketId),
+      closing
+        ? readPosition(dAppKit.getClient(), ctx.deployment, marketId, ctx.account.accountId)
+        : Promise.resolve(undefined),
     ]);
+    const returnCollateralIfFlat =
+      closing && !createPosition && position != null
+        ? { restoreImr: this.restoreImrFor(marketId, market, position) }
+        : undefined;
     const allocate = payloads.reduce((sum, p) => sum + (p.transferToSubaccountAmount ?? 0), 0);
     const tx = ctx.builder.session({
       ref: { account: ctx.account.account, cap: ctx.account.cap },
@@ -302,12 +385,22 @@ export class AccountTransactionSupervisor {
             : undefined,
         allocateMissingMargin: true,
         deallocateFreeCollateral: false,
+        returnCollateralIfFlat,
       },
       priceUpdates,
     });
     try {
       const result = await signAndExecute(tx);
       this.markPosition(ctx, marketId);
+      const returned = eventsOf(result.events, '::events::DeallocatedCollateral');
+      if (returned.length > 0) {
+        this.forgetWalletAccount(ctx.deployment, ctx.address);
+        logBonsaiInfo(FN, 'collateral returned to the account balance', {
+          digest: result.digest,
+          marketId,
+          amounts: returned.map((e) => String(e.collateral)),
+        });
+      }
       // The engine emits a taker fill event only when the session filled something. A market
       // order that matched nothing inside its limit can still succeed (it may have cleared
       // expired makers on the way), so report it as not filled rather than filled.
@@ -632,8 +725,10 @@ export class AccountTransactionSupervisor {
   }
 
   /**
-   * The collateral the connected wallet holds and the trading account's unallocated balance
-   * (what can be withdrawn), both read from chain, in collateral units (e.g. 12.5 TUSD).
+   * The collateral the connected wallet holds and what the trading account can withdraw, both
+   * read from chain, in collateral units (e.g. 12.5 TUSD). The withdrawable amount is the
+   * account balance plus the collateral left in markets the account no longer trades in, which
+   * a withdrawal returns to the balance on the way (see `withdrawCollateral`).
    */
   public async collateralBalances(): Promise<
     OperationResult<{ wallet: number; account: number | undefined; symbol: string }>
@@ -649,9 +744,17 @@ export class AccountTransactionSupervisor {
         findPerpAccount(client, deployment, address),
       ]);
       const held = coins.reduce((sum, c) => sum + c.balance, 0n);
+      const returnable = account
+        ? (await this.returnableMarkets(client, deployment, account.accountId)).reduce(
+            (sum, m) => sum + m.units,
+            0n
+          )
+        : 0n;
       return wrapOperationSuccess({
         wallet: unitsToCollateral(held, decimals).toNumber(),
-        account: account ? unitsToCollateral(account.collateral, decimals).toNumber() : undefined,
+        account: account
+          ? unitsToCollateral(account.collateral + returnable, decimals).toNumber()
+          : undefined,
         symbol: coinType.split('::').pop() ?? 'USD',
       });
     } catch (error) {
@@ -704,8 +807,10 @@ export class AccountTransactionSupervisor {
   }
 
   /**
-   * Withdraws collateral from the account balance (parent subaccount) to the wallet.
-   * Collateral allocated to a market has to be moved back to the balance first.
+   * Withdraws collateral from the account balance (parent subaccount) to the wallet. When the
+   * balance alone falls short, the collateral left in markets without a position or resting
+   * orders is returned to it in the same transaction. Collateral backing an open position has
+   * to be moved back with that market's margin controls first.
    */
   public async withdrawCollateral(amount: number): Promise<OperationResult<{ digest: string }>> {
     const ctx = await this.context();
@@ -714,24 +819,40 @@ export class AccountTransactionSupervisor {
     const units = collateralToUnits(amount, deployment.collateral.decimals);
     if (units <= 0n) return failure('Enter an amount to withdraw', STRING_KEYS.ENTER_AMOUNT);
     try {
-      const { collateral } = await readAccount(dAppKit.getClient(), account.account);
-      if (collateral < units) {
+      const client = dAppKit.getClient();
+      const { collateral } = await readAccount(client, account.account);
+      const returns =
+        collateral < units
+          ? await this.returnableMarkets(client, deployment, account.accountId)
+          : [];
+      const available = returns.reduce((sum, m) => sum + m.units, collateral);
+      if (available < units) {
         return failure(
-          'Not enough free collateral on the account balance',
+          'Not enough free collateral; collateral backing an open position has to be moved back first',
           STRING_KEYS.INSUFFICIENT_BALANCE
         );
       }
+      const priceUpdates = await this.priceUpdatesForMarkets(
+        ctx.payload,
+        returns.map((m) => m.marketId)
+      );
       const tx = builder.withdraw({
         ref: { account: account.account, cap: account.cap },
         amount: units,
         recipient: address,
+        returns: returns.map(({ marketId, restoreImr }) => ({ marketId, restoreImr })),
+        priceUpdates,
       });
       const result = await signAndExecute(tx);
       this.forgetWalletAccount(deployment, address);
       appQueryClient
         .invalidateQueries({ queryKey: ['validator', 'accountBalances'] })
         .catch(() => undefined);
-      logBonsaiInfo(FN, 'collateral withdrawn', { digest: result.digest, amount });
+      logBonsaiInfo(FN, 'collateral withdrawn', {
+        digest: result.digest,
+        amount,
+        returnedFrom: returns.map((m) => m.marketId),
+      });
       return wrapOperationSuccess({ digest: result.digest });
     } catch (error) {
       return this.toFailure(error);

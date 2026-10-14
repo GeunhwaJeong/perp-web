@@ -11,6 +11,7 @@ import {
   type StopLossTakeProfitDetails,
   type TwapDetails,
 } from './tickets';
+import { IFIXED_ONE } from './units';
 
 /**
  * Programmable transaction builders for the perpetuals engine. Every builder returns an
@@ -59,7 +60,16 @@ export type SessionOptions = {
   initialMarginRatio?: bigint;
   /** Allocate this much collateral (coin units) to the market before trading. */
   allocate?: bigint;
+  /**
+   * After the session, return the market's collateral to the account balance if the position
+   * is left without size or resting orders (see `addReturnCollateralIfFlat`), putting the
+   * position's initial margin ratio back to `restoreImr`.
+   */
+  returnCollateralIfFlat?: { restoreImr: bigint };
 };
+
+/** A market whose idle collateral a withdrawal returns to the account balance first. */
+export type CollateralReturn = { marketId: string; restoreImr: bigint };
 
 const target = (pkg: string, module: string, fn: string) => `${pkg}::${module}::${fn}`;
 
@@ -134,8 +144,31 @@ export class PerpTransactionBuilder {
     return tx;
   }
 
-  withdraw({ ref, amount, recipient }: { ref: PerpAccountRef; amount: bigint; recipient: string }) {
+  /**
+   * Pays `amount` of the account balance to `recipient`. Markets in `returns` give their idle
+   * collateral back to the balance first, in the same transaction, so collateral left in a market
+   * after its position closed can be withdrawn without a separate step.
+   */
+  withdraw({
+    ref,
+    amount,
+    recipient,
+    returns = [],
+    priceUpdates = [],
+  }: {
+    ref: PerpAccountRef;
+    amount: bigint;
+    recipient: string;
+    returns?: CollateralReturn[];
+    /** Signed prices the returns' margin checks read. */
+    priceUpdates?: SignedPriceUpdate[];
+  }) {
     const tx = new Transaction();
+    if (returns.length > 0) addPriceUpdates(tx, this.deployment, priceUpdates);
+    returns.forEach(({ marketId, restoreImr }) => {
+      const market = this.market(marketId);
+      this.addReturnCollateralIfFlat(tx, ref, market, tx.object(market.clearingHouse), restoreImr);
+    });
     const coin = tx.moveCall({
       target: target(this.perp, 'account', 'withdraw_collateral'),
       typeArguments: [this.coinType],
@@ -315,6 +348,15 @@ export class PerpTransactionBuilder {
     });
 
     const clearingHouse = this.addEndSession(tx, session[0]!, ref, options);
+    if (options.returnCollateralIfFlat) {
+      this.addReturnCollateralIfFlat(
+        tx,
+        ref,
+        market,
+        clearingHouse[0]!,
+        options.returnCollateralIfFlat.restoreImr
+      );
+    }
     tx.moveCall({
       target: target(this.perp, 'clearing_house', 'share'),
       typeArguments: [this.coinType],
@@ -644,16 +686,53 @@ export class PerpTransactionBuilder {
   }
 
   private addSetImr(tx: Transaction, ref: PerpAccountRef, market: PerpMarketConfig, imr: bigint) {
+    this.addSetImrOn(tx, ref, tx.object(market.clearingHouse), imr);
+  }
+
+  /** `set_position_initial_margin_ratio` on a clearing house argument, shared or session-held. */
+  private addSetImrOn(
+    tx: Transaction,
+    ref: PerpAccountRef,
+    clearingHouse: TransactionObjectArgument,
+    imr: bigint
+  ) {
     tx.moveCall({
       target: target(this.perp, 'clearing_house', 'set_position_initial_margin_ratio'),
       typeArguments: [this.coinType, this.types.admin],
+      arguments: [clearingHouse, tx.object(ref.cap), tx.object(ref.account), tx.pure.u256(imr)],
+    });
+  }
+
+  /**
+   * Returns a market's collateral to the account balance only when the position there has no
+   * size and no resting orders, a condition the chain decides at execution rather than the app
+   * guessing it beforehand. At an initial margin ratio of 1, any size the position holds or its
+   * resting orders could add needs margin equal to its whole notional, so the free collateral
+   * `deallocate_free_collateral` releases is nothing for a leveraged position (a partly filled
+   * close keeps all of its margin) and everything for an empty one. The position's own ratio is
+   * put back in the same transaction.
+   */
+  private addReturnCollateralIfFlat(
+    tx: Transaction,
+    ref: PerpAccountRef,
+    market: PerpMarketConfig,
+    clearingHouse: TransactionObjectArgument,
+    restoreImr: bigint
+  ) {
+    this.addSetImrOn(tx, ref, clearingHouse, IFIXED_ONE);
+    tx.moveCall({
+      target: target(this.perp, 'clearing_house', 'deallocate_free_collateral'),
+      typeArguments: [this.coinType, this.types.admin],
       arguments: [
-        tx.object(market.clearingHouse),
+        clearingHouse,
         tx.object(ref.cap),
         tx.object(ref.account),
-        tx.pure.u256(imr),
+        tx.object(market.basePriceFeedStorage),
+        tx.object(this.deployment.collateral.priceFeedStorage),
+        tx.object(CLOCK_OBJECT_ID),
       ],
     });
+    this.addSetImrOn(tx, ref, clearingHouse, restoreImr);
   }
 
   private addAllocate(
