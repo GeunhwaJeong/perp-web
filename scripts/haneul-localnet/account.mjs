@@ -198,12 +198,25 @@ try {
   await openMenu();
   const menu = await page.locator('body').innerText();
   check(
-    'account menu lists Recovery phrase (Back up), Face ID toggle and Lock',
-    ['Recovery phrase', 'Back up', 'Turn off Face ID unlock', 'Lock'].every((s) => menu.includes(s))
+    'drawer shows the name, the status, the tiles and the backup card',
+    [
+      '.haneul',
+      'Name saved on this device only',
+      'Deposit',
+      'Back up your recovery phrase',
+      'View portfolio',
+    ].every((s) => menu.includes(s))
   );
-  // No name service on this network, so the name never leaves the device here.
-  check('account menu shows the name status', menu.includes('Name saved on this device only'));
-  await page.getByText('Recovery phrase', { exact: false }).first().click();
+  await button(/^settings$/i).click();
+  await page.waitForTimeout(500);
+  const settings = await page.locator('body').innerText();
+  check(
+    'settings slide-out lists Theme, Recovery phrase, Face ID unlock, Lock and Disconnect',
+    ['Theme', 'Recovery phrase', 'Face ID unlock', 'Lock', 'Disconnect'].every((s) =>
+      settings.includes(s)
+    )
+  );
+  await page.getByText('Recovery phrase', { exact: true }).click();
   await page.getByText('Before you view it').waitFor({ timeout: 10000 });
   await button(/view phrase/i).click();
   await page.getByText('Confirm your password').waitFor({ timeout: 10000 });
@@ -222,13 +235,19 @@ try {
   await page.waitForTimeout(800);
   account = await stored();
   check('Done records the backup', !!account?.backedUpAt);
-
   await openMenu();
-  await page.getByText('Turn off Face ID unlock').click();
+  check(
+    'backup card gone once backed up',
+    !(await page.locator('body').innerText()).includes('Back up your recovery phrase')
+  );
+
+  await button(/^settings$/i).click();
+  await page.getByRole('switch').waitFor({ timeout: 10000 });
+  await page.waitForTimeout(300);
+  await page.getByRole('switch').click();
   await page.waitForTimeout(1000);
   check('Face ID turned off', !(await stored())?.biometric);
-  await openMenu();
-  await page.getByText('Unlock with Face ID').first().click();
+  await page.getByRole('switch').click();
   await page.getByPlaceholder('Password').waitFor({ timeout: 10000 });
   await page.getByPlaceholder('Password').fill(PASSWORD);
   await button(/^continue$/i).click();
@@ -239,6 +258,8 @@ try {
 
   await page.keyboard.press('Escape');
   await openMenu();
+  await button(/^settings$/i).click();
+  await page.waitForTimeout(500);
   await page.getByText(/^Lock$/).click();
   await page.waitForTimeout(1000);
   check('Lock closes the session', !(await sessionOpen()));

@@ -8,22 +8,32 @@ import { css } from 'styled-components';
  */
 
 export const spacing = {
+  s2: '2px',
   s4: '4px',
+  s6: '6px',
   s8: '8px',
   s12: '12px',
   s16: '16px',
+  s20: '20px',
   s24: '24px',
   s32: '32px',
+  s48: '48px',
+  s60: '60px',
 } as const;
 
 export const radii = {
+  r4: '4px',
   r8: '8px',
   r12: '12px',
   r16: '16px',
   r20: '20px',
   r24: '24px',
+  r32: '32px',
   full: '9999px',
 } as const;
+
+/** Spore icon sizes. */
+export const icons = { i12: 12, i16: 16, i20: 20, i24: 24, i28: 28, i40: 40, i48: 48 } as const;
 
 /** Modal: 480 wide including the 32 of padding; the mobile sheet uses 24. */
 export const modal = {
@@ -61,6 +71,7 @@ const face = (size: number, lineHeight: number, weight: number, letterSpacing = 
 `;
 
 export const type = {
+  heading2: face(36, 40, weights.book, '-0.01em'),
   heading3: face(24, 28, weights.book, '-0.005em'),
   subheading1: face(18, 24, weights.book),
   subheading2: face(16, 24, weights.book),
@@ -70,7 +81,15 @@ export const type = {
   button1: face(18, 24, weights.medium),
   button2: face(16, 24, weights.medium),
   button3: face(14, 20, weights.medium),
+  button4: face(12, 16, weights.medium),
 } as const;
+
+/** Spore's medium shadow, dark theme: two soft layers of the surface colour. */
+export const shadowMedium = css`
+  box-shadow:
+    0px 10px 15px -3px rgba(0, 0, 0, 0.54),
+    0px 4px 6px -2px rgba(0, 0, 0, 0.4);
+`;
 
 /** Spore motion curves, byte for byte. */
 export const motion = {

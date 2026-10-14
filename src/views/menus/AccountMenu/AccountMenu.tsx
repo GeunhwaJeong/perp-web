@@ -1,487 +1,88 @@
-import { useMemo } from 'react';
-
 import { SIGMA_ACCOUNT_WALLET_NAME, SIGMA_PASSKEY_WALLET_NAME } from '@/haneul/account';
-import { linkAccountName, type NameOwner } from '@/haneul/names';
-import styled, { css } from 'styled-components';
-import tw from 'twin.macro';
+import styled from 'styled-components';
 
-import { AMOUNT_RESERVED_FOR_GAS_USDC, OnboardingState } from '@/constants/account';
-import { ButtonAction, ButtonShape, ButtonSize } from '@/constants/buttons';
-import { DialogTypes } from '@/constants/dialogs';
-import { STRING_KEYS } from '@/constants/localization';
-import { isDev } from '@/constants/networks';
-import { SMALL_USD_DECIMALS, USD_DECIMALS } from '@/constants/numbers';
-import { StatsigFlags } from '@/constants/statsig';
-import { DydxChainAsset } from '@/constants/wallets';
+import { OnboardingState } from '@/constants/account';
+import { ButtonSize } from '@/constants/buttons';
 
-import { useAccountBalance } from '@/hooks/useAccountBalance';
 import { useAccounts } from '@/hooks/useAccounts';
 import { useBreakpoints } from '@/hooks/useBreakpoints';
-import { useComplianceState } from '@/hooks/useComplianceState';
-import { useEnvFeatures } from '@/hooks/useEnvFeatures';
 import { useLocalAccount } from '@/hooks/useLocalAccount';
-import { useMobileAppUrl } from '@/hooks/useMobileAppUrl';
 import { usePasskeyAccount } from '@/hooks/usePasskeyAccount';
-import { useStatsigGateValue } from '@/hooks/useStatsig';
-import { useStringGetter } from '@/hooks/useStringGetter';
-import { useSubaccount } from '@/hooks/useSubaccount';
-import { useTokenConfigs } from '@/hooks/useTokenConfigs';
 
-import { headerMixins } from '@/styles/headerMixins';
-import { layoutMixins } from '@/styles/layoutMixins';
-
-import { AssetIcon } from '@/components/AssetIcon';
-import { CopyButton } from '@/components/CopyButton';
-import { DropdownMenu } from '@/components/DropdownMenu';
-import { Icon, IconName } from '@/components/Icon';
-import { IconButton } from '@/components/IconButton';
-import { Output, OutputType } from '@/components/Output';
-import { Tag, TagSign } from '@/components/Tag';
-import { WalletIcon } from '@/components/WalletIcon';
-import { MobileDownloadLinks } from '@/views/MobileDownloadLinks';
+import { colors, icons, motion, spacing, type } from '@/views/dialogs/AccountDialog/tokens';
 import { OnboardingTriggerButton } from '@/views/dialogs/OnboardingTriggerButton';
+import { AccountDrawer } from '@/views/menus/AccountDrawer/AccountDrawer';
+import { Avatar } from '@/views/menus/AccountDrawer/Avatar';
+import { SigmaBadgeIcon } from '@/views/menus/AccountDrawer/icons';
 
-import { getOnboardingState, getSubaccountFreeCollateral } from '@/state/accountSelectors';
-import { useAppDispatch, useAppSelector } from '@/state/appTypes';
-import { AppTheme } from '@/state/appUiConfigs';
-import { getAppTheme } from '@/state/appUiConfigsSelectors';
-import { openDialog } from '@/state/dialogs';
+import { getOnboardingState } from '@/state/accountSelectors';
+import { useAppSelector } from '@/state/appTypes';
 
-import { isTruthy } from '@/lib/isTruthy';
-import { MustBigNumber } from '@/lib/numbers';
-import { log } from '@/lib/telemetry';
 import { truncateAddress } from '@/lib/wallet';
 
-import { SubaccountActions } from './SubaccountActions';
-import { WalletActions } from './WalletActions';
+/**
+ * The header's account pill (Uniswap's `Web3Status`): a 24 avatar, the name in body2 and
+ * the badge, opening the account drawer. Before a wallet is connected it is the sign-up
+ * button.
+ */
+const $Trigger = styled.button`
+  display: inline-flex;
+  align-items: center;
+  gap: ${spacing.s8};
+  height: 2.25rem;
+  padding: 0 ${spacing.s12} 0 ${spacing.s8};
+  border-radius: 0.5em;
+  background: ${colors.surface2};
+  color: ${colors.neutral1};
+  ${type.body2}
+  transition: background-color ${motion.fast};
 
-const asError = (error: unknown) => (error instanceof Error ? error : new Error(String(error)));
+  &:hover,
+  &[data-state='open'] {
+    background: ${colors.surface2Hovered};
+  }
+
+  > span {
+    max-width: 12em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  > svg {
+    flex: none;
+  }
+`;
 
 export const AccountMenu = () => {
-  const stringGetter = useStringGetter();
   const { isTablet } = useBreakpoints();
-  const { complianceState } = useComplianceState();
-  const affiliatesEnabled = useStatsigGateValue(StatsigFlags.ffEnableAffiliates);
-  const dispatch = useAppDispatch();
   const onboardingState = useAppSelector(getOnboardingState);
-  const freeCollateral = useAppSelector(getSubaccountFreeCollateral);
-
-  const { nativeTokenBalance, usdcBalance } = useAccountBalance();
-
-  const { usdcImage, usdcLabel, chainTokenImage, chainTokenLabel } = useTokenConfigs();
-
-  const { debugCompliance } = useEnvFeatures();
-  const theme = useAppSelector(getAppTheme);
   const {
     sourceAccount: { walletInfo },
     dydxAddress,
   } = useAccounts();
-  const { registerAffiliate } = useSubaccount();
-  const { account: localAccount, store: localAccountStore } = useLocalAccount();
+  const { account: localAccount } = useLocalAccount();
   const passkeyAccount = usePasskeyAccount();
-  const isSigmaAccount = walletInfo?.name === SIGMA_ACCOUNT_WALLET_NAME && localAccount !== null;
-  // The name stands in for the address once the account has one; the address stays a copy
-  // button inside the menu. Only Sigma's own accounts carry a name.
-  const nameOwner: NameOwner | undefined =
+
+  if (onboardingState === OnboardingState.Disconnected || !dydxAddress) {
+    return <OnboardingTriggerButton size={ButtonSize.XSmall} />;
+  }
+
+  const name =
     walletInfo?.name === SIGMA_ACCOUNT_WALLET_NAME
-      ? 'local'
+      ? localAccount?.username
       : walletInfo?.name === SIGMA_PASSKEY_WALLET_NAME
-        ? 'passkey'
+        ? passkeyAccount?.username
         : undefined;
-  const nameRecord =
-    nameOwner === 'local' ? localAccount : nameOwner === 'passkey' ? passkeyAccount : null;
-  const accountName = nameRecord?.username;
-  const nameStatus = nameRecord?.nameStatus;
-  const nameStatusLabel =
-    accountName &&
-    {
-      pending: 'Name saved on this device only',
-      claimed: 'Name issued, not yet linked to this address',
-      linked: 'Name linked on chain',
-    }[nameStatus ?? 'pending'];
-  const linkName = () => {
-    if (!nameOwner) return;
-    linkAccountName({ owner: nameOwner }).catch((linkError: unknown) =>
-      log('AccountMenu/linkName', asError(linkError))
-    );
-  };
 
-  const onRecoverKeys = () => {
-    dispatch(openDialog(DialogTypes.Onboarding()));
-  };
-
-  const { appleAppStoreUrl, googlePlayStoreUrl } = useMobileAppUrl();
-
-  const usedBalanceBN = MustBigNumber(usdcBalance);
-
-  const showConfirmPendingDeposit =
-    usedBalanceBN.gt(AMOUNT_RESERVED_FOR_GAS_USDC) &&
-    usedBalanceBN.minus(AMOUNT_RESERVED_FOR_GAS_USDC).toFixed(2) !== '0.00';
-
-  const walletIcon = useMemo(() => {
-    if (onboardingState === OnboardingState.WalletConnected) {
-      return <Icon iconName={IconName.Warning} tw="text-[1.25rem] text-color-warning" />;
-    }
-
-    if (walletInfo == null) {
-      return null;
-    }
-
-    return <WalletIcon wallet={walletInfo} />;
-  }, [onboardingState, walletInfo]);
-
-  return onboardingState === OnboardingState.Disconnected ? (
-    <OnboardingTriggerButton size={ButtonSize.XSmall} />
-  ) : (
-    <$DropdownMenu
-      modal={false}
-      slotTopContent={
-        onboardingState === OnboardingState.AccountConnected && (
-          <div tw="flexColumn gap-1 px-1 pb-0.5 pt-1">
-            <div tw="row flex-wrap gap-[0.25rem]">
-              <$AddressCopyButton
-                value={dydxAddress}
-                size={ButtonSize.XSmall}
-                shape={ButtonShape.Pill}
-                copyIconPosition="end"
-                action={ButtonAction.Base}
-              >
-                <AssetIcon
-                  logoUrl={chainTokenImage}
-                  symbol={chainTokenLabel}
-                  tw="[--asset-icon-size:1.25rem]"
-                />
-                {stringGetter({ key: STRING_KEYS.PERPETUALS })}
-              </$AddressCopyButton>
-            </div>
-            {nameStatusLabel && <$label>{nameStatusLabel}</$label>}
-
-            <$Balances>
-              <div>
-                <div>
-                  <$label>
-                    {stringGetter({
-                      key: STRING_KEYS.ASSET_BALANCE,
-                      params: { ASSET: chainTokenLabel },
-                    })}
-                    <AssetIcon logoUrl={chainTokenImage} symbol={chainTokenLabel} />
-                  </$label>
-                  <$BalanceOutput type={OutputType.Asset} value={nativeTokenBalance} />
-                </div>
-                <SubaccountActions
-                  asset={DydxChainAsset.CHAINTOKEN}
-                  complianceState={complianceState}
-                  dispatch={dispatch}
-                  hasBalance={nativeTokenBalance.gt(0)}
-                  stringGetter={stringGetter}
-                />
-              </div>
-              {isDev && (
-                <div>
-                  <div>
-                    <$label>
-                      {stringGetter({
-                        key: STRING_KEYS.WALLET_BALANCE,
-                        params: { ASSET: usdcLabel },
-                      })}
-                      <AssetIcon logoUrl={usdcImage} symbol="USDC" />
-                    </$label>
-                    <$BalanceOutput
-                      type={OutputType.Asset}
-                      value={usdcBalance}
-                      fractionDigits={SMALL_USD_DECIMALS}
-                    />
-                  </div>
-                  <WalletActions
-                    complianceState={complianceState}
-                    dispatch={dispatch}
-                    stringGetter={stringGetter}
-                  />
-                </div>
-              )}
-              <div>
-                <div>
-                  <$label>
-                    {stringGetter({
-                      key: STRING_KEYS.ASSET_BALANCE,
-                      params: { ASSET: usdcLabel },
-                    })}
-                    <AssetIcon logoUrl={usdcImage} symbol="USDC" />
-                  </$label>
-                  <$BalanceOutput
-                    type={OutputType.Asset}
-                    value={freeCollateral ?? 0}
-                    fractionDigits={USD_DECIMALS}
-                  />
-                </div>
-                <SubaccountActions
-                  asset={DydxChainAsset.USDC}
-                  complianceState={complianceState}
-                  dispatch={dispatch}
-                  hasBalance={MustBigNumber(freeCollateral).gt(0)}
-                  stringGetter={stringGetter}
-                  withOnboarding
-                />
-              </div>
-            </$Balances>
-            {showConfirmPendingDeposit && (
-              <$ConfirmPendingDeposit>
-                You have a pending deposit
-                <br /> for confirmation
-                <$IconButton
-                  action={ButtonAction.Base}
-                  shape={ButtonShape.Square}
-                  iconName={IconName.Send}
-                  onClick={() =>
-                    dispatch(
-                      openDialog(
-                        DialogTypes.ConfirmPendingDeposit({
-                          usdcBalance:
-                            MustBigNumber(usdcBalance).toNumber() - AMOUNT_RESERVED_FOR_GAS_USDC,
-                        })
-                      )
-                    )
-                  }
-                />
-              </$ConfirmPendingDeposit>
-            )}
-          </div>
-        )
+  return (
+    <AccountDrawer
+      trigger={
+        <$Trigger type="button">
+          <Avatar address={dydxAddress} size={icons.i24} badge={false} />
+          {!isTablet && <span>{name ? `${name}.haneul` : truncateAddress(dydxAddress)}</span>}
+          {!isTablet && name && <SigmaBadgeIcon size={18} />}
+        </$Trigger>
       }
-      items={[
-        onboardingState === OnboardingState.WalletConnected && {
-          value: 'ConnectToChain',
-          label: (
-            <$ConnectToChain>
-              <p>{stringGetter({ key: STRING_KEYS.MISSING_KEYS_DESCRIPTION })}</p>
-              <OnboardingTriggerButton />
-            </$ConnectToChain>
-          ),
-          onSelect: onRecoverKeys,
-          separator: true,
-        },
-        affiliatesEnabled &&
-          onboardingState === OnboardingState.AccountConnected && {
-            value: 'Affiliates',
-            icon: <Icon iconName={IconName.Giftbox} />,
-            label: (
-              <span>
-                {stringGetter({ key: STRING_KEYS.INVITE_FRIENDS })}{' '}
-                <Tag sign={TagSign.Positive}>{stringGetter({ key: STRING_KEYS.EARN_FEES })}</Tag>
-              </span>
-            ),
-            onSelect: () => {
-              dispatch(openDialog(DialogTypes.ShareAffiliate()));
-            },
-          },
-        ...(accountName && nameStatus === 'claimed'
-          ? [
-              {
-                value: 'LinkName',
-                icon: <Icon iconName={IconName.LinkOut} />,
-                label: 'Link name to this address',
-                onSelect: linkName,
-              },
-            ]
-          : []),
-        ...(isSigmaAccount
-          ? [
-              {
-                value: 'RecoveryPhrase',
-                icon: <Icon iconName={IconName.ExportKeys} />,
-                label: (
-                  <span>
-                    Recovery phrase{' '}
-                    {!localAccount.backedUpAt && <Tag sign={TagSign.Warning}>Back up</Tag>}
-                  </span>
-                ),
-                onSelect: () =>
-                  dispatch(openDialog(DialogTypes.AccountSecurity({ intent: 'recoveryPhrase' }))),
-              },
-              {
-                value: 'FaceIdUnlock',
-                icon: <Icon iconName={IconName.Lock} />,
-                label: localAccount.biometric ? 'Turn off Face ID unlock' : 'Unlock with Face ID',
-                onSelect: () =>
-                  localAccount.biometric
-                    ? localAccountStore.disableBiometric()
-                    : dispatch(
-                        openDialog(DialogTypes.AccountSecurity({ intent: 'enableBiometric' }))
-                      ),
-              },
-              {
-                value: 'LockAccount',
-                icon: <Icon iconName={IconName.Lock} />,
-                label: 'Lock',
-                onSelect: () => {
-                  localAccountStore.lock();
-                  dispatch(openDialog(DialogTypes.DisconnectWallet()));
-                },
-              },
-            ]
-          : []),
-        {
-          value: 'Preferences',
-          icon: <Icon iconName={IconName.Gear} />,
-          label: stringGetter({ key: STRING_KEYS.PREFERENCES }),
-          onSelect: () => dispatch(openDialog(DialogTypes.Preferences())),
-        },
-        {
-          value: 'DisplaySettings',
-          icon:
-            theme === AppTheme.Light ? (
-              <Icon iconName={IconName.Sun} />
-            ) : (
-              <Icon iconName={IconName.Moon} />
-            ),
-          label: stringGetter({ key: STRING_KEYS.DISPLAY_SETTINGS }),
-          onSelect: () => dispatch(openDialog(DialogTypes.DisplaySettings())),
-        },
-        ...(isDev
-          ? [
-              {
-                value: 'registerAffiliate',
-                icon: <Icon iconName={IconName.Gear} />,
-                label: 'Register Affiliate',
-                onSelect: () => {
-                  // eslint-disable-next-line no-alert
-                  const affiliate = window.prompt('Enter affiliate address');
-                  if (affiliate) {
-                    registerAffiliate(affiliate);
-                  }
-                },
-              },
-            ]
-          : []),
-        ...(isDev || debugCompliance
-          ? [
-              {
-                value: 'ComplianceConfig',
-                icon: <Icon iconName={IconName.Gear} />,
-                label: 'Compliance Config',
-                onSelect: () => {
-                  dispatch(openDialog(DialogTypes.ComplianceConfig()));
-                },
-              },
-            ]
-          : []),
-        ...((appleAppStoreUrl ?? googlePlayStoreUrl)
-          ? [
-              {
-                value: 'MobileDownload',
-                icon: <Icon iconName={IconName.Qr} />,
-                label: stringGetter({ key: STRING_KEYS.DOWNLOAD_MOBILE_APP }),
-                onSelect: () => {
-                  dispatch(
-                    openDialog(
-                      DialogTypes.MobileDownload({
-                        mobileAppUrl: (appleAppStoreUrl ?? googlePlayStoreUrl)!,
-                      })
-                    )
-                  );
-                },
-              },
-            ]
-          : []),
-        {
-          value: 'Disconnect',
-          icon: <Icon iconName={IconName.BoxClose} />,
-          label: stringGetter({ key: STRING_KEYS.DISCONNECT }),
-          highlightColor: 'destroy' as const,
-          onSelect: () => dispatch(openDialog(DialogTypes.DisconnectWallet())),
-        },
-      ].filter(isTruthy)}
-      slotBottomContent={<MobileDownloadLinks withBadges />}
-      align="end"
-      sideOffset={16}
-    >
-      {walletIcon}
-      {!isTablet && (
-        <$Address>{accountName ? `${accountName}.haneul` : truncateAddress(dydxAddress)}</$Address>
-      )}
-    </$DropdownMenu>
+    />
   );
 };
-
-const $Column = styled.div`
-  ${layoutMixins.column}
-`;
-const $label = styled.div`
-  ${layoutMixins.row}
-
-  gap: 0.25rem;
-  font-size: var(--fontSize-mini);
-  color: var(--color-text-0);
-
-  --asset-icon-size: 1rem;
-`;
-
-const $Balances = styled.div`
-  ${layoutMixins.flexColumn}
-  > div {
-    ${layoutMixins.spacedRow}
-    box-shadow: 0 0 0 1px var(--color-border);
-
-    gap: 0.5rem;
-    padding: 0.625rem 1rem;
-
-    background-color: var(--color-layer-4);
-
-    &:first-child {
-      border-radius: 0.5rem 0.5rem 0 0;
-    }
-
-    &:last-child {
-      border-radius: 0 0 0.5rem 0.5rem;
-    }
-  }
-`;
-
-const $ConfirmPendingDeposit = styled.div`
-  ${layoutMixins.row}
-
-  justify-content: space-between;
-  box-shadow: 0 0 0 1px var(--color-border);
-  border-radius: 0.5rem;
-  padding: 0.625rem 1rem;
-
-  color: var(--color-text-1);
-  font-size: var(--fontSize-small);
-`;
-
-const $BalanceOutput = tw(Output)`text-medium`;
-
-const $DropdownMenu = styled(DropdownMenu)`
-  ${headerMixins.dropdownTrigger}
-
-  --dropdownMenu-item-font-size: 0.875rem;
-  --popover-padding: 0 0 0.5rem 0;
-  max-width: 17em;
-` as typeof DropdownMenu;
-const $Address = tw.span`font-base-book [font-feature-settings:--fontFeature-monoNumbers]`;
-
-const $ConnectToChain = styled($Column)`
-  gap: 0.5rem;
-  text-align: center;
-
-  p {
-    color: var(--color-text-1);
-    font: var(--font-small-book);
-  }
-`;
-
-const $IconButton = styled(IconButton)`
-  --button-padding: 0 0.25rem;
-  --button-border: solid var(--border-width) var(--color-layer-6);
-
-  ${({ iconName }) =>
-    iconName != null &&
-    [IconName.Withdraw, IconName.Deposit].includes(iconName) &&
-    css`
-      --button-icon-size: 1.375em;
-    `}
-`;
-
-const $AddressCopyButton = styled(CopyButton)`
-  --button-padding: 0 0.375rem;
-`;
