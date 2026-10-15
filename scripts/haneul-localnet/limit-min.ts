@@ -4,10 +4,13 @@
  * The smallest limit order through the trade form, against a running localnet. A trader with 20
  * TUSD in the account rests 0.001 BTC (the lot size) at the default leverage: the engine asks
  * about $10 of margin for it and has no minimum margin of its own, so the form must not hold the
- * order back with dYdX's $20 isolated-margin minimum. The form is filled through its redux
- * actions, read from the page (alerts and the place-order button) and submitted by pressing the
- * button; the order is read back from chain. Requires the fixture (`fixture.mjs setup` + `push`),
- * the indexer and API, and `pnpm dev`.
+ * order back with dYdX's $20 isolated-margin minimum. With the market's fee rates served by the
+ * API, the receipt prices the order from them and the form does not warn that the account's fee
+ * rates are unknown (dYdX loads those from its validator, which Haneul does not have). The form
+ * is filled through its redux actions, read from the page (alerts and the place-order button)
+ * and submitted by pressing the button; the order is read back from chain. Requires the fixture
+ * (`fixture.mjs setup` + `push`), the indexer and API (perp-indexer fea64d4 or later), and
+ * `pnpm dev`.
  *
  *   PLAYWRIGHT=/path/to/node_modules/playwright pnpm exec tsx scripts/haneul-localnet/limit-min.ts
  */
@@ -43,6 +46,8 @@ const UNIT = 10n ** 6n; // TUSD
 const PER_UNIT = 10n ** 12n; // ifixed collateral per TUSD unit
 // Wording of dYdX's "isolated margin orders require at least $20 of collateral" alert.
 const DYDX_MINIMUM = 'minimum collateral requirement';
+// Wording of the warning for fee rates that could not be loaded.
+const FEE_UNKNOWN = 'fee rates may have changed';
 
 let passed = 0;
 const check = (name: string, ok: boolean, detail = '') => {
@@ -173,6 +178,7 @@ await fill([
   ['setSizeToken', '0.001'],
 ]);
 let f = await form();
+const marketOrder = f;
 check('one place-order button on the page', f.buttons === 1, `${f.buttons}`);
 check(
   'market 0.001 BTC: no minimum alert, button enabled',
@@ -206,6 +212,17 @@ await page.screenshot({ path: screenshot });
 console.log(`  screenshot ${screenshot}`);
 check('limit 0.001 BTC: no $20 minimum alert', !f.text.includes(DYDX_MINIMUM), shown(f));
 check('limit 0.001 BTC: place-order button enabled', !f.disabled, shown(f));
+check(
+  'no fee-rate warning on the market or the limit order',
+  !marketOrder.text.includes(FEE_UNKNOWN) && !f.text.includes(FEE_UNKNOWN),
+  shown(f)
+);
+// 0.001 BTC at 99,000 and the 2 bp maker rate of a resting order
+check(
+  'the receipt prices the limit order at the market rate',
+  /Fee\s+\$0\.02\b/.test(f.text),
+  f.text.match(/Fee\s+\S+/)?.[0] ?? 'no fee row'
+);
 
 await page.locator('form button[type="submit"]:visible').click();
 let rested = before;

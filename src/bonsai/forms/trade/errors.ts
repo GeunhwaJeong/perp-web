@@ -31,6 +31,7 @@ import { AttemptNumber, MustNumber } from '@/lib/numbers';
 import { validateTriggerOrder } from '../triggers/errors';
 import { TriggerOrderState, TriggerPriceInputType } from '../triggers/types';
 import { getGoodTilInSeconds } from './summary';
+import { marketMakerFee, marketTakerFee } from './tradeInfo';
 import {
   ExecutionType,
   MarginMode,
@@ -128,7 +129,12 @@ function validateNonMarketInputData(
     );
   }
 
-  if (inputData.userFeeStats.makerFeeRate == null || inputData.userFeeStats.takerFeeRate == null) {
+  // The receipt prices orders at the market's base rates while no fee tier is known, so the
+  // rates are missing only when the market's are too.
+  if (
+    (inputData.userFeeStats.makerFeeRate ?? marketMakerFee(inputData)) == null ||
+    (inputData.userFeeStats.takerFeeRate ?? marketTakerFee(inputData)) == null
+  ) {
     errors.push(
       simpleValidationError({
         code: 'REQUIRED_RELEVANT_MARKETS',

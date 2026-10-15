@@ -1295,9 +1295,9 @@ function generateGeometricWeights(
 
 // The engine charges each market's base rates; the account's tier multipliers are applied on
 // chain and are not indexed yet, so the base rate is the estimate when no tier is known.
-const marketTakerFee = (accountData: TradeFormInputData) =>
+export const marketTakerFee = (accountData: TradeFormInputData) =>
   AttemptNumber(accountData.currentTradeMarketSummary?.takerFee);
-const marketMakerFee = (accountData: TradeFormInputData) =>
+export const marketMakerFee = (accountData: TradeFormInputData) =>
   AttemptNumber(accountData.currentTradeMarketSummary?.makerFee);
 
 function calculateTradeFeeAfterDiscounts(
