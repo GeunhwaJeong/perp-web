@@ -198,18 +198,25 @@ export const TradeForm = ({
         <TradeFormInputs />
         <TradeSizeInputs />
         <AdvancedTradeOptions />
-        <TradeFormMessages
-          isErrorShownInOrderStatusToast={isErrorShownInOrderStatusToast}
-          placeOrderError={placeOrderError}
-          primaryAlert={formAlert}
-          shouldPromptUserToPlaceLimitOrder={shouldPromptUserToPlaceLimitOrder}
-        />
       </$InputsColumn>
     </$OrderbookAndInputs>
   );
 
+  // The tablet's preview steps show their own alert above the footer.
+  const isPreviewStep = currentStep != null && currentStep !== MobilePlaceOrderSteps.EditOrder;
+
   const tradeFooter = (
     <PlaceOrderButtonAndReceipt
+      slotAlerts={
+        isPreviewStep ? undefined : (
+          <TradeFormMessages
+            isErrorShownInOrderStatusToast={isErrorShownInOrderStatusToast}
+            placeOrderError={placeOrderError}
+            primaryAlert={formAlert}
+            shouldPromptUserToPlaceLimitOrder={shouldPromptUserToPlaceLimitOrder}
+          />
+        )
+      }
       summary={summary}
       actionStringKey={shortAlertKey}
       confirmButtonConfig={{

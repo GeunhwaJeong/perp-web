@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { ReactNode, useState } from 'react';
 
 import { TradeFormSummary, TradeFormType } from '@/bonsai/forms/trade/types';
 import { BonsaiHelpers } from '@/bonsai/ontology';
@@ -57,6 +57,8 @@ type ElementProps = {
   onClearInputs: () => void;
   shouldEnableTrade: boolean;
   showDeposit?: boolean;
+  /** Alerts about the order, kept next to the button it holds back. */
+  slotAlerts?: ReactNode;
   summary: TradeFormSummary;
   tradingUnavailable: boolean;
 };
@@ -70,6 +72,7 @@ export const PlaceOrderButtonAndReceipt = ({
   onClearInputs,
   shouldEnableTrade,
   showDeposit,
+  slotAlerts,
   summary,
   tradingUnavailable,
 }: ElementProps) => {
@@ -326,6 +329,7 @@ export const PlaceOrderButtonAndReceipt = ({
 
   return (
     <$Footer>
+      {slotAlerts != null && <$Alerts>{slotAlerts}</$Alerts>}
       {!isTablet && (
         <div tw="row gap-0.5 justify-self-end px-0 py-0.5">
           <$WithSeparators layout="row">
@@ -378,6 +382,21 @@ const $Footer = styled.footer`
   padding-bottom: var(--dialog-content-paddingBottom);
   ${layoutMixins.column}
   width: 100%;
+
+  /* Where the form keeps this footer sticky, the inputs scroll beneath it: cover them, and take
+     the clicks that would otherwise reach the inputs hidden underneath. */
+  background-color: var(--stickyArea-background, transparent);
+  pointer-events: auto;
+`;
+
+const $Alerts = styled.div`
+  ${layoutMixins.flexColumn}
+  gap: 0.5rem;
+  padding-top: 0.5rem;
+
+  &:empty {
+    display: none;
+  }
 `;
 
 const $WithSeparators = styled(WithSeparators)`

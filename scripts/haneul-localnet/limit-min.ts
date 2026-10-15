@@ -8,7 +8,9 @@
  * margin for it and has no minimum margin of its own, so the form must not hold the order back
  * with dYdX's $20 isolated-margin minimum. With the market's fee rates served by the API, the
  * receipt prices the order from them and the form does not warn that the account's fee rates are
- * unknown (dYdX loads those from its validator, which Haneul does not have). The form is filled
+ * unknown (dYdX loads those from its validator, which Haneul does not have). On laptop-height
+ * windows, where the order footer is sticky, an alert holding the order back shows in full next
+ * to the button, with nothing in the footer over it. The form is filled
  * through its redux actions, read from the page (alerts and the order button) and driven by
  * pressing its buttons; the account and the order are read back from chain. Requires the fixture
  * (`fixture.mjs setup` + `push`), the indexer and API (perp-indexer fea64d4 or later), and
@@ -264,6 +266,57 @@ check(
   shown(f)
 );
 
+// On laptop-height windows the order footer is sticky and the inputs scroll beneath it; the
+// alert saying why the button is held back must stay in sight, with nothing in the footer over it.
+const alertLayout = (wording: string) =>
+  page.evaluate((w: string) => {
+    const footer = [...document.querySelectorAll('form footer')].find(
+      (e) => (e as HTMLElement).offsetParent != null
+    );
+    const holders = [...document.querySelectorAll('form *')].filter((e) =>
+      e.textContent?.includes(w)
+    );
+    const text = holders.find((e) => ![...e.children].some((c) => c.textContent?.includes(w)));
+    if (footer == null || text == null) return { found: false, inWindow: false, covers: [] };
+    const box = text.getBoundingClientRect();
+    const y = box.top + box.height / 2;
+    const covers = [box.left + 4, box.left + box.width / 2, box.right - 4]
+      .map((x) => document.elementFromPoint(x, y))
+      .filter((hit) => hit == null || !(hit === text || text.contains(hit) || hit.contains(text)))
+      .map((hit) =>
+        hit == null
+          ? 'nothing'
+          : `${hit.tagName.toLowerCase()} "${(hit as HTMLElement).innerText.slice(0, 20)}"`
+      );
+    return {
+      found: true,
+      inWindow: box.top >= 0 && box.bottom <= window.innerHeight,
+      covers,
+      footerBackground: getComputedStyle(footer).backgroundColor,
+    };
+  }, wording);
+for (const [width, height] of [
+  [1728, 875],
+  [1549, 784],
+]) {
+  await page.setViewportSize({ width, height });
+  await page.waitForTimeout(1_500);
+  const layout = await alertLayout(ALERTS.marginUsage);
+  await page.screenshot({ path: `${screenshots}-alert-${width}x${height}.png` });
+  console.log(`  screenshot ${screenshots}-alert-${width}x${height}.png`);
+  check(
+    `${width}x${height}: the margin alert shows in full, with nothing over it`,
+    layout.found && layout.inWindow && layout.covers.length === 0,
+    JSON.stringify(layout)
+  );
+  check(
+    `${width}x${height}: the footer is opaque`,
+    layout.footerBackground !== 'rgba(0, 0, 0, 0)',
+    layout.footerBackground
+  );
+}
+await page.setViewportSize({ width: 1440, height: 1100 });
+
 // 3. the smallest limit order: about $10 of margin out of 20
 await fill(limitBuy('0.001'));
 f = await form();
@@ -271,6 +324,19 @@ await page.screenshot({ path: `${screenshots}-order.png` });
 console.log(`  screenshot ${screenshots}-order.png`);
 check('limit 0.001 BTC: no $20 minimum alert', !f.text.includes(ALERTS.dydxMinimum), shown(f));
 check('limit 0.001 BTC: place-order button enabled', !f.disabled, shown(f));
+const emptyAlertSpace = await page.evaluate(() => {
+  const footer = [...document.querySelectorAll('form footer')].find(
+    (e) => (e as HTMLElement).offsetParent != null
+  );
+  return [...(footer?.children ?? [])].filter(
+    (c) => c.getBoundingClientRect().height > 0 && c.querySelector('button') == null
+  ).length;
+});
+check(
+  'limit 0.001 BTC: with no alert the footer keeps no room for one',
+  emptyAlertSpace === 0,
+  `${emptyAlertSpace}`
+);
 check(
   'no fee-rate warning on the market or the limit order',
   !marketOrder.text.includes(ALERTS.feeUnknown) && !f.text.includes(ALERTS.feeUnknown),
