@@ -49,7 +49,6 @@ export const MAX_TWAP_FREQUENCY_SECONDS = 3600;
 
 const marketOrderErrorSlippage = 0.1;
 const marketOrderWarningSlippage = 0.05;
-const isolatedLimitOrderMinimumEquity = 20.0;
 
 export function calculateTradeFormErrors(
   state: TradeForm,
@@ -514,7 +513,6 @@ function validateAdvancedTradeConditions(
     if (liquidityError) {
       errors.push(liquidityError);
     }
-    // For limit orders, validate isolated margin requirements
   } else if (
     state.type === TradeFormType.LIMIT ||
     state.type === TradeFormType.SCALE ||
@@ -522,11 +520,8 @@ function validateAdvancedTradeConditions(
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     state.type === TradeFormType.TRIGGER_MARKET
   ) {
-    // todo this should probably check for limit order if the execution is IOC
-    const isolatedMarginError = validateIsolatedMarginMinSize(summary);
-    if (isolatedMarginError) {
-      errors.push(isolatedMarginError);
-    }
+    // The engine sets no minimum margin for an order. Its one floor, a minimum value for an
+    // order that rests without matching, it checks itself (clearing_house abort 3).
   } else {
     assertNever(state.type);
   }
@@ -552,57 +547,6 @@ function validateLiquidity(summary: TradeFormSummary): ValidationError | undefin
       fields: ['size'],
       titleKey: STRING_KEYS.MODIFY_SIZE_FIELD,
       textKey: STRING_KEYS.MARKET_ORDER_ONE_SIDED_LIQUIDITY,
-    });
-  }
-
-  return undefined;
-}
-
-function validateIsolatedMarginMinSize(summary: TradeFormSummary): ValidationError | undefined {
-  const state = summary.effectiveTrade;
-
-  // Only check for isolated margin mode
-  if (state.marginMode !== MarginMode.ISOLATED) {
-    return undefined;
-  }
-
-  const subaccountBefore = summary.accountDetailsBefore?.account;
-  const subaccountAfter = summary.accountDetailsAfter?.account;
-
-  if (!subaccountBefore || !subaccountAfter) {
-    return undefined;
-  }
-
-  if (
-    summary.accountDetailsBefore?.position?.marginValueInitial.gte(isolatedLimitOrderMinimumEquity)
-  ) {
-    return undefined;
-  }
-
-  const currentFreeCollateral = subaccountBefore.freeCollateral.toNumber();
-  const postFreeCollateral = subaccountAfter.freeCollateral.toNumber();
-  const orderEquity = currentFreeCollateral - postFreeCollateral;
-  const isReducingPosition = orderEquity <= 0;
-
-  // Check if the order meets minimum equity requirements
-  if (
-    postFreeCollateral >= 0 &&
-    !isReducingPosition &&
-    orderEquity < isolatedLimitOrderMinimumEquity
-  ) {
-    return simpleValidationError({
-      code: 'ISOLATED_MARGIN_LIMIT_ORDER_BELOW_MINIMUM',
-      type: ErrorType.error,
-      fields: ['size'],
-      titleKey: STRING_KEYS.MODIFY_SIZE_FIELD,
-      textKey: STRING_KEYS.ISOLATED_MARGIN_LIMIT_ORDER_BELOW_MINIMUM,
-      textParams: {
-        MIN_VALUE: {
-          value: isolatedLimitOrderMinimumEquity,
-          format: ErrorFormat.Price,
-        },
-      },
-      learnMoreUrlKey: 'equityTiersLearnMore',
     });
   }
 
