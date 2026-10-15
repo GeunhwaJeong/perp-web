@@ -100,6 +100,14 @@ export const TradeForm = ({
   const { side } = tradeFormInputValues;
   const selectedOrderSide = side ?? OrderSide.BUY;
 
+  // Every order's margin comes from the account's collateral, so with none there yet the button
+  // offers a deposit and the size and margin alerts are left out. A position keeps the usual form
+  // so it can still be reduced or closed.
+  const needsDeposit =
+    summary.accountDetailsBefore?.account?.equity.lte(0) === true &&
+    summary.accountDetailsBefore.position == null;
+  const formAlert = needsDeposit ? undefined : primaryAlert;
+
   const { selectedTradeType, tradeTypeItems: allTradeTypeItems } = useTradeTypeOptions({
     showAll: true,
     showAssetIcon: true,
@@ -193,7 +201,7 @@ export const TradeForm = ({
         <TradeFormMessages
           isErrorShownInOrderStatusToast={isErrorShownInOrderStatusToast}
           placeOrderError={placeOrderError}
-          primaryAlert={primaryAlert}
+          primaryAlert={formAlert}
           shouldPromptUserToPlaceLimitOrder={shouldPromptUserToPlaceLimitOrder}
         />
       </$InputsColumn>
@@ -214,7 +222,7 @@ export const TradeForm = ({
       hasValidationErrors={hasValidationErrors}
       onClearInputs={() => dispatch(tradeFormActions.resetPrimaryInputs())}
       shouldEnableTrade={shouldEnableTrade}
-      showDeposit={false}
+      showDeposit={needsDeposit}
       tradingUnavailable={tradingUnavailable}
     />
   );
@@ -232,7 +240,7 @@ export const TradeForm = ({
           <TradeFormAlertContent
             placeOrderError={placeOrderError}
             isErrorShownInOrderStatusToast={isErrorShownInOrderStatusToast}
-            primaryAlert={primaryAlert}
+            primaryAlert={formAlert}
           />
         </>
       ) : // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition

@@ -1,14 +1,16 @@
 /* eslint-disable no-console */
 
 /**
- * The smallest limit order through the trade form, against a running localnet. A trader with 20
- * TUSD in the account rests 0.001 BTC (the lot size) at the default leverage: the engine asks
- * about $10 of margin for it and has no minimum margin of its own, so the form must not hold the
- * order back with dYdX's $20 isolated-margin minimum. With the market's fee rates served by the
- * API, the receipt prices the order from them and the form does not warn that the account's fee
- * rates are unknown (dYdX loads those from its validator, which Haneul does not have). The form
- * is filled through its redux actions, read from the page (alerts and the place-order button)
- * and submitted by pressing the button; the order is read back from chain. Requires the fixture
+ * A first-time trader through the trade form, against a running localnet. With TUSD in the wallet
+ * but no trading account, the order button offers a deposit instead of checking an order the
+ * engine could not take, and the deposit dialog it opens funds the account. With 20 TUSD there,
+ * the trader rests 0.001 BTC (the lot size) at the default leverage: the engine asks about $10 of
+ * margin for it and has no minimum margin of its own, so the form must not hold the order back
+ * with dYdX's $20 isolated-margin minimum. With the market's fee rates served by the API, the
+ * receipt prices the order from them and the form does not warn that the account's fee rates are
+ * unknown (dYdX loads those from its validator, which Haneul does not have). The form is filled
+ * through its redux actions, read from the page (alerts and the order button) and driven by
+ * pressing its buttons; the account and the order are read back from chain. Requires the fixture
  * (`fixture.mjs setup` + `push`), the indexer and API (perp-indexer fea64d4 or later), and
  * `pnpm dev`.
  *
@@ -34,7 +36,7 @@ const { chromium } = require(process.env.PLAYWRIGHT ?? 'playwright');
 
 const ROOT = join(import.meta.dirname, '..', '..');
 const url = process.env.APP_URL ?? 'http://localhost:5173/#/trade/BTC-USD';
-const screenshot = process.env.SCREENSHOT ?? join(ROOT, '.localnet', 'limit-min.png');
+const screenshots = process.env.SCREENSHOTS ?? join(ROOT, '.localnet', 'limit-min');
 const MARKET = 'BTC-USD';
 const deployment: PerpDeployment = JSON.parse(
   readFileSync(join(ROOT, 'public/configs/haneul/perp.localnet.json'), 'utf8')
@@ -44,10 +46,18 @@ const client = new HaneulGrpcClient({ network: 'localnet', baseUrl: 'http://127.
 const ONE = 10n ** 18n;
 const UNIT = 10n ** 6n; // TUSD
 const PER_UNIT = 10n ** 12n; // ifixed collateral per TUSD unit
-// Wording of dYdX's "isolated margin orders require at least $20 of collateral" alert.
-const DYDX_MINIMUM = 'minimum collateral requirement';
-// Wording of the warning for fee rates that could not be loaded.
-const FEE_UNKNOWN = 'fee rates may have changed';
+// Wording of the form alerts this suite looks for.
+const ALERTS = {
+  // dYdX's "isolated margin orders require at least $20 of collateral"
+  dydxMinimum: 'minimum collateral requirement',
+  feeUnknown: 'fee rates may have changed',
+  belowLotSize: 'below the minimum order size',
+  marginUsage: 'margin usage',
+};
+const alertsIn = (text: string) =>
+  Object.entries(ALERTS)
+    .filter(([, wording]) => text.includes(wording))
+    .map(([name]) => name);
 
 let passed = 0;
 const check = (name: string, ok: boolean, detail = '') => {
@@ -57,7 +67,7 @@ const check = (name: string, ok: boolean, detail = '') => {
 };
 const tusd = (units: bigint) => `${Number(units) / 1e6}`;
 
-// A trader with gas and 1,000 TUSD in the wallet, of which only 20 goes into the account.
+// A trader with gas and 1,000 TUSD in the wallet and no trading account; 20 goes in.
 const fresh = Ed25519Keypair.generate();
 const me = fresh.getPublicKey().toHaneulAddress();
 const funded = spawnSync(
@@ -101,11 +111,98 @@ const supervisor = (method: string, ...args: unknown[]) =>
   );
 const ok = (r: any) => r.type === 'success';
 
-// 0. account with 20 TUSD
-const r = await supervisor('depositCollateral', 20);
-check('deposit opens the account with 20', ok(r), JSON.stringify(r).slice(0, 120));
+const fill = (actions: Array<[string, unknown]>) =>
+  page.evaluate((list: Array<[string, unknown]>) => {
+    const { store } = (window as any).haneulPerp.supervisor;
+    store.dispatch({ type: 'TradeForm/resetPrimaryInputs' });
+    list.forEach(([type, payload]) => store.dispatch({ type: `TradeForm/${type}`, payload }));
+  }, actions);
+const limitBuy = (size: string): Array<[string, unknown]> => [
+  ['setOrderType', 'LIMIT'],
+  ['setSide', 'BUY'],
+  ['setLimitPrice', '99000'],
+  ['setSizeToken', size],
+];
+// What the trader sees: the order form's button (the order, or the deposit standing in for it)
+// and any alert in the form.
+const form = async () => {
+  await page.waitForTimeout(1_500);
+  return page.evaluate(() => {
+    const footers = [...document.querySelectorAll('form footer')].filter(
+      (e) => (e as HTMLElement).offsetParent != null
+    );
+    const buttons = [...(footers[0]?.querySelectorAll('button') ?? [])] as HTMLButtonElement[];
+    const button =
+      buttons.find((b) => b.type === 'submit') ?? buttons.find((b) => /deposit/i.test(b.innerText));
+    const { type, side, size, limitPrice } = (window as any).haneulPerp.supervisor.store.getState()
+      .tradeForm;
+    return {
+      forms: footers.length,
+      label: button?.innerText.trim() ?? '',
+      disabled: button?.disabled ?? true,
+      text: (footers[0]?.closest('form') as HTMLElement | null)?.innerText ?? '',
+      state: JSON.stringify({ type, side, size, limitPrice }),
+    };
+  });
+};
+const shown = (f: Awaited<ReturnType<typeof form>>) =>
+  `button "${f.label}"${f.disabled ? ' disabled' : ''}; alerts [${alertsIn(f.text)}]; form ${
+    f.state
+  }`;
+
+// The form resets itself when it mounts, so it is filled only once it is on the page.
+await page.locator('form footer').first().waitFor({ timeout: 60_000 });
+
+// 0. no trading account: the button offers a deposit instead of an order the engine cannot take
+const empty = await page
+  .waitForFunction(
+    () => {
+      const { haneulPerp } = window as any;
+      const summary = haneulPerp.BonsaiCore.account.parentSubaccountSummary.data(
+        haneulPerp.supervisor.store.getState()
+      );
+      return summary == null ? null : { equity: summary.equity.toNumber() };
+    },
+    null,
+    { timeout: 30_000 }
+  )
+  .then((h: any) => h.jsonValue())
+  .catch(() => null);
+check('without an account the app reads an empty one', empty?.equity === 0, JSON.stringify(empty));
+
+await fill(limitBuy('0.001'));
+let f = await form();
+await page.screenshot({ path: `${screenshots}-no-account.png` });
+console.log(`  screenshot ${screenshots}-no-account.png`);
+check('one order form on the page', f.forms === 1, `${f.forms}`);
+check(
+  'no account, limit 0.001 BTC: the button offers a deposit, with no alert',
+  /deposit/i.test(f.label) && !f.disabled && alertsIn(f.text).length === 0,
+  shown(f)
+);
+await fill([...limitBuy(''), ['setSizeAvailablePercent', '0.10']]);
+f = await form();
+check(
+  'no account, 10% of the balance: still the deposit, no minimum-size alert',
+  /deposit/i.test(f.label) && alertsIn(f.text).length === 0,
+  shown(f)
+);
+
+// The deposit button opens the deposit dialog, and 20 TUSD through it opens the account.
+await page.locator('form footer button', { hasText: /deposit/i }).click();
+const dialog = page.getByRole('dialog');
+await dialog.waitFor({ timeout: 15_000 });
+await page.waitForFunction(
+  () => document.querySelector('[role="dialog"]')?.textContent?.includes('1,000') === true,
+  null,
+  { timeout: 15_000 }
+);
+check('the deposit button opens the deposit dialog with the wallet balance', true);
+await dialog.locator('input').first().fill('20');
+await dialog.locator('button[type="submit"]').click();
+await dialog.waitFor({ state: 'detached', timeout: 60_000 });
 const acct = await findPerpAccount(client, deployment, me);
-if (!acct) throw new Error('no account');
+if (!acct) throw new Error('no account after the deposit');
 const chain = async () => {
   const [account, position] = await Promise.all([
     readAccount(client, acct.account),
@@ -124,7 +221,11 @@ const describe = (s: Awaited<ReturnType<typeof chain>>) =>
     Number(s.collateral / PER_UNIT) / 1e6
   }, resting ${s.pending}, imr ${Number(s.imr) / 1e18}`;
 const before = await chain();
-check('account balance 20 on chain', before.balance === 20n * UNIT, describe(before));
+check(
+  'the deposit opened the account with 20 on chain',
+  before.balance === 20n * UNIT,
+  describe(before)
+);
 
 // The form reads free collateral from the indexer; wait until the app has the deposit.
 await page.waitForFunction(
@@ -140,81 +241,39 @@ await page.waitForFunction(
 );
 check('the app shows 20 of free collateral', true);
 
-const fill = (actions: Array<[string, unknown]>) =>
-  page.evaluate((list: Array<[string, unknown]>) => {
-    const { store } = (window as any).haneulPerp.supervisor;
-    store.dispatch({ type: 'TradeForm/resetPrimaryInputs' });
-    list.forEach(([type, payload]) => store.dispatch({ type: `TradeForm/${type}`, payload }));
-  }, actions);
-// What the trader sees: the visible place-order button and any alert in its form.
-const form = async () => {
-  await page.waitForTimeout(1_500);
-  return page.evaluate(() => {
-    const buttons = [...document.querySelectorAll('form button[type="submit"]')].filter(
-      (b) => (b as HTMLElement).offsetParent != null
-    ) as HTMLButtonElement[];
-    const button = buttons[0];
-    const { type, side, size, limitPrice } = (window as any).haneulPerp.supervisor.store.getState()
-      .tradeForm;
-    return {
-      buttons: buttons.length,
-      label: button?.innerText.trim() ?? '',
-      disabled: button?.disabled ?? true,
-      text: (button?.closest('form') as HTMLElement | null)?.innerText ?? '',
-      state: JSON.stringify({ type, side, size, limitPrice }),
-    };
-  });
-};
-const shown = (f: Awaited<ReturnType<typeof form>>) =>
-  `button "${f.label}"${f.disabled ? ' disabled' : ''}; form ${f.state}`;
-
-// The form resets itself when it mounts, so it is filled only once its button is on the page.
-await page.locator('form button[type="submit"]:visible').waitFor({ timeout: 60_000 });
-
 // 1. a market order of the same size was never held back
 await fill([
   ['setOrderType', 'MARKET'],
   ['setSide', 'BUY'],
   ['setSizeToken', '0.001'],
 ]);
-let f = await form();
+f = await form();
 const marketOrder = f;
-check('one place-order button on the page', f.buttons === 1, `${f.buttons}`);
 check(
-  'market 0.001 BTC: no minimum alert, button enabled',
-  !f.text.includes(DYDX_MINIMUM) && !f.disabled,
+  'market 0.001 BTC: an order again, no minimum alert, button enabled',
+  /place/i.test(f.label) && !f.text.includes(ALERTS.dydxMinimum) && !f.disabled,
   shown(f)
 );
 
 // 2. a limit order beyond the balance is still refused by the margin check
-await fill([
-  ['setOrderType', 'LIMIT'],
-  ['setSide', 'BUY'],
-  ['setLimitPrice', '99000'],
-  ['setSizeToken', '0.01'],
-]);
+await fill(limitBuy('0.01'));
 f = await form();
 check(
   'limit 0.01 BTC (about $100 of margin): refused for margin, not for a minimum',
-  f.disabled && !f.text.includes(DYDX_MINIMUM),
+  f.disabled && !f.text.includes(ALERTS.dydxMinimum),
   shown(f)
 );
 
 // 3. the smallest limit order: about $10 of margin out of 20
-await fill([
-  ['setOrderType', 'LIMIT'],
-  ['setSide', 'BUY'],
-  ['setLimitPrice', '99000'],
-  ['setSizeToken', '0.001'],
-]);
+await fill(limitBuy('0.001'));
 f = await form();
-await page.screenshot({ path: screenshot });
-console.log(`  screenshot ${screenshot}`);
-check('limit 0.001 BTC: no $20 minimum alert', !f.text.includes(DYDX_MINIMUM), shown(f));
+await page.screenshot({ path: `${screenshots}-order.png` });
+console.log(`  screenshot ${screenshots}-order.png`);
+check('limit 0.001 BTC: no $20 minimum alert', !f.text.includes(ALERTS.dydxMinimum), shown(f));
 check('limit 0.001 BTC: place-order button enabled', !f.disabled, shown(f));
 check(
   'no fee-rate warning on the market or the limit order',
-  !marketOrder.text.includes(FEE_UNKNOWN) && !f.text.includes(FEE_UNKNOWN),
+  !marketOrder.text.includes(ALERTS.feeUnknown) && !f.text.includes(ALERTS.feeUnknown),
   shown(f)
 );
 // 0.001 BTC at 99,000 and the 2 bp maker rate of a resting order
@@ -224,7 +283,7 @@ check(
   f.text.match(/Fee\s+\S+/)?.[0] ?? 'no fee row'
 );
 
-await page.locator('form button[type="submit"]:visible').click();
+await page.locator('form footer button[type="submit"]:visible').click();
 let rested = before;
 for (let i = 0; i < 60 && rested.pending === 0n; i += 1) {
   await page.waitForTimeout(1_000);
