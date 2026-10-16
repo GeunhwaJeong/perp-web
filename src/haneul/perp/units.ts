@@ -52,6 +52,17 @@ export const collateralToUnits = (amount: number | string, decimals: number) =>
 export const unitsToCollateral = (units: bigint | string, decimals: number) =>
   new BigNumber(units.toString()).div(new BigNumber(10).pow(decimals));
 
+/**
+ * How many decimals show a collateral amount exactly when it is rounded down to the coin's
+ * decimals: trailing zeros dropped, but at least two (12.5 shows as 12.50, 19.835284 as is).
+ * Rounding down keeps the shown balance from exceeding what can be moved.
+ */
+export const collateralDisplayDecimals = (amount: number, decimals: number) =>
+  Math.max(
+    2,
+    new BigNumber(amount).decimalPlaces(decimals, BigNumber.ROUND_DOWN).decimalPlaces() ?? 0
+  );
+
 export const unitsToPrice = (units: bigint | string) =>
   new BigNumber(units.toString()).div(B9.toString());
 

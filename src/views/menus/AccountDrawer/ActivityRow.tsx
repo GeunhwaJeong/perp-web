@@ -37,6 +37,20 @@ const $Logo = styled.div`
   }
 `;
 
+// The collateral has no logo of its own (the app's TUSD icon is TrueUSD's), so it shows as a
+// lettered disc, the way the app shows any asset without one.
+const $Collateral = styled.div`
+  display: flex;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  border-radius: ${radii.full};
+  background: ${colors.surface2};
+  color: ${colors.neutral1};
+  ${type.subheading2}
+`;
+
 const $Status = styled.div<{ $tone: 'up' | 'down' | 'neutral' }>`
   position: absolute;
   right: -4px;
@@ -105,7 +119,11 @@ export const ActivityRow = ({ item }: { item: ActivityItem }) => {
   return (
     <$Row>
       <$Logo>
-        <AssetIcon symbol={item.symbol} className="asset" />
+        {item.kind === 'buy' || item.kind === 'sell' ? (
+          <AssetIcon symbol={item.symbol} className="asset" />
+        ) : (
+          <$Collateral>{item.symbol.charAt(0)}</$Collateral>
+        )}
         <$Status $tone={tone}>{icon}</$Status>
       </$Logo>
       <$Text>

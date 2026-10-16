@@ -4,6 +4,8 @@ import { BonsaiCore } from '@/bonsai/ontology';
 
 import { IndexerTransferType } from '@/types/indexer/indexerApiGen';
 
+import { useTokenConfigs } from '@/hooks/useTokenConfigs';
+
 import { useAppSelector } from '@/state/appTypes';
 
 export type ActivityItem = {
@@ -30,6 +32,9 @@ const amount = (size: string | undefined, digits: number) =>
 export const useRecentActivity = (limit = 3): ActivityItem[] => {
   const transfers = useAppSelector(BonsaiCore.account.transfers.data);
   const fills = useAppSelector(BonsaiCore.account.fills.data);
+  // The indexer names the collateral USDC, as dYdX's did; the drawer calls it what the wallet
+  // holds, as its balance line does.
+  const { usdcLabel } = useTokenConfigs();
 
   return useMemo(() => {
     const fromTransfers: ActivityItem[] = transfers.map((t) => {
@@ -43,10 +48,10 @@ export const useRecentActivity = (limit = 3): ActivityItem[] => {
         id: `transfer-${t.id}`,
         title:
           kind === 'deposit' ? 'Deposited' : kind === 'withdrawal' ? 'Withdrew' : 'Transferred',
-        caption: `${amount(t.size, 2)} ${t.symbol}`,
+        caption: `${amount(t.size, 2)} ${usdcLabel}`,
         at: Date.parse(t.createdAt),
         kind,
-        symbol: t.symbol,
+        symbol: usdcLabel,
       };
     });
     const fromFills: ActivityItem[] = fills
@@ -64,7 +69,7 @@ export const useRecentActivity = (limit = 3): ActivityItem[] => {
         };
       });
     return [...fromTransfers, ...fromFills].sort((a, b) => b.at - a.at).slice(0, limit);
-  }, [transfers, fills, limit]);
+  }, [transfers, fills, limit, usdcLabel]);
 };
 
 const usd = (price: string | undefined) =>

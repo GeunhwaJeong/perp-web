@@ -6,8 +6,11 @@
  * TUSD in and 0.001 BTC open, the panel shows the position's unrealized P&L and funding and, as
  * margin used, the share of the portfolio the account balance cannot spend; the portfolio page
  * shows the same usage and the account's leverage. The header's Deposit opens the deposit
- * dialog, and the panel keeps its own deposit and withdraw buttons. Expected values come from
- * chain (the balance) and the API (equity, P&L, mark price), not from the app's own summary.
+ * dialog, and the panel keeps its own deposit and withdraw buttons. The deposit and withdraw
+ * dialogs show balances exactly, rounded down (0.00 available before there is an account), and
+ * Max fills the exact amount; the drawer lists the deposit in the collateral's own name, without
+ * USDC's or TrueUSD's logo. Expected values come from chain (the balance) and the API (equity,
+ * P&L, mark price), not from the app's own summary.
  * Requires the fixture (`fixture.mjs setup` + `push`), the indexer and API, and `pnpm dev`.
  *
  *   PLAYWRIGHT=/path/to/node_modules/playwright pnpm exec tsx scripts/haneul-localnet/account-panel.ts
@@ -51,6 +54,12 @@ const amount = (shown: string | undefined) =>
   shown != null && /\d/.test(shown)
     ? Number(shown.replace('−', '-').replace(/[^0-9.-]/g, ''))
     : NaN;
+// TUSD units (6 decimals) as the dialogs should show them: every nonzero decimal, at least two.
+const exact = (units: bigint, grouping = true) => {
+  const whole = units / 1_000_000n;
+  const fraction = (units % 1_000_000n).toString().padStart(6, '0').replace(/0+$/, '');
+  return `${grouping ? whole.toLocaleString('en-US') : whole}.${fraction.padEnd(2, '0')}`;
+};
 
 // A trader with gas and 1,000 TUSD in the wallet.
 const fresh = Ed25519Keypair.generate();
@@ -169,9 +178,53 @@ const hideNotifications = () =>
     });
   });
 const headerDeposit = page.locator('header button', { hasText: /^\s*Deposit\s*$/ });
+const dialog = page.getByRole('dialog');
+// The deposit or withdraw dialog: its balance lines ("1,000.00 TUSD"), amount field and button.
+const collateralDialog = () =>
+  page.evaluate(() => {
+    const box = document.querySelector('[role="dialog"]');
+    const [wallet, available] = ['Wallet Balance', 'Available Balance'].map((name) => {
+      const label = [...(box?.querySelectorAll('*') ?? [])].find(
+        (e) => e instanceof HTMLElement && e.childElementCount === 0 && e.innerText.trim() === name
+      ) as HTMLElement | undefined;
+      return (label?.parentElement?.innerText ?? '').replace(name, '').replace(/\s+/g, ' ').trim();
+    });
+    const submit = box?.querySelector('button[type="submit"]') as HTMLButtonElement | null;
+    return {
+      wallet,
+      available,
+      input: (box?.querySelector('input') as HTMLInputElement | null)?.value ?? '',
+      button: submit?.innerText.trim() ?? '',
+      disabled: submit?.disabled ?? true,
+    };
+  });
+// Opens with the wallet's balance read, which the dialog loads after it shows.
+const dialogWithWallet = async (wallet: string) => {
+  await dialog.waitFor({ timeout: 15_000 });
+  await page.waitForFunction(
+    (w: string) => document.querySelector('[role="dialog"]')?.textContent.includes(w) === true,
+    wallet,
+    { timeout: 15_000 }
+  );
+  await page.waitForTimeout(500);
+};
+const closeDialog = async () => {
+  await page.keyboard.press('Escape');
+  await dialog.waitFor({ state: 'detached', timeout: 15_000 });
+};
+
+await page.locator('form footer').first().waitFor({ timeout: 60_000 });
+
+// Before any deposit: the deposit dialog of a wallet without a trading account.
+await headerDeposit.click();
+await dialogWithWallet('1,000');
+const noAccount = await collateralDialog();
+await hideNotifications();
+await page.screenshot({ path: `${screenshots}-deposit-no-account.png` });
+console.log(`  screenshot ${screenshots}-deposit-no-account.png`);
+await closeDialog();
 
 // 20 TUSD in and 0.001 BTC bought through the app's own write path.
-await page.locator('form footer').first().waitFor({ timeout: 60_000 });
 const deposited = await supervisor('depositCollateral', 20);
 check('20 TUSD deposited', deposited.type === 'success', JSON.stringify(deposited).slice(0, 200));
 await page.waitForFunction(
@@ -234,6 +287,65 @@ await hideNotifications();
 await page.screenshot({ path: `${screenshots}-position.png` });
 console.log(`  screenshot ${screenshots}-position.png`);
 
+// The withdraw dialog from the panel's withdraw button, before and after Max (nothing is sent).
+await page.evaluate(() => {
+  const label = [...document.querySelectorAll('*')].find(
+    (e) =>
+      e instanceof HTMLElement && e.childElementCount === 0 && e.innerText.trim() === 'Margin Used'
+  );
+  let box = label?.parentElement ?? null;
+  while (box != null && box.querySelector('button svg') == null) box = box.parentElement;
+  [...(box?.querySelectorAll('button') ?? [])]
+    .find((b) => b.innerText.trim() === '' && b.querySelector('svg') != null)
+    ?.setAttribute('data-check', 'withdraw');
+});
+await page.locator('[data-check="withdraw"]').click();
+await dialogWithWallet('980');
+const withdraw = await collateralDialog();
+await dialog.getByRole('button', { name: 'Max' }).click();
+await page.waitForTimeout(500);
+const withdrawMax = await collateralDialog();
+await hideNotifications();
+await page.screenshot({ path: `${screenshots}-withdraw.png` });
+console.log(`  screenshot ${screenshots}-withdraw.png`);
+await closeDialog();
+
+// The drawer's recent activity, from the account button in the header.
+await page
+  .locator('header button', { hasText: /0x[0-9a-f]{4}/i })
+  .first()
+  .click();
+await page.waitForFunction(
+  () =>
+    [...document.querySelectorAll('[role="dialog"]')].some((d) =>
+      d.textContent.includes('Deposited')
+    ),
+  null,
+  { timeout: 30_000 }
+);
+await page.waitForTimeout(1_000);
+const drawer = await page.evaluate(() => {
+  const box = [...document.querySelectorAll('[role="dialog"]')].find((d) =>
+    d.textContent.includes('Deposited')
+  ) as HTMLElement | undefined;
+  return {
+    text: (box?.innerText ?? '').replace(/\s+/g, ' '),
+    images: [...(box?.querySelectorAll('img') ?? [])].map((i) => i.getAttribute('src') ?? ''),
+  };
+});
+await hideNotifications();
+await page.screenshot({ path: `${screenshots}-drawer.png` });
+console.log(`  screenshot ${screenshots}-drawer.png`);
+await page.keyboard.press('Escape');
+await page.waitForFunction(
+  () =>
+    ![...document.querySelectorAll('[role="dialog"]')].some((d) =>
+      d.textContent.includes('Deposited')
+    ),
+  null,
+  { timeout: 15_000 }
+);
+
 // What the panel should show: the balance from chain, equity, P&L and the mark from the API.
 const [account, position] = await Promise.all([
   readAccount(client, acct.account),
@@ -265,7 +377,6 @@ console.log(`  panel open ${JSON.stringify(open)}`);
 // 1. the header's Deposit works for a connected account
 check('the header Deposit is enabled', headerEnabled);
 await headerDeposit.click();
-const dialog = page.getByRole('dialog');
 await dialog.waitFor({ timeout: 15_000 });
 // the wallet's 980 TUSD left after the deposit, once the dialog has read it
 const opened = await page
@@ -314,7 +425,44 @@ check(
   `${open.available} vs ${balance}`
 );
 
-// 4. the portfolio page shows the same usage and the account's leverage
+// 4. the deposit and withdraw dialogs show balances exactly, rounded down
+console.log(
+  `  dialogs: no account ${JSON.stringify(noAccount)}; withdraw ${JSON.stringify(withdraw)};`
+);
+console.log(`  after Max ${JSON.stringify(withdrawMax)}; drawer ${JSON.stringify(drawer)}`);
+check(
+  'before any deposit the dialog shows the wallet and 0.00 available',
+  noAccount.wallet === '1,000.00 TUSD' && noAccount.available === '0.00 TUSD',
+  JSON.stringify(noAccount)
+);
+check(
+  'the withdraw dialog shows the balance on chain to its last decimal',
+  withdraw.available === `${exact(account.collateral)} TUSD` && withdraw.wallet === '980.00 TUSD',
+  `${withdraw.available} vs ${exact(account.collateral)} TUSD; wallet ${withdraw.wallet}`
+);
+check(
+  'Max fills that exact amount and the withdrawal is allowed',
+  withdrawMax.input === exact(account.collateral, false) &&
+    withdrawMax.button === 'Withdraw' &&
+    !withdrawMax.disabled,
+  JSON.stringify(withdrawMax)
+);
+
+// 5. the drawer's activity names the collateral as the wallet holds it
+check(
+  'the drawer lists the deposit as 20.00 TUSD',
+  drawer.text.includes('Deposited') &&
+    drawer.text.includes('20.00 TUSD') &&
+    !drawer.text.includes('USDC'),
+  drawer.text.slice(0, 200)
+);
+check(
+  'with no USDC or TrueUSD logo',
+  !drawer.images.some((src) => /usdc\.png|tusd\.png/.test(src)),
+  JSON.stringify(drawer.images)
+);
+
+// 6. the portfolio page shows the same usage and the account's leverage
 // Opened afresh: under the dev server, leaving the trade page from inside the app stalls on the
 // chart's teardown ("doWhenApiIsReady" of null), which the production build does not.
 await openPage(new URL('/portfolio', url).toString());

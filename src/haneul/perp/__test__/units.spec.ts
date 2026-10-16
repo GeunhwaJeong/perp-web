@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  collateralDisplayDecimals,
   fractionToIfixed,
   IFIXED_ONE,
   limitPriceToUnits,
@@ -57,5 +58,26 @@ describe('ratioToRestore', () => {
 
   it('never exceeds 1', () => {
     expect(ratioToRestore(TEN_X, [IFIXED_ONE + 1n])).toBe(IFIXED_ONE);
+  });
+});
+
+describe('collateralDisplayDecimals', () => {
+  const TUSD = 6;
+
+  it('shows a balance to its last nonzero decimal', () => {
+    // mainnet, 2026-10-16: the account balance after closing 0.001 BTC
+    expect(collateralDisplayDecimals(19.835284, TUSD)).toBe(6);
+    expect(collateralDisplayDecimals(9.92999, TUSD)).toBe(5);
+  });
+
+  it('keeps two decimals for whole and short amounts', () => {
+    expect(collateralDisplayDecimals(980, TUSD)).toBe(2);
+    expect(collateralDisplayDecimals(12.5, TUSD)).toBe(2);
+    expect(collateralDisplayDecimals(0, TUSD)).toBe(2);
+  });
+
+  it("stops at the coin's decimals", () => {
+    expect(collateralDisplayDecimals(0.1234567, TUSD)).toBe(6);
+    expect(collateralDisplayDecimals(0.0000004, TUSD)).toBe(2);
   });
 });

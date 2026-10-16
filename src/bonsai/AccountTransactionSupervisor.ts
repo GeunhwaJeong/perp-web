@@ -737,6 +737,7 @@ export class AccountTransactionSupervisor {
       account: number | undefined;
       withdrawable: number | undefined;
       symbol: string;
+      decimals: number;
     }>
   > {
     const wallet = await this.walletContext();
@@ -763,6 +764,7 @@ export class AccountTransactionSupervisor {
           ? unitsToCollateral(account.collateral + returnable, decimals).toNumber()
           : undefined,
         symbol: coinType.split('::').pop() ?? 'USD',
+        decimals,
       });
     } catch (error) {
       return this.toFailure(error);

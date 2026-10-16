@@ -2,6 +2,8 @@ import { FormEvent, useCallback, useEffect, useState } from 'react';
 
 import { accountTransactionManager } from '@/bonsai/AccountTransactionSupervisor';
 import { isOperationFailure } from '@/bonsai/lib/operationResult';
+import { collateralDisplayDecimals } from '@/haneul/perp';
+import BigNumber from 'bignumber.js';
 
 import { AlertType } from '@/constants/alerts';
 import { ButtonAction, ButtonType } from '@/constants/buttons';
@@ -26,6 +28,7 @@ type Balances = {
   account: number | undefined;
   withdrawable: number | undefined;
   symbol: string;
+  decimals: number;
 };
 
 /**
@@ -90,6 +93,7 @@ const CollateralDialog = ({
     setIsOpen(false);
   };
 
+  // Exact to the coin's decimals and rounded down, so the amount shown can be typed in and moved.
   const balanceRow = (label: string, balance: number | undefined) => (
     <div tw="row justify-between text-color-text-0 font-small-medium">
       <span>{label}</span>
@@ -97,6 +101,10 @@ const CollateralDialog = ({
         tw="text-color-text-1"
         type={OutputType.Number}
         value={balance}
+        fractionDigits={
+          balance != null && balances ? collateralDisplayDecimals(balance, balances.decimals) : null
+        }
+        roundingMode={BigNumber.ROUND_DOWN}
         tag={balances?.symbol}
         useGrouping
       />
@@ -112,9 +120,14 @@ const CollateralDialog = ({
     >
       <form tw="flexColumn mt-1.25 gap-1.25" onSubmit={onSubmit}>
         {balanceRow(stringGetter({ key: STRING_KEYS.WALLET_BALANCE }), balances?.wallet)}
-        {balanceRow(stringGetter({ key: STRING_KEYS.AVAILABLE_BALANCE }), balances?.withdrawable)}
+        {balanceRow(
+          stringGetter({ key: STRING_KEYS.AVAILABLE_BALANCE }),
+          // No trading account yet: nothing in it.
+          balances ? (balances.withdrawable ?? 0) : undefined
+        )}
         <FormInput
           type={InputType.Number}
+          decimals={balances?.decimals}
           label={stringGetter({ key: STRING_KEYS.AMOUNT })}
           value={amount}
           onInput={({ formattedValue }: { formattedValue?: string }) =>
