@@ -55,7 +55,7 @@ export const AccountInfoSection = () => {
 
   const { isTablet } = useBreakpoints();
   const { complianceState } = useComplianceState();
-  const { dydxAccounts } = useAccounts();
+  const { dydxAddress } = useAccounts();
 
   const subAccount = orEmptyObj(useAppSelector(BonsaiCore.account.parentSubaccountSummary.data));
   const isLoadingGuards = useAppSelector(calculateIsAccountLoading);
@@ -63,7 +63,11 @@ export const AccountInfoSection = () => {
     useAppSelector(BonsaiCore.account.parentSubaccountSummary.loading) === 'pending';
   const isLoading = !!isLoadingGuards || isLoadingData;
 
-  const { freeCollateral: availableBalance, marginUsage, equity: portfolioValue } = subAccount;
+  const {
+    freeCollateral: availableBalance,
+    accountMarginUsage: marginUsage,
+    equity: portfolioValue,
+  } = subAccount;
   const positions = useAppSelector(BonsaiCore.account.parentSubaccountPositions.data);
   // The engine settles funding only when a session touches the market, so what a position has
   // accrued since is shown apart from its P&L: it is what the next trade will move.
@@ -83,7 +87,7 @@ export const AccountInfoSection = () => {
   );
   const {
     freeCollateral: availableBalancePost,
-    marginUsage: marginUsagePost,
+    accountMarginUsage: marginUsagePost,
     equity: portfolioValuePost,
   } = parentSubaccountAfterOperation;
 
@@ -126,7 +130,7 @@ export const AccountInfoSection = () => {
     </Button>
   );
 
-  const depositWithdrawRow = dydxAccounts && (
+  const depositWithdrawRow = dydxAddress != null && (
     <div tw="inlineRow gap-0.75 pt-0.25">
       {complianceState === ComplianceStates.FULL_ACCESS ? (
         <>
@@ -193,7 +197,7 @@ export const AccountInfoSection = () => {
           hideDiff
           isPositive={unrealizedPnl.gte(0)}
           type={OutputType.Fiat}
-          value={dydxAccounts ? unrealizedPnl : undefined}
+          value={dydxAddress != null ? unrealizedPnl : undefined}
           valuePost={null}
         />
       ),
@@ -207,7 +211,7 @@ export const AccountInfoSection = () => {
           hideDiff
           isPositive={unrealizedFunding.gte(0)}
           type={OutputType.Fiat}
-          value={dydxAccounts ? unrealizedFunding : undefined}
+          value={dydxAddress != null ? unrealizedFunding : undefined}
           valuePost={null}
         />
       ),

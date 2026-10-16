@@ -35,7 +35,11 @@ export const AccountDetailsAndHistory = () => {
   const selectedLocale = useAppSelector(getSelectedLocale);
   const onboardingState = useAppSelector(getOnboardingState);
 
-  const { equity, leverage, marginUsage } = orEmptyObj(useAppSelector(getSubaccount));
+  const {
+    equity,
+    accountLeverage: leverage,
+    accountMarginUsage: marginUsage,
+  } = orEmptyObj(useAppSelector(getSubaccount));
 
   const [tooltipContext, setTooltipContext] = useState<TooltipContextType<PnlDatum>>();
 

@@ -82,16 +82,24 @@ export function calculateParentSubaccountSummary(
   if (parentSummary == null) {
     throw new Error('Parent subaccount not found in ParentSubaccountData');
   }
+  const present = Object.values(summaries).filter(isPresent);
+  const equity = present.map((s) => s.equity).reduce((a, b) => a.plus(b), BIG_NUMBERS.ZERO);
+  const notional = present
+    .map((s) => s.notionalTotal)
+    .reduce((a, b) => a.plus(b), BIG_NUMBERS.ZERO);
   return {
     marginUsage: parentSummary.marginUsage,
     leverage: parentSummary.leverage,
     freeCollateral: parentSummary.freeCollateral,
     rawFreeCollateral: parentSummary.rawFreeCollateral,
     parentSubaccountEquity: parentSummary.equity,
-    equity: Object.values(summaries)
-      .filter(isPresent)
-      .map((s) => s.equity)
-      .reduce((a, b) => a.plus(b), BIG_NUMBERS.ZERO),
+    equity,
+    // Every Haneul position is isolated in its market's subaccount, so the parent's own usage
+    // stays at zero. Across the account, what is in use is whatever the balance cannot spend.
+    accountMarginUsage: equity.gt(0)
+      ? BIG_NUMBERS.ONE.minus(parentSummary.freeCollateral.div(equity))
+      : null,
+    accountLeverage: equity.gt(0) ? notional.div(equity) : null,
   };
 }
 

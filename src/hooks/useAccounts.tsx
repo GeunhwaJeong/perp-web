@@ -126,7 +126,6 @@ const useAccountsContext = () => {
   const hdKey = undefined as PrivateInformation | undefined;
   const localDydxWallet = undefined as LocalWallet | undefined;
   const localNobleWallet = undefined as LocalWallet | undefined;
-  const dydxAccounts = undefined as LocalWallet['accounts'] | undefined;
   const nobleAddress = undefined as string | undefined;
   const osmosisAddress = undefined as string | undefined;
   const neutronAddress = undefined as string | undefined;
@@ -154,7 +153,6 @@ const useAccountsContext = () => {
     // Trading account
     hdKey,
     localDydxWallet,
-    dydxAccounts,
     dydxAddress,
     currentAccount,
 

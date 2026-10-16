@@ -8,7 +8,6 @@ import { DialogTypes } from '@/constants/dialogs';
 import { STRING_KEYS, SUPPORTED_LOCALES } from '@/constants/localization';
 import { AppRoute } from '@/constants/routes';
 
-import { useAccounts } from '@/hooks/useAccounts';
 import { useComplianceState } from '@/hooks/useComplianceState';
 import { useEnvFeatures } from '@/hooks/useEnvFeatures';
 import { useStringGetter } from '@/hooks/useStringGetter';
@@ -41,7 +40,6 @@ export const HeaderDesktop = () => {
   const { documentation, community, mintscanBase, exchangeStats, fundingComparison } =
     useURLConfigs();
   const dispatch = useAppDispatch();
-  const { dydxAccounts } = useAccounts();
   const onboardingState = useAppSelector(getOnboardingState);
   const { complianceState } = useComplianceState();
   const { isVaultEnabled } = useEnvFeatures();
@@ -183,7 +181,6 @@ export const HeaderDesktop = () => {
               onClick={() => {
                 dispatch(openDialog(DialogTypes.Deposit2({})));
               }}
-              state={{ isDisabled: !dydxAccounts }}
             >
               <Icon iconName={IconName.Deposit2} size="1rem" />
               <span tw="font-small-bold">{stringGetter({ key: STRING_KEYS.DEPOSIT })}</span>
