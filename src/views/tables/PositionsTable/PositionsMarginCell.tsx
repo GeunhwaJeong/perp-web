@@ -1,3 +1,7 @@
+import { useMemo } from 'react';
+
+import { BonsaiCore } from '@/bonsai/ontology';
+import { calculatePositionMargin } from '@/bonsai/public-calculators/positionMargin';
 import { SubaccountPosition } from '@/bonsai/types/summaryTypes';
 import styled from 'styled-components';
 
@@ -13,7 +17,7 @@ import { Output, OutputType, ShowSign } from '@/components/Output';
 import { TableCell } from '@/components/Table/TableCell';
 import { WithTooltip } from '@/components/WithTooltip';
 
-import { useAppDispatch } from '@/state/appTypes';
+import { useAppDispatch, useAppSelector } from '@/state/appTypes';
 import { openDialog } from '@/state/dialogs';
 
 type PositionsMarginCellProps = {
@@ -23,6 +27,12 @@ type PositionsMarginCellProps = {
 export const PositionsMarginCell = ({ position }: PositionsMarginCellProps) => {
   const stringGetter = useStringGetter();
   const dispatch = useAppDispatch();
+  const openOrders = useAppSelector(BonsaiCore.account.openOrders.data);
+  // The margin a resting order brought in counts with the position, as the engine counts it.
+  const { leverage } = useMemo(
+    () => calculatePositionMargin(position, openOrders),
+    [position, openOrders]
+  );
 
   return (
     <TableCell
@@ -51,7 +61,7 @@ export const PositionsMarginCell = ({ position }: PositionsMarginCellProps) => {
       />
       {position.marginMode === 'ISOLATED' &&
         position.effectiveSelectedLeverage
-          .minus(position.leverage ?? 0)
+          .minus(leverage ?? 0)
           .abs()
           .gt(1) && (
           <div tw="row">
@@ -59,7 +69,7 @@ export const PositionsMarginCell = ({ position }: PositionsMarginCellProps) => {
             <Output
               type={OutputType.Multiple}
               fractionDigits={0}
-              value={position.leverage}
+              value={leverage}
               showSign={ShowSign.None}
             />
             )

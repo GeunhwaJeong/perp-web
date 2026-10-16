@@ -17,8 +17,10 @@ import {
 } from '../calculators/subaccount';
 import { createForm, createVanillaReducer } from '../lib/forms';
 import { ErrorType, simpleValidationError, ValidationError } from '../lib/validationErrors';
+import { calculatePositionMargin } from '../public-calculators/positionMargin';
 import { SubaccountOperations } from '../types/operationTypes';
 import { MarketsData, ParentSubaccountDataBase } from '../types/rawTypes';
+import { SubaccountOrder } from '../types/summaryTypes';
 
 export interface AdjustIsolatedMarginFormState {
   type: AdjustIsolatedMarginType;
@@ -81,6 +83,7 @@ interface InputData {
   rawParentSubaccountData: ParentSubaccountDataBase | undefined;
   rawRelevantMarkets: MarketsData | undefined;
   selectedMarketLeverages: { [marketId: string]: number };
+  openOrders: SubaccountOrder[];
   canViewAccount?: boolean;
 }
 
@@ -90,8 +93,8 @@ interface AccountDetails {
 
   positionMargin?: number;
   positionMaintenanceRisk?: number;
-  positionMaxMarketLeverage?: number;
-  positionNotional?: number;
+  positionRequiredMargin?: number;
+  positionWithdrawableMargin?: number;
   liquidationPrice?: number;
   positionLeverage?: number;
 }
@@ -141,7 +144,8 @@ function calculateSummary(
         rawParentSubaccountData,
         rawRelevantMarkets,
         accountData.selectedMarketLeverages,
-        childSubaccountNumber
+        childSubaccountNumber,
+        accountData.openOrders
       )
   );
 
@@ -178,16 +182,14 @@ function calculateSummary(
     }
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (state.type === AdjustIsolatedMarginType.REMOVE) {
+      // The engine lets out what the position holds beyond the initial margin it and its resting
+      // orders need at its own ratio, unrealized profit excepted; the buffer covers the mark
+      // moving before the transaction lands.
       const maxTransfer = mapIfPresent(
-        accountBefore?.positionMargin,
-        accountBefore?.positionMaxMarketLeverage,
-        accountBefore?.positionNotional,
-        (margin, maxLeverage, notional) =>
-          clamp(
-            margin - notional / ((maxLeverage || 1) * MAX_LEVERAGE_BUFFER_PERCENT),
-            0,
-            Number.MAX_SAFE_INTEGER
-          )
+        accountBefore?.positionWithdrawableMargin,
+        accountBefore?.positionRequiredMargin,
+        (withdrawable, required) =>
+          clamp(withdrawable - required / MAX_LEVERAGE_BUFFER_PERCENT, 0, Number.MAX_SAFE_INTEGER)
       );
       if (state.amountInput.type === AdjustIsolatedMarginInputType.AMOUNT) {
         const parsedAmount = stringToNumberStringOrUndefined(state.amountInput.amount);
@@ -280,7 +282,8 @@ function calculateSummary(
           applyOperationsToSubaccount(rawParentSubaccountData, operations),
           rawRelevantMarkets,
           accountData.selectedMarketLeverages,
-          childSubaccountNumber
+          childSubaccountNumber,
+          accountData.openOrders
         )
     );
   });
@@ -448,7 +451,8 @@ function getRelevantAccountDetails(
   rawParentSubaccountData: ParentSubaccountDataBase,
   rawRelevantMarkets: MarketsData,
   selectedMarketLeverages: { [marketId: string]: number },
-  childSubaccountNumber: number
+  childSubaccountNumber: number,
+  openOrders: SubaccountOrder[]
 ): AccountDetails {
   const calculatedAccount = calculateParentSubaccountSummary(
     rawParentSubaccountData,
@@ -472,6 +476,7 @@ function getRelevantAccountDetails(
     return {};
   }
   const relevantPosition = relevantPositions.at(0)!;
+  const margin = calculatePositionMargin(relevantPosition, openOrders);
   return {
     crossFreeCollateral: calculatedAccount.freeCollateral.toNumber(),
     // Shown as the account's margin used, as in the account panel: every position is isolated,
@@ -479,10 +484,10 @@ function getRelevantAccountDetails(
     crossMarginUsage: calculatedAccount.accountMarginUsage?.toNumber(),
     positionMargin: relevantPosition.marginValueMaintenance.toNumber(),
     liquidationPrice: relevantPosition.liquidationPrice?.toNumber(),
-    positionLeverage: relevantPosition.leverage?.toNumber(),
+    positionLeverage: margin.leverage?.toNumber(),
     positionMaintenanceRisk: relevantPosition.maintenanceRisk.toNumber(),
-    positionMaxMarketLeverage: relevantPosition.maxLeverage?.toNumber(),
-    positionNotional: relevantPosition.notional.toNumber(),
+    positionRequiredMargin: margin.required.toNumber(),
+    positionWithdrawableMargin: margin.withdrawable.toNumber(),
   };
 }
 

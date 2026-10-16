@@ -12,7 +12,7 @@ import {
   getAlertsToRender,
   getFormDisabledButtonStringKey,
 } from '@/bonsai/lib/validationErrors';
-import { BonsaiForms, BonsaiHelpers, BonsaiRaw } from '@/bonsai/ontology';
+import { BonsaiCore, BonsaiForms, BonsaiHelpers, BonsaiRaw } from '@/bonsai/ontology';
 import { SubaccountPosition } from '@/bonsai/types/summaryTypes';
 import styled from 'styled-components';
 
@@ -426,6 +426,7 @@ function useForm() {
   const rawParentSubaccountData = useAppSelector(BonsaiRaw.parentSubaccountBase);
   const rawRelevantMarkets = useAppSelector(BonsaiRaw.parentSubaccountRelevantMarkets);
   const selectedMarketLeverages = useAppSelector(BonsaiRaw.selectedMarketLeverages);
+  const openOrders = useAppSelector(BonsaiCore.account.openOrders.data);
   const canViewAccount = useAppSelector(calculateCanViewAccount);
 
   const inputs = useMemo(
@@ -433,9 +434,16 @@ function useForm() {
       rawParentSubaccountData,
       rawRelevantMarkets,
       selectedMarketLeverages: selectedMarketLeverages ?? {},
+      openOrders,
       canViewAccount,
     }),
-    [canViewAccount, rawParentSubaccountData, rawRelevantMarkets, selectedMarketLeverages]
+    [
+      canViewAccount,
+      openOrders,
+      rawParentSubaccountData,
+      rawRelevantMarkets,
+      selectedMarketLeverages,
+    ]
   );
 
   return useFormValues(BonsaiForms.AdjustIsolatedMarginFormFns, inputs);
