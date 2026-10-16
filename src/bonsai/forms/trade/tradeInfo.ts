@@ -589,7 +589,7 @@ function createMarketOrder(
       simulateMarketOrder(
         effectiveSizeTarget,
         orderbook,
-        accountData.userFeeStats.takerFeeRate ?? 0,
+        accountData.userFeeStats.takerFeeRate ?? marketTakerFee(accountData) ?? 0,
         accountData.currentTradeMarketSummary?.marketFeeDiscountMultiplier,
         oraclePrice,
         equity,

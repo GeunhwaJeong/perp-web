@@ -7,10 +7,10 @@
  * the trader rests 0.001 BTC (the lot size) at the default leverage: the engine asks about $10 of
  * margin for it and has no minimum margin of its own, so the form must not hold the order back
  * with dYdX's $20 isolated-margin minimum. With the market's fee rates served by the API, the
- * receipt prices the order from them and the form does not warn that the account's fee rates are
- * unknown (dYdX loads those from its validator, which Haneul does not have). On laptop-height
- * windows, where the order footer is sticky, an alert holding the order back shows in full next
- * to the button, with nothing in the footer over it. The form is filled
+ * receipt prices market and limit orders from them and the form does not warn that the account's
+ * fee rates are unknown (dYdX loads those from its validator, which Haneul does not have). On
+ * laptop-height windows, where the order footer is sticky, an alert holding the order back shows
+ * in full next to the button, with nothing in the footer over it. The form is filled
  * through its redux actions, read from the page (alerts and the order button) and driven by
  * pressing its buttons; the account and the order are read back from chain. Requires the fixture
  * (`fixture.mjs setup` + `push`), the indexer and API (perp-indexer fea64d4 or later), and
@@ -251,10 +251,18 @@ await fill([
 ]);
 f = await form();
 const marketOrder = f;
+await page.screenshot({ path: `${screenshots}-market.png` });
+console.log(`  screenshot ${screenshots}-market.png`);
 check(
   'market 0.001 BTC: an order again, no minimum alert, button enabled',
   /place/i.test(f.label) && !f.text.includes(ALERTS.dydxMinimum) && !f.disabled,
   shown(f)
+);
+// 0.001 BTC from the best ask (100,010) at the 5 bp taker rate
+check(
+  'the receipt prices the market order at the market taker rate',
+  /Fee\s+\$0\.05\b/.test(f.text),
+  f.text.match(/Fee\s+\S+/)?.[0] ?? 'no fee row'
 );
 
 // 2. a limit order beyond the balance is still refused by the margin check
