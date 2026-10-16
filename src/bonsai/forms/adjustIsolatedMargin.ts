@@ -474,7 +474,9 @@ function getRelevantAccountDetails(
   const relevantPosition = relevantPositions.at(0)!;
   return {
     crossFreeCollateral: calculatedAccount.freeCollateral.toNumber(),
-    crossMarginUsage: calculatedAccount.marginUsage?.toNumber(),
+    // Shown as the account's margin used, as in the account panel: every position is isolated,
+    // so the parent's own usage is always zero.
+    crossMarginUsage: calculatedAccount.accountMarginUsage?.toNumber(),
     positionMargin: relevantPosition.marginValueMaintenance.toNumber(),
     liquidationPrice: relevantPosition.liquidationPrice?.toNumber(),
     positionLeverage: relevantPosition.leverage?.toNumber(),

@@ -36,6 +36,12 @@ function modifyUsdcAssetPosition(
 
     const childSubaccount = draftParentSubaccountData.childSubaccounts[subaccountNumber]!;
 
+    // The indexer's liquidation prices were for the collateral before this change, as they are
+    // for the size before a trade (see increasePosition).
+    Object.keys(childSubaccount.openPerpetualPositions).forEach((market) => {
+      childSubaccount.openPerpetualPositions[market]!.liquidationPrice = undefined;
+    });
+
     // if no USDC, add a zero USDC position
     if (childSubaccount.assetPositions.USDC == null) {
       childSubaccount.assetPositions.USDC = newUsdcAssetPosition({

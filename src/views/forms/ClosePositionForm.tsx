@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 
 import { OrderSizeInputs, TradeFormType } from '@/bonsai/forms/trade/types';
-import { BonsaiHelpers } from '@/bonsai/ontology';
+import { BonsaiCore, BonsaiHelpers } from '@/bonsai/ontology';
 import BigNumber from 'bignumber.js';
 import styled, { css } from 'styled-components';
 
@@ -73,6 +73,22 @@ export const ClosePositionForm = ({
 
   const market = useAppSelector(getCurrentMarketIdIfTradeable);
   const id = useAppSelector(BonsaiHelpers.currentMarket.assetId);
+
+  // A market close fills as a taker, which the engine records without the order's client id, so
+  // the indexer lists it under client id 0 and `onLastOrderIndexed` never runs for it. The form
+  // closes once the position it was opened for is gone instead.
+  const positions = useAppSelector(BonsaiCore.account.parentSubaccountPositions.data);
+  const hasPosition = positions?.some((p) => p.market === market) === true;
+  const positionGone = positions != null && !hasPosition;
+  const hadPosition = useRef(false);
+  useEffect(() => {
+    if (hasPosition) {
+      hadPosition.current = true;
+    } else if (positionGone && hadPosition.current) {
+      hadPosition.current = false;
+      onClosePositionSuccess?.();
+    }
+  }, [hasPosition, positionGone, onClosePositionSuccess]);
 
   const { stepSizeDecimals, tickSizeDecimals } = orEmptyObj(
     useAppSelector(BonsaiHelpers.currentMarket.stableMarketInfo)

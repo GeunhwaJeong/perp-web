@@ -228,12 +228,12 @@ export const AdjustIsolatedMarginForm = ({
           inputReceiptItems: [
             {
               key: 'cross-free-collateral',
-              label: stringGetter({ key: STRING_KEYS.CROSS_FREE_COLLATERAL }),
+              label: stringGetter({ key: STRING_KEYS.AVAILABLE_BALANCE }),
               value: freeCollateralDiffOutput,
             },
             {
               key: 'cross-margin-usage',
-              label: stringGetter({ key: STRING_KEYS.CROSS_MARGIN_USAGE }),
+              label: stringGetter({ key: STRING_KEYS.MARGIN_USED }),
               value: marginUsageDiffOutput,
             },
           ],
@@ -268,12 +268,12 @@ export const AdjustIsolatedMarginForm = ({
           receiptItems: [
             {
               key: 'cross-free-collateral',
-              label: stringGetter({ key: STRING_KEYS.CROSS_FREE_COLLATERAL }),
+              label: stringGetter({ key: STRING_KEYS.AVAILABLE_BALANCE }),
               value: freeCollateralDiffOutput,
             },
             {
               key: 'cross-margin-usage',
-              label: stringGetter({ key: STRING_KEYS.CROSS_MARGIN_USAGE }),
+              label: stringGetter({ key: STRING_KEYS.MARGIN_USED }),
               value: marginUsageDiffOutput,
             },
           ],
