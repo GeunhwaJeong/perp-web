@@ -1,12 +1,9 @@
-import { useMemo } from 'react';
-
 import { accountTransactionManager } from '@/bonsai/AccountTransactionSupervisor';
 import { TradeFormInputData, TradeFormSummary, TradeFormType } from '@/bonsai/forms/trade/types';
 import { PlaceOrderPayload } from '@/bonsai/forms/triggers/types';
 import { isOperationSuccess } from '@/bonsai/lib/operationResult';
 import { ErrorType, ValidationError } from '@/bonsai/lib/validationErrors';
 import { logBonsaiInfo } from '@/bonsai/logs';
-import { BonsaiCore } from '@/bonsai/ontology';
 
 import { AnalyticsEvents } from '@/constants/analytics';
 import { ComplianceStates } from '@/constants/compliance';
@@ -23,17 +20,14 @@ import { getCurrentTradePageForm } from '@/state/tradeFormSelectors';
 
 import { track } from '@/lib/analytics/analytics';
 import { useDisappearingValue } from '@/lib/disappearingValue';
-import { runFn } from '@/lib/do';
 import { operationFailureToErrorParams } from '@/lib/errorHelpers';
 import { isTruthy } from '@/lib/isTruthy';
 import { purgeBigNumbers } from '@/lib/purgeBigNumber';
 
-import { useAccounts } from '../useAccounts';
 import { ConnectionErrorType, useApiState } from '../useApiState';
 import { useComplianceState } from '../useComplianceState';
 import { useOnOrderIndexed } from '../useOnOrderIndexed';
 import { useStringGetter } from '../useStringGetter';
-import { useSubaccount } from '../useSubaccount';
 
 export enum TradeFormSource {
   ClosePositionForm = 'ClosePositionForm',
@@ -68,8 +62,6 @@ export const useTradeForm = ({
 
   const { connectionError } = useApiState();
   const { complianceState } = useComplianceState();
-  const { updateLeverage } = useSubaccount();
-  const { dydxAddress } = useAccounts();
 
   const { setUnIndexedClientId, clientId: unIndexedClientId } =
     useOnOrderIndexed(onLastOrderIndexed);
@@ -84,9 +76,8 @@ export const useTradeForm = ({
   const currentMarketId = useAppSelector(getCurrentMarketIdIfTradeable);
   const subaccountNumber = useAppSelector(getSubaccountId);
   const canAccountTrade = useAppSelector(calculateCanAccountTrade);
-  const positions = useAppSelector(BonsaiCore.account.parentSubaccountPositions.data);
 
-  const { errors: tradeErrors, summary, inputData } = fullFormSummary;
+  const { errors: tradeErrors, summary } = fullFormSummary;
   const tradeFormInputValues = summary.effectiveTrade;
   const { marketId } = tradeFormInputValues;
   const isClosePosition = source === TradeFormSource.ClosePositionForm;
@@ -110,10 +101,6 @@ export const useTradeForm = ({
   const shouldEnableTrade =
     canAccountTrade && !hasMissingData && !hasValidationErrors && !tradingUnavailable;
 
-  const currentPosition = useMemo(() => {
-    return positions?.find((p) => p.market === marketId);
-  }, [positions, marketId]);
-
   const placeOrder = async ({
     onPlaceOrder,
     onSuccess,
@@ -130,36 +117,10 @@ export const useTradeForm = ({
       return;
     }
 
-    // We defer saving selected leverage when opening a new position here since the
-    // subaccount being used for new isolated positions isn't known until the user presses
-    // placeOrder. For existing positions, updating leverage is done through the dialog.
-    runFn(() => {
-      const impliedMarket = summary.accountDetailsAfter?.position?.market;
-      if (impliedMarket === undefined) return;
-
-      const positionSubaccountNumber = summary.accountDetailsAfter?.position?.subaccountNumber;
-      const clobPairId =
-        summary.tradePayload?.orderPayload?.clobPairId ??
-        summary.tradePayload?.scaleOrderPayloads?.[0]?.clobPairId;
-      const rawSelectedLeverage = inputData?.rawSelectedMarketLeverages[impliedMarket];
-      const hasExistingPosition = currentPosition !== undefined;
-      if (
-        !hasExistingPosition &&
-        positionSubaccountNumber !== undefined &&
-        clobPairId !== undefined &&
-        dydxAddress !== undefined &&
-        rawSelectedLeverage !== undefined
-      ) {
-        // Fire and forget - don't await to keep order placement fast
-        updateLeverage({
-          senderAddress: dydxAddress,
-          subaccountNumber: positionSubaccountNumber,
-          clobPairId,
-          leverage: rawSelectedLeverage,
-        });
-      }
-    });
-
+    // dYdX saved the leverage chosen for a new position here, once the order had picked its
+    // subaccount. The leverage dialog writes it to the position on chain and the selection is read
+    // back from there, so there is nothing to save; a transaction sent here would take the
+    // account's cap at the version the order was built with, and the order would be rejected.
     onPlaceOrder?.(representativePayload);
     const volume =
       payload.scaleOrderPayloads != null && payload.scaleOrderPayloads.length > 0
