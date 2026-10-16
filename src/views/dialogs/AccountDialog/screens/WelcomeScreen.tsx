@@ -16,7 +16,6 @@ const CAROUSEL_TOKENS: readonly (keyof typeof ASSET_ICON_MAP)[] = [
   'ETH',
   'SOL',
   'USDC',
-  'TUSD',
   'DOGE',
   'AVAX',
   'LINK',

@@ -644,7 +644,7 @@ export const ASSET_ICON_MAP = {
   TT: '/currencies/tt.png',
   TURBO: '/currencies/turbo.png',
   TURBOS: '/currencies/turbos.png',
-  TUSD: '/currencies/tusd.png',
+  // No TUSD: the logo under that ticker is TrueUSD's, and the app's TUSD is a different coin.
   TWT: '/currencies/twt.png',
   UFT: '/currencies/uft.png',
   ULTI: '/currencies/ulti.png',

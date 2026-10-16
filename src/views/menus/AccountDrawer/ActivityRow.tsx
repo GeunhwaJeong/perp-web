@@ -37,8 +37,8 @@ const $Logo = styled.div`
   }
 `;
 
-// The collateral has no logo of its own (the app's TUSD icon is TrueUSD's), so it shows as a
-// lettered disc, the way the app shows any asset without one.
+// The collateral has no logo (the one under its ticker is TrueUSD's, a different coin), so it shows
+// as a lettered disc, the way the app shows any asset without one.
 const $Collateral = styled.div`
   display: flex;
   width: 100%;

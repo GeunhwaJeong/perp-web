@@ -22,7 +22,7 @@ export type TokenConfigsResult = {
   usdcDenom: string;
   usdcDecimals: number;
   usdcGasDenom: string;
-  usdcImage: string;
+  usdcImage: string | undefined;
   usdcLabel: string;
   chainTokenDenom: string;
   chainTokenDecimals: number;
@@ -32,13 +32,15 @@ export type TokenConfigsResult = {
 
 const getTokenConfigsData = (selectedDydxChainId: DydxChainId): TokenConfigsResult => {
   const tokensConfigs = TOKEN_CONFIG_MAP[selectedDydxChainId];
+  // The collateral has no logo in env.json (the one under its ticker is TrueUSD's).
+  const usdc: TokenConfig = tokensConfigs[DydxChainAsset.USDC];
 
   return {
     tokensConfigs,
     usdcDenom: tokensConfigs[DydxChainAsset.USDC].denom,
     usdcDecimals: tokensConfigs[DydxChainAsset.USDC].decimals,
     usdcGasDenom: tokensConfigs[DydxChainAsset.USDC].gasDenom,
-    usdcImage: tokensConfigs[DydxChainAsset.USDC].image,
+    usdcImage: usdc.image,
     usdcLabel: tokensConfigs[DydxChainAsset.USDC].name,
     chainTokenDenom: tokensConfigs[DydxChainAsset.CHAINTOKEN].denom,
     chainTokenDecimals: tokensConfigs[DydxChainAsset.CHAINTOKEN].decimals,
