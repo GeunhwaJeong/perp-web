@@ -31,9 +31,13 @@ import { useAppDispatch, useAppSelector } from '@/state/appTypes';
 import { setMarketFilter } from '@/state/perpetuals';
 import { getMarketFilter } from '@/state/perpetualsSelectors';
 
+import { formatFundingPeriod, getFundingPeriodHours } from '@/lib/fundingPeriod';
 import { MustBigNumber } from '@/lib/numbers';
 
 import { FavoriteButton } from './MarketsTable/FavoriteButton';
+
+const fundingForPeriod = (row: MarketData) =>
+  MustBigNumber(row.nextFundingRate).times(getFundingPeriodHours(row.fundingPeriodMs)).toNumber();
 
 export const MarketsTable = forwardRef(
   ({ className }: { className?: string }, ref: ForwardedRef<HTMLDivElement>) => {
@@ -48,6 +52,16 @@ export const MarketsTable = forwardRef(
       filter,
       searchFilter,
     });
+
+    // Funding shows over each market's period, as the trade page's header shows it; the column
+    // names the period when the listed markets share one.
+    const fundingPeriods = [
+      ...new Set(filteredMarkets.map((m) => getFundingPeriodHours(m.fundingPeriodMs))),
+    ];
+    const fundingLabel =
+      fundingPeriods.length === 1
+        ? `Funding (${formatFundingPeriod(fundingPeriods[0]!)})`
+        : 'Funding';
 
     const columns = useMemo<ColumnDef<MarketData>[]>(
       () =>
@@ -171,7 +185,8 @@ export const MarketsTable = forwardRef(
               {
                 columnKey: 'oraclePrice',
                 getCellValue: (row) => row.oraclePrice,
-                label: stringGetter({ key: STRING_KEYS.ORACLE_PRICE }),
+                // The indexer's oraclePrice is the engine's mark price.
+                label: stringGetter({ key: STRING_KEYS.MARK_PRICE }),
                 renderCell: ({ oraclePrice, tickSizeDecimals }) => (
                   <$TabletOutput
                     withSubscript
@@ -265,20 +280,20 @@ export const MarketsTable = forwardRef(
               },
               {
                 columnKey: 'nextFundingRate',
-                getCellValue: (row) => row.nextFundingRate,
-                label: stringGetter({ key: STRING_KEYS.FUNDING_RATE_1H_SHORT }),
+                getCellValue: (row) => fundingForPeriod(row),
+                label: fundingLabel,
                 renderCell: (row) => (
                   <$Output
                     type={OutputType.Percent}
                     fractionDigits={FUNDING_DECIMALS}
-                    value={row.nextFundingRate}
+                    value={fundingForPeriod(row)}
                     isPositive={MustBigNumber(row.nextFundingRate).gt(0)}
                     isNegative={MustBigNumber(row.nextFundingRate).isNegative()}
                   />
                 ),
               },
             ] satisfies ColumnDef<MarketData>[]),
-      [stringGetter, isTablet]
+      [stringGetter, isTablet, fundingLabel]
     );
 
     const setFilter = (newFilter: MarketFilters) => {

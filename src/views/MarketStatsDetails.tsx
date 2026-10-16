@@ -24,6 +24,7 @@ import { NextFundingTimer } from '@/views/NextFundingTimer';
 import { useAppSelector } from '@/state/appTypes';
 import { getSelectedDisplayUnit } from '@/state/appUiConfigsSelectors';
 
+import { formatFundingPeriod, getFundingPeriodHours } from '@/lib/fundingPeriod';
 import { BIG_NUMBERS, MaybeBigNumber, MustBigNumber } from '@/lib/numbers';
 import { orEmptyObj } from '@/lib/typeUtils';
 
@@ -46,8 +47,6 @@ enum MarketStats {
   NextFunding = 'NextFunding',
   MaxLeverage = 'MaxLeverage',
 }
-
-const HOUR_MS = 3_600_000;
 
 export const MarketStatsDetails = ({
   showMidMarketPrice = true,
@@ -75,6 +74,7 @@ export const MarketStatsDetails = ({
     oraclePrice,
     percentChange24h,
     priceChange24H,
+    stepSizeDecimals,
     tickSizeDecimals,
     trades24H,
     volume24H,
@@ -82,17 +82,13 @@ export const MarketStatsDetails = ({
 
   const displayUnit = useAppSelector(getSelectedDisplayUnit);
 
-  // The indexer serves the funding rate per hour, but the engine charges it over a period (eight
-  // hours on the BTC market), so the header shows the period's rate under a label that names it.
-  const fundingPeriodHours =
-    fundingPeriodMs != null && fundingPeriodMs > 0 ? fundingPeriodMs / HOUR_MS : 1;
+  // The header shows the period's rate under a label that names the period.
+  const fundingPeriodHours = getFundingPeriodHours(fundingPeriodMs);
   const fundingRateForPeriod =
     nextFundingRate != null
       ? MustBigNumber(nextFundingRate).times(fundingPeriodHours).toString()
       : nextFundingRate;
-  const fundingPeriodLabel = Number.isInteger(fundingPeriodHours)
-    ? `${fundingPeriodHours}h`
-    : `${fundingPeriodHours.toFixed(1)}h`;
+  const fundingPeriodLabel = formatFundingPeriod(fundingPeriodHours);
 
   const valueMap = {
     // The indexer's `oraclePrice` is the mark price under the protocol's name; `markPrice`
@@ -143,6 +139,7 @@ export const MarketStatsDetails = ({
               value={valueMap[stat]}
               stat={stat}
               tickSizeDecimals={tickSizeDecimals}
+              stepSizeDecimals={stepSizeDecimals}
               assetId={displayableAsset ?? ''}
               isLoading={isLoading}
               priceChange24HPercent={percentChange24h}
@@ -245,6 +242,7 @@ const DetailsItem = ({
   value,
   stat,
   tickSizeDecimals,
+  stepSizeDecimals,
   assetId,
   isLoading,
   priceChange24HPercent,
@@ -258,6 +256,7 @@ const DetailsItem = ({
   value: string | number | null | undefined;
   stat: MarketStats;
   tickSizeDecimals: number | null | undefined;
+  stepSizeDecimals: number | null | undefined;
   assetId: string;
   isLoading: boolean;
   priceChange24HPercent: number | null | undefined;
@@ -286,11 +285,12 @@ const DetailsItem = ({
       );
     }
     case MarketStats.OpenInterest: {
+      // Positions move in the market's lot (0.001 BTC), so open interest shows to that step.
       return (
         <$Output
           type={OutputType.Number}
           value={value}
-          fractionDigits={useFiatDisplayUnit ? 0 : LARGE_TOKEN_DECIMALS}
+          fractionDigits={useFiatDisplayUnit ? 0 : (stepSizeDecimals ?? LARGE_TOKEN_DECIMALS)}
           slotRight={
             <DisplayUnitTag tw="ml-[0.5ch]" assetId={assetId} entryPoint="openInterestAssetTag" />
           }

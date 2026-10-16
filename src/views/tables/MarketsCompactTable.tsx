@@ -78,7 +78,7 @@ export const MarketsCompactTable = ({
           {
             columnKey: 'oraclePrice',
             allowsSorting: false,
-            label: stringGetter({ key: STRING_KEYS.ORACLE_PRICE }),
+            label: stringGetter({ key: STRING_KEYS.MARK_PRICE }),
             renderCell: ({
               oraclePrice,
               priceChange24h,
@@ -161,7 +161,7 @@ export const MarketsCompactTable = ({
           {
             columnKey: 'oraclePrice',
             allowsSorting: false,
-            label: stringGetter({ key: STRING_KEYS.ORACLE_PRICE }),
+            label: stringGetter({ key: STRING_KEYS.MARK_PRICE }),
             renderCell: ({
               oraclePrice,
               priceChange24h,

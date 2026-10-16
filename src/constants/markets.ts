@@ -31,6 +31,8 @@ export type MarketData = {
   sparkline24h: Nullable<number[]>;
   name: string;
   nextFundingRate: Nullable<number>;
+  // The period the hourly `nextFundingRate` is charged over, when the indexer sends it.
+  fundingPeriodMs?: Nullable<number>;
   openInterest: Nullable<number>;
   openInterestUSDC: Nullable<number>;
   oraclePrice: Nullable<number>;

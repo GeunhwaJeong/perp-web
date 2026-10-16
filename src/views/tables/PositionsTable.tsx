@@ -145,7 +145,7 @@ const getPositionsTableColumnDef = ({
         getCellValue: (row) => row.entryPrice.toNumber(),
         label: (
           <TableColumnHeader>
-            <span>{stringGetter({ key: STRING_KEYS.ORACLE_PRICE_ABBREVIATED })}</span>
+            <span>Mark</span>
             <span>
               {stringGetter({
                 key: STRING_KEYS.ENTRY_PRICE_SHORT,
@@ -311,7 +311,8 @@ const getPositionsTableColumnDef = ({
       [PositionsTableColumnKey.Oracle]: {
         columnKey: 'oracle',
         getCellValue: (row) => row.oraclePrice,
-        label: stringGetter({ key: STRING_KEYS.ORACLE_PRICE_ABBREVIATED }),
+        // The indexer's oraclePrice is the engine's mark price.
+        label: 'Mark',
         renderCell: ({ oraclePrice, tickSizeDecimals }) => (
           <TableCell>
             <Output

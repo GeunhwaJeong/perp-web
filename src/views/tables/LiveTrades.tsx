@@ -136,7 +136,7 @@ export const LiveTrades = ({ className, histogramSide = 'left' }: StyleProps) =>
             type={OutputType.Fiat}
             value={row.price}
             fractionDigits={tickSizeDecimals}
-            useGrouping={false}
+            useGrouping
           />
         ),
       },
