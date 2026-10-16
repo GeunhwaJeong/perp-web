@@ -458,7 +458,7 @@ check(
 );
 check(
   'with no USDC or TrueUSD logo',
-  !drawer.images.some((src) => /usdc\.png|tusd\.png/.test(src)),
+  !drawer.images.some((src: string) => /usdc\.png|tusd\.png/.test(src)),
   JSON.stringify(drawer.images)
 );
 
