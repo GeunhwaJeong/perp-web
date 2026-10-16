@@ -34,11 +34,12 @@ import {
   type CollateralReturn,
   type OrderSpec,
   type PerpAccount,
+  type PerpAccountRef,
   type PerpDeployment,
   type PerpPositionState,
   type SignedPriceUpdate,
 } from '@/haneul/perp';
-import { signAndExecute } from '@/haneul/perp/executor';
+import { signAndExecute, simulateWithApp } from '@/haneul/perp/executor';
 import { buildCoinSend, isGasCoinType, listCoins } from '@/haneul/transfer';
 import { OrderExecution, OrderSide, OrderTimeInForce, OrderType } from '@dydxprotocol/v4-client-js';
 import type { ClientWithCoreApi } from '@haneullabs/haneul/client';
@@ -326,6 +327,87 @@ export class AccountTransactionSupervisor {
     return found.filter(isTruthy);
   }
 
+  /**
+   * Markets a cancel empties: no size, and none of their resting orders left once the given ones
+   * are gone, with collateral there to return. Only active markets count, since a paused one
+   * refuses the deallocation.
+   */
+  private async marketsEmptiedByCancel(
+    ctx: Context,
+    ids: Record<string, bigint[]>
+  ): Promise<CollateralReturn[]> {
+    const markets = BonsaiCore.markets.markets.data(this.store.getState()) ?? {};
+    const found = await Promise.all(
+      Object.entries(ids).map(async ([marketId, list]) => {
+        const market = ctx.deployment.markets[marketId];
+        if (!market || markets[marketId]?.status !== IndexerPerpetualMarketStatus.ACTIVE) {
+          return undefined;
+        }
+        const position = await readPosition(
+          dAppKit.getClient(),
+          ctx.deployment,
+          marketId,
+          ctx.account.accountId
+        );
+        if (position == null || position.pendingOrders > BigInt(list.length)) return undefined;
+        const idle = returnableCollateral(
+          { ...position, pendingOrders: 0n },
+          ctx.deployment.collateral.decimals
+        );
+        if (idle <= 0n) return undefined;
+        return { marketId, restoreImr: this.restoreImrFor(marketId, market, position) };
+      })
+    );
+    return found.filter(isTruthy);
+  }
+
+  /**
+   * Sends a cancel, returning in the same transaction the collateral of the markets it empties.
+   * The return reads signed prices and fails on a paused market or on an index too far from its
+   * average, where a cancel alone goes through. So when the transaction with the returns fails to
+   * simulate, or aborts on chain, the cancel goes alone, and the collateral waits in the market
+   * for the next withdrawal, which returns it.
+   */
+  private async cancelReturningCollateral(
+    ctx: Context,
+    ref: PerpAccountRef,
+    ids: Record<string, bigint[]>
+  ) {
+    const cancelAlone = () => ctx.builder.cancelOrdersAcrossMarkets({ ref, byMarket: ids });
+    const returns = await this.marketsEmptiedByCancel(ctx, ids);
+    if (returns.length === 0) return signAndExecute(cancelAlone());
+    const priceUpdates = await this.priceUpdatesForMarkets(
+      ctx,
+      returns.map((r) => r.marketId)
+    );
+    const withReturns = () =>
+      ctx.builder.cancelOrdersAcrossMarkets({ ref, byMarket: ids, returns, priceUpdates });
+    const markets = returns.map((r) => r.marketId);
+    try {
+      const simulated = withReturns();
+      simulated.setSender(ctx.address);
+      await simulateWithApp(simulated);
+    } catch (error) {
+      logBonsaiInfo(FN, 'cancel sent without returning collateral', {
+        markets,
+        reason: error instanceof Error ? error.message : String(error),
+      });
+      return signAndExecute(cancelAlone());
+    }
+    try {
+      return await signAndExecute(withReturns());
+    } catch (error) {
+      // A wallet refusal or a network failure is the user's to retry; only the chain's
+      // rejection of the returns sends the cancel again on its own.
+      if (!(error instanceof HaneulTransactionError) || error.abort == null) throw error;
+      logBonsaiInfo(FN, 'cancel sent again without returning collateral', {
+        markets,
+        reason: error.message,
+      });
+      return signAndExecute(cancelAlone());
+    }
+  }
+
   private markPosition(ctx: Context, marketId: string) {
     this.positions.add(`${ctx.deployment.network}:${ctx.account.account}:${marketId}`);
   }
@@ -574,16 +656,22 @@ export class AccountTransactionSupervisor {
       return failure('Order id is not a native order id', STRING_KEYS.NO_ORDERS_TO_CANCEL);
     }
     try {
-      const tx = ctx.payload.builder.cancelOrdersAcrossMarkets({
-        ref: { account: ctx.payload.account.account, cap: ctx.payload.account.cap },
-        byMarket: ids,
-      });
-      const result = await signAndExecute(tx);
+      const result = await this.cancelReturningCollateral(
+        ctx.payload,
+        { account: ctx.payload.account.account, cap: ctx.payload.account.cap },
+        ids
+      );
       const canceled = eventsOf(result.events, '::events::CanceledOrder').map((e) =>
         String(e.order_id)
       );
       canceled.forEach((id) => this.orderMarkets.delete(id));
-      logBonsaiInfo(FN, 'orders canceled', { digest: result.digest, canceled });
+      const returned = eventsOf(result.events, '::events::DeallocatedCollateral').map((e) =>
+        String(e.collateral)
+      );
+      if (returned.length > 0) {
+        this.forgetWalletAccount(ctx.payload.deployment, ctx.payload.address);
+      }
+      logBonsaiInfo(FN, 'orders canceled', { digest: result.digest, canceled, returned });
       return wrapOperationSuccess({ canceled });
     } catch (error) {
       return this.toFailure(error);

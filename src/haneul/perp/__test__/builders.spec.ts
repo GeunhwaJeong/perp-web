@@ -128,6 +128,33 @@ describe('withdraw with returns', () => {
   });
 });
 
+describe('cancel with returns', () => {
+  it('returns the collateral of the market it empties, after the cancel', () => {
+    const tx = new PerpTransactionBuilder(deployment).cancelOrdersAcrossMarkets({
+      ref,
+      byMarket: { 'BTC-USD': [7n] },
+      returns: [{ marketId: 'BTC-USD', restoreImr: RESTORE }],
+    });
+    const calls = moveCalls(tx).map(({ call }) => call);
+    expect(calls.map((call) => call.function)).toEqual([
+      'cancel_orders',
+      'set_position_initial_margin_ratio',
+      'deallocate_free_collateral',
+      'set_position_initial_margin_ratio',
+    ]);
+    expect(pureU256(tx, calls[1]!.arguments[3]!)).toBe(IFIXED_ONE);
+    expect(pureU256(tx, calls[3]!.arguments[3]!)).toBe(RESTORE);
+  });
+
+  it('is the cancel alone without returns', () => {
+    const tx = new PerpTransactionBuilder(deployment).cancelOrdersAcrossMarkets({
+      ref,
+      byMarket: { 'BTC-USD': [7n] },
+    });
+    expect(moveCalls(tx).map(({ call }) => call.function)).toEqual(['cancel_orders']);
+  });
+});
+
 describe('returnableCollateral', () => {
   const position = (over: Partial<PerpPositionState>): PerpPositionState => ({
     initialMarginRatio: 100_000_000_000_000_000n,

@@ -380,15 +380,25 @@ export class PerpTransactionBuilder {
     return tx;
   }
 
-  /** Cancels on several markets in one transaction. */
+  /**
+   * Cancels on several markets in one transaction. Each market in `returns` then has its
+   * collateral returned to the account balance if the cancels left it without size or resting
+   * orders (see `addReturnCollateralIfFlat`), as a withdrawal does.
+   */
   cancelOrdersAcrossMarkets({
     ref,
     byMarket,
+    returns = [],
+    priceUpdates = [],
   }: {
     ref: PerpAccountRef;
     byMarket: Record<string, bigint[]>;
+    returns?: CollateralReturn[];
+    /** Signed prices the returns' margin checks read. */
+    priceUpdates?: SignedPriceUpdate[];
   }) {
     const tx = new Transaction();
+    if (returns.length > 0) addPriceUpdates(tx, this.deployment, priceUpdates);
     let count = 0;
     Object.entries(byMarket).forEach(([marketId, ids]) => {
       if (ids.length === 0) return;
@@ -396,6 +406,10 @@ export class PerpTransactionBuilder {
       this.addCancel(tx, ref, this.market(marketId), ids);
     });
     if (count === 0) throw new Error('No orders to cancel');
+    returns.forEach(({ marketId, restoreImr }) => {
+      const market = this.market(marketId);
+      this.addReturnCollateralIfFlat(tx, ref, market, tx.object(market.clearingHouse), restoreImr);
+    });
     return tx;
   }
 
