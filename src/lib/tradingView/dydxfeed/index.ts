@@ -39,7 +39,7 @@ import { orEmptyObj } from '@/lib/typeUtils';
 
 import { log } from '../../telemetry';
 import { getSymbol, mapCandle } from '../utils';
-import { getMarkForOrderFills } from './utils';
+import { getBarTime, getMarkForOrderFills } from './utils';
 
 const timezone = DateTime.local().get('zoneName') as unknown as Timezone;
 
@@ -128,7 +128,10 @@ export const getDydxDatafeed = (
     const theme = getAppTheme(store.getState());
     const colorMode = getAppColorMode(store.getState());
 
-    const [fromMs, toMs] = [fromSeconds * 1000, toSeconds * 1000];
+    // The range starts at a boundary of the chart's time zone, inside the leftmost bar; that bar's
+    // earlier fills are on screen too, so the range is taken from the bar's UTC start.
+    const fromMs = (getBarTime(0, fromSeconds * 1000, resolution) ?? fromSeconds) * 1000;
+    const toMs = toSeconds * 1000;
     const market = BonsaiHelpers.markets.selectMarketSummaryById(
       store.getState(),
       symbolInfo.ticker!
@@ -148,7 +151,6 @@ export const getDydxDatafeed = (
         orderFills,
         market.stepSizeDecimals,
         orderId,
-        fromMs,
         resolution,
         stringGetter,
         localeSeparators,
