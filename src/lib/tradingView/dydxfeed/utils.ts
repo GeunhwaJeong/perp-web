@@ -97,8 +97,8 @@ export const getMarkForOrderFills = (
 
   return {
     id: orderId,
-    // Bars start at UTC multiples of the resolution, as the indexer's candles do. The range
-    // TradingView asks marks for starts at a boundary of the chart's time zone, not at a bar.
+    // Bars start at UTC multiples of the resolution, as the indexer's candles do, whatever range
+    // TradingView asks marks for.
     time: getBarTime(0, new Date(fill.createdAt ?? 0).getTime(), resolution) ?? 0,
     minSize: 16,
     text,

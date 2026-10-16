@@ -1,14 +1,16 @@
 /* eslint-disable no-console */
 
 /**
- * The chart's buy and sell marks, against a running localnet, in a browser set to Asia/Seoul.
- * TradingView asks for marks over a range that starts at a boundary of the chart's time zone (a
- * Seoul day starts at 15:00 UTC), while the indexer's candles start at UTC multiples of their
- * resolution. Each mark must sit on the bar its fill belongs to: at 1h, 4h and 1D every mark's
- * time is the UTC start of its fill's bar, and both fills of a buy and a close are marked.
+ * The chart's bars and its buy and sell marks, against a running localnet, in a browser set to a
+ * time zone (TZ_ID, Asia/Seoul by default). The indexer's candles start at UTC multiples of their
+ * resolution, and TradingView lays bars out from the time zone the datafeed gives the symbol, so
+ * that zone decides where the bars it draws start. At 1h, 4h and 1D the bar holding each fill
+ * starts where the indexer's candle does, both fills of a buy and a close are marked, and every
+ * mark's time is the time of a bar TradingView draws (a mark at any other time is moved).
  * Requires the fixture (`fixture.mjs setup` + `push`), the indexer and API, and `pnpm dev`.
  *
- *   PLAYWRIGHT=/path/to/node_modules/playwright pnpm exec tsx scripts/haneul-localnet/chart-marks.ts
+ *   PLAYWRIGHT=/path/to/node_modules/playwright TZ_ID=Asia/Kolkata \
+ *     pnpm exec tsx scripts/haneul-localnet/chart-marks.ts
  */
 import { Ed25519Keypair } from '@haneullabs/haneul/keypairs/ed25519';
 import { spawnSync } from 'node:child_process';
@@ -22,6 +24,7 @@ const { chromium } = require(process.env.PLAYWRIGHT ?? 'playwright');
 const ROOT = join(import.meta.dirname, '..', '..');
 const url = process.env.APP_URL ?? 'http://localhost:5173/#/trade/BTC-USD';
 const screenshots = process.env.SCREENSHOTS ?? join(ROOT, '.localnet', 'chart-marks');
+const timezoneId = process.env.TZ_ID ?? 'Asia/Seoul';
 const MARKET = 'BTC-USD';
 const INTERVAL_SECONDS: Record<string, number> = { '60': 3_600, '240': 14_400, '1D': 86_400 };
 const RESOLUTIONS = Object.keys(INTERVAL_SECONDS);
@@ -47,8 +50,9 @@ if (funded.status !== 0) throw new Error('fixture.mjs fund failed');
 const browser = await chromium.launch();
 const context = await browser.newContext({
   viewport: { width: 1440, height: 1100 },
-  timezoneId: 'Asia/Seoul',
+  timezoneId,
 });
+console.log(`  browser time zone ${timezoneId}`);
 const page = await context.newPage();
 page.on('pageerror', (e: Error) => {
   if (!e.message.includes('qs_')) console.log('  page error:', e.message);
@@ -179,7 +183,9 @@ await page.evaluate(() => {
 
 type Call = { res: string; from: number; to: number; marks: Array<[string, number]> };
 const results: Record<string, Call | undefined> = {};
-// Each resolution's data is reloaded, which makes TradingView ask for its marks again.
+const drawnBars: Record<string, number[]> = {};
+// Each resolution's data is reloaded, which makes TradingView ask for its marks again; the bars it
+// then draws are read back with their times.
 for (let i = 0; i < RESOLUTIONS.length; i += 1) {
   const res = RESOLUTIONS[i]!;
   // eslint-disable-next-line no-await-in-loop
@@ -203,32 +209,52 @@ for (let i = 0; i < RESOLUTIONS.length; i += 1) {
   // eslint-disable-next-line no-await-in-loop
   await page.waitForTimeout(1_500);
   // eslint-disable-next-line no-await-in-loop
+  drawnBars[res] = await page.evaluate(async () => {
+    const exported = await (window as any).haneulPerp.tvWidget
+      .activeChart()
+      .exportData({ includeTime: true, includedStudies: [] });
+    const column = exported.schema.findIndex((f: { type: string }) => f.type === 'time');
+    return exported.data.map((row: Float64Array) => row[column]);
+  });
+  // eslint-disable-next-line no-await-in-loop
   await page.screenshot({ path: `${screenshots}-${res}.png` });
 }
 console.log(`  screenshots ${screenshots}-{${RESOLUTIONS.join(',')}}.png`);
 
+// The indexer's candle for a fill starts at the fill's time less its remainder in the resolution.
+const candleStarts = (res: string) => {
+  const interval = INTERVAL_SECONDS[res]!;
+  return [...new Set(fillTimes.map((t) => t - (t % interval)))];
+};
 RESOLUTIONS.forEach((res) => {
   const call = results[res];
-  const interval = INTERVAL_SECONDS[res]!;
-  const expected = [...new Set(fillTimes.map((t) => t - (t % interval)))];
   console.log(
     `  ${res}: asked from ${call ? iso(call.from) : '-'}, marks ${
       call?.marks.map(([label, time]) => `${label} ${iso(time)}`).join(', ') ?? 'none'
-    }; bars of the fills ${expected.map(iso).join(', ')}`
+    }; candles of the fills ${candleStarts(res).map(iso).join(', ')}; last bars drawn ${(
+      drawnBars[res] ?? []
+    )
+      .slice(-3)
+      .map(iso)
+      .join(', ')}`
   );
 });
 RESOLUTIONS.forEach((res) => {
   const call = results[res];
-  const interval = INTERVAL_SECONDS[res]!;
-  const bars = new Set(fillTimes.map((t) => t - (t % interval)));
+  const drawn = new Set(drawnBars[res] ?? []);
+  check(
+    `${res}: the bar holding the fills starts where the indexer's candle does`,
+    candleStarts(res).every((start) => drawn.has(start)),
+    `candles ${candleStarts(res).map(iso).join(', ')}`
+  );
   check(
     `${res}: both fills are marked`,
     call != null && call.marks.length === 2,
     call == null ? 'no marks' : `${call.marks.length} marks`
   );
   check(
-    `${res}: each mark sits at the UTC start of its fill's bar`,
-    call != null && call.marks.every(([, time]) => bars.has(time)),
+    `${res}: each mark is at the time of a bar the chart draws`,
+    call != null && call.marks.every(([, time]) => drawn.has(time)),
     call?.marks.map(([label, time]) => `${label} ${iso(time)}`).join(', ') ?? 'no marks'
   );
 });

@@ -4,7 +4,6 @@ import { BonsaiHelpers } from '@/bonsai/ontology';
 // eslint-disable-next-line no-restricted-imports
 import { subscribeOnStream, unsubscribeFromStream } from '@/bonsai/websocket/candlesForTradingView';
 import { groupBy } from 'lodash';
-import { DateTime } from 'luxon';
 import type {
   DatafeedConfiguration,
   DatafeedErrorCallback,
@@ -18,7 +17,6 @@ import type {
   ResolveCallback,
   SearchSymbolsCallback,
   SubscribeBarsCallback,
-  Timezone,
 } from 'public/tradingview/charting_library';
 
 import { Candle, RESOLUTION_MAP } from '@/constants/candles';
@@ -40,8 +38,6 @@ import { orEmptyObj } from '@/lib/typeUtils';
 import { log } from '../../telemetry';
 import { getSymbol, mapCandle } from '../utils';
 import { getBarTime, getMarkForOrderFills } from './utils';
-
-const timezone = DateTime.local().get('zoneName') as unknown as Timezone;
 
 const configurationData: DatafeedConfiguration = {
   supported_resolutions: objectKeys(RESOLUTION_MAP),
@@ -111,7 +107,9 @@ export const getDydxDatafeed = (
       intraday_multipliers: ['1', '5', '15', '30', '60', '240'],
       supported_resolutions: configurationData.supported_resolutions!,
       data_status: 'streaming',
-      timezone,
+      // The exchange's time zone, which sets where bars start: the indexer builds candles on UTC
+      // boundaries. The timescale is still shown in the viewer's time zone (the widget's own).
+      timezone: 'Etc/UTC',
       format: 'price',
     };
 
@@ -128,8 +126,8 @@ export const getDydxDatafeed = (
     const theme = getAppTheme(store.getState());
     const colorMode = getAppColorMode(store.getState());
 
-    // The range starts at a boundary of the chart's time zone, inside the leftmost bar; that bar's
-    // earlier fills are on screen too, so the range is taken from the bar's UTC start.
+    // A range that starts inside its leftmost bar would leave out that bar's earlier fills, which
+    // are on screen too, so the range is taken from the bar's UTC start.
     const fromMs = (getBarTime(0, fromSeconds * 1000, resolution) ?? fromSeconds) * 1000;
     const toMs = toSeconds * 1000;
     const market = BonsaiHelpers.markets.selectMarketSummaryById(
