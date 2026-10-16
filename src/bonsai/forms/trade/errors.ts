@@ -34,7 +34,6 @@ import { getGoodTilInSeconds } from './summary';
 import { marketMakerFee, marketTakerFee } from './tradeInfo';
 import {
   ExecutionType,
-  MarginMode,
   OrderSide,
   TimeInForce,
   TradeForm,
@@ -756,10 +755,11 @@ function validateAccountState(
     errors.push(crossOrderError);
   }
 
-  const postOrderError = validateSubaccountMargin(summary);
-  if (postOrderError) {
-    errors.push(postOrderError);
-  }
+  // dYdX also rejected an order that left the position's subaccount without free collateral,
+  // since it moved a fixed amount there before the order. An order session here ends by
+  // allocating whatever initial margin the position is missing, so the position always ends at
+  // its initial margin or above, with nothing free when the order took exactly what it needed;
+  // the account balance that pays for it is checked above.
 
   return errors;
 }
@@ -905,48 +905,6 @@ function fillsExistingOrder(inputData: TradeFormInputData, summary: TradeFormSum
 
 function isTriggerOrder(type: TradeFormType): boolean {
   return [TradeFormType.TRIGGER_MARKET, TradeFormType.TRIGGER_LIMIT].includes(type);
-}
-
-/**
- * Validates that all positions remain valid after the order
- */
-function validateSubaccountMargin(summary: TradeFormSummary): ValidationError | undefined {
-  if (summary.effectiveTrade.marginMode !== MarginMode.ISOLATED) {
-    return undefined;
-  }
-
-  if (
-    summary.accountDetailsAfter?.position == null ||
-    summary.accountDetailsAfter.position.unsignedSize.isZero()
-  ) {
-    return undefined;
-  }
-
-  const preOrderFreeCollateral =
-    summary.accountDetailsBefore?.subaccountSummaries?.[
-      summary.tradeInfo.subaccountNumber
-    ]?.freeCollateral.toNumber();
-  const postOrderFreeCollateral =
-    summary.accountDetailsAfter.subaccountSummaries?.[
-      summary.tradeInfo.subaccountNumber
-    ]?.freeCollateral.toNumber();
-
-  // post order is negative and pre order was positive or non-existent
-  const overleveraged =
-    postOrderFreeCollateral != null &&
-    postOrderFreeCollateral <= 0 &&
-    (preOrderFreeCollateral == null || preOrderFreeCollateral > 0);
-
-  if (overleveraged) {
-    return simpleValidationError({
-      code: 'ORDER_WITH_CURRENT_ORDERS_INVALID',
-      type: ErrorType.error,
-      titleKey: STRING_KEYS.MODIFY_TARGET_LEVERAGE,
-      textKey: STRING_KEYS.ORDER_WITH_CURRENT_ORDERS_INVALID,
-    });
-  }
-
-  return undefined;
 }
 
 /**

@@ -4,7 +4,7 @@ import { CanvasOrderbookLine } from '@/bonsai/types/orderbookTypes';
 import { ParentSubaccountDataBase } from '@/bonsai/types/rawTypes';
 import {
   FeeTierSummary,
-  PerpetualMarketSummary,
+  OrderStatus,
   RewardParamsSummary,
   SubaccountOrder,
   SubaccountPosition,
@@ -13,7 +13,7 @@ import BigNumber from 'bignumber.js';
 
 import { MAX_SUBACCOUNT_NUMBER, NUM_PARENT_SUBACCOUNTS } from '@/constants/account';
 import { MAJOR_MARKETS } from '@/constants/markets';
-import { IndexerPositionSide } from '@/types/indexer/indexerApiGen';
+import { IndexerOrderSide, IndexerPositionSide } from '@/types/indexer/indexerApiGen';
 
 import { CURRENT_SURGE_REWARDS_DETAILS } from '@/hooks/rewards/util';
 
@@ -47,7 +47,6 @@ import {
 
 const STOP_MARKET_ORDER_SLIPPAGE_BUFFER_MAJOR_MARKET = 0.05;
 const STOP_MARKET_ORDER_SLIPPAGE_BUFFER = 0.1;
-const MAX_TARGET_LEVERAGE_BUFFER_PERCENT = 0.98;
 const MAX_ALLOCATION_BUFFER_CROSS = 0.98;
 const MAX_ALLOCATION_BUFFER_ISOLATED = 0.95;
 const DEFAULT_TARGET_LEVERAGE = 2.0;
@@ -143,10 +142,8 @@ export function calculateTradeInfo(
               calculated.summary?.averageFillPrice ?? 0,
               calculated.marketOrder?.totalFees ?? 0,
               subaccountToUse,
-              accountData.rawParentSubaccountData?.parentSubaccount,
-              baseAccount?.position,
-              accountData.currentTradeMarketSummary,
-              accountData.rawSelectedMarketLeverages
+              baseAccount,
+              accountData
             ),
             reward: calculateTakerReward(
               calculated.marketOrder?.usdcSize,
@@ -255,10 +252,8 @@ export function calculateTradeInfo(
               price ?? 0,
               totalFees ?? 0,
               subaccountToUse,
-              accountData.rawParentSubaccountData?.parentSubaccount,
-              baseAccount?.position,
-              accountData.currentTradeMarketSummary,
-              accountData.rawSelectedMarketLeverages
+              baseAccount,
+              accountData
             ),
             payloadPrice,
             startPrice: undefined,
@@ -333,10 +328,8 @@ export function calculateTradeInfo(
               weightedAvgPrice ?? 0,
               totalFees ?? 0,
               subaccountToUse,
-              accountData.rawParentSubaccountData?.parentSubaccount,
-              baseAccount?.position,
-              accountData.currentTradeMarketSummary,
-              accountData.rawSelectedMarketLeverages
+              baseAccount,
+              accountData
             ),
             reward: isMaker
               ? calculateMakerReward(totalFees, accountData.rewardParams)
@@ -402,10 +395,8 @@ export function calculateTradeInfo(
               price ?? 0,
               totalFees ?? 0,
               subaccountToUse,
-              accountData.rawParentSubaccountData?.parentSubaccount,
-              baseAccount?.position,
-              accountData.currentTradeMarketSummary,
-              accountData.rawSelectedMarketLeverages
+              baseAccount,
+              accountData
             ),
             reward: isMaker
               ? calculateMakerReward(totalFees, accountData.rewardParams)
@@ -1047,18 +1038,16 @@ function calculateIsolatedTransferAmount(
   tradePrice: number,
   tradeFees: number,
   subaccountToUse: number,
-  parentSubaccount: number | undefined,
-  existingPosition: SubaccountPosition | undefined,
-  tradeMarketSummary: PerpetualMarketSummary | undefined,
-  rawSelectedMarketLeverages: { [marketId: string]: number }
+  baseAccount: TradeAccountDetails | undefined,
+  accountData: TradeFormInputData
 ): number {
   if (
     !getShouldTransferCollateral(
       trade,
       tradeSize,
       subaccountToUse,
-      existingPosition,
-      parentSubaccount
+      baseAccount?.position,
+      accountData.rawParentSubaccountData?.parentSubaccount
     )
   ) {
     return 0;
@@ -1069,9 +1058,9 @@ function calculateIsolatedTransferAmount(
       tradeSize,
       tradePrice,
       tradeFees,
-      existingPosition,
-      tradeMarketSummary,
-      rawSelectedMarketLeverages
+      subaccountToUse,
+      baseAccount,
+      accountData
     ) ?? 0
   );
 }
@@ -1091,18 +1080,31 @@ function getShouldTransferCollateral(
   return isIsolatedOrder && isIncreasingOrCrossing && !isReduceOnly;
 }
 
+/**
+ * The collateral an order's session takes from the account balance. The session ends with
+ * `allocate_missing_margin`, which allocates what the position is short of its initial margin
+ * once the orders have run, and no more: the margin ratio times the mark price times the larger
+ * size the position would have if all its resting bids, or all its resting asks, filled, against
+ * the position's equity at the mark after the order's fee and its fill against the mark.
+ *
+ * dYdX sent a buffered amount ahead of the order instead (at 98% of the leverage, with half a
+ * percent on both the oracle and the fill price, and 1% more for limit orders); the surplus stayed
+ * with the position, which opened a 10x position at about 8.9x.
+ */
 function calculateIsolatedMarginTransferAmount(
   trade: TradeForm,
   tradeSize: number,
   tradePrice: number,
   tradeFees: number,
-  existingPosition: SubaccountPosition | undefined,
-  tradeMarketSummary: PerpetualMarketSummary | undefined,
-  rawSelectedMarketLeverages: { [marketId: string]: number }
+  subaccountToUse: number,
+  baseAccount: TradeAccountDetails | undefined,
+  accountData: TradeFormInputData
 ): number | undefined {
-  const oraclePrice = AttemptNumber(tradeMarketSummary?.oraclePrice);
+  const tradeMarketSummary = accountData.currentTradeMarketSummary;
+  // The indexer's oracle price is the engine's mark price.
+  const currentMarkPrice = AttemptNumber(tradeMarketSummary?.oraclePrice);
   const side = trade.side;
-  if (side == null || oraclePrice == null) {
+  if (side == null || currentMarkPrice == null) {
     return undefined;
   }
 
@@ -1111,45 +1113,56 @@ function calculateIsolatedMarginTransferAmount(
   const effectiveTargetLeverage = calculateEffectiveSelectedLeverage({
     userSelectedLeverage:
       tradeMarketSummary?.ticker != null
-        ? rawSelectedMarketLeverages[tradeMarketSummary.ticker]
+        ? accountData.rawSelectedMarketLeverages[tradeMarketSummary.ticker]
         : undefined,
     initialMarginFraction: tradeMarketSummary?.initialMarginFraction,
   });
-  const targetLeverage =
-    AttemptNumber(effectiveTargetLeverage) ?? Math.min(DEFAULT_TARGET_LEVERAGE, marketMaxLeverage);
-
-  const positionIncreasingAmount = getIncreasingPositionAmount(trade, tradeSize, existingPosition);
-
-  const estOraclePriceAtExecution = calc(() => {
-    switch (trade.type) {
-      case TradeFormType.TWAP:
-      case TradeFormType.MARKET:
-        return oraclePrice;
-      case TradeFormType.LIMIT:
-      case TradeFormType.SCALE:
-      case TradeFormType.TRIGGER_LIMIT:
-        return tradePrice;
-      case TradeFormType.TRIGGER_MARKET:
-        return MustNumber(trade.triggerPrice);
-      default:
-        assertNever(trade.type);
-        return 0;
-    }
-  });
-
-  return calculateIsolatedMarginTransferAmountFromValues(
-    targetLeverage,
-    side,
-    estOraclePriceAtExecution,
-    tradePrice,
-    tradeFees,
-    marketMaxLeverage,
-    tradeSize,
-    positionIncreasingAmount,
-    trade.type === TradeFormType.LIMIT ||
-      trade.type === TradeFormType.SCALE ||
-      trade.type === TradeFormType.TRIGGER_LIMIT
+  // The engine holds a position to the higher of its own margin ratio and the market's.
+  const targetLeverage = Math.min(
+    AttemptNumber(effectiveTargetLeverage) ?? DEFAULT_TARGET_LEVERAGE,
+    marketMaxLeverage
   );
+  if (targetLeverage <= 0) {
+    return undefined;
+  }
+
+  // A market order fills as its session runs, a trigger order once the mark reaches its trigger;
+  // a limit order may rest on the book.
+  const fills =
+    trade.type === TradeFormType.MARKET ||
+    trade.type === TradeFormType.TWAP ||
+    trade.type === TradeFormType.TRIGGER_MARKET;
+  const markPrice =
+    trade.type === TradeFormType.TRIGGER_MARKET || trade.type === TradeFormType.TRIGGER_LIMIT
+      ? MustNumber(trade.triggerPrice)
+      : currentMarkPrice;
+
+  const signedTradeSize = side === OrderSide.BUY ? tradeSize : -tradeSize;
+  // Stop orders wait off the book as tickets, so only the other open orders rest on it.
+  const restingSize = (orderSide: IndexerOrderSide) =>
+    accountData.currentTradeMarketOpenOrders
+      .filter((o) => o.side === orderSide && o.status !== OrderStatus.Untriggered)
+      .reduce((sum, o) => sum + (o.remainingSize ?? o.size).toNumber(), 0);
+  const size = (baseAccount?.position?.signedSize.toNumber() ?? 0) + (fills ? signedTradeSize : 0);
+  const bids =
+    restingSize(IndexerOrderSide.BUY) + (!fills && side === OrderSide.BUY ? tradeSize : 0);
+  const asks =
+    restingSize(IndexerOrderSide.SELL) + (!fills && side === OrderSide.SELL ? tradeSize : 0);
+  const requiredMargin =
+    (Math.max(Math.abs(size + bids), Math.abs(size - asks)) * markPrice) / targetLeverage;
+
+  // A fill against the mark is a profit or loss straight away. A resting order costs nothing
+  // until it fills, but a limit order that crosses can fill at up to its price, so for one only a
+  // price worse than the mark counts.
+  const fillPnl = (markPrice - tradePrice) * signedTradeSize;
+  const equity =
+    mapIfPresent(baseAccount?.subaccountSummaries, (summaries) =>
+      summaries[subaccountToUse]?.equity.toNumber()
+    ) ?? 0;
+  const margin = equity - tradeFees + (fills ? fillPnl : Math.min(fillPnl, 0));
+
+  const amount = requiredMargin - margin;
+  return amount > 0 ? amount : undefined;
 }
 
 function getIncreasingPositionAmount(
@@ -1179,84 +1192,8 @@ function getIncreasingPositionAmount(
   return Math.max(0, tradeSize - positionSize);
 }
 
-function calculateIsolatedMarginTransferAmountFromValues(
-  targetLeverage: number,
-  side: OrderSide,
-  estOraclePriceAtExecution: number,
-  price: number,
-  fees: number,
-  maxMarketLeverage: number,
-  orderSize: number,
-  positionIncreasingSize: number,
-  ignoreSlippageAndOracleDrift: boolean
-): number | undefined {
-  const adjustedTargetLeverage = Math.min(
-    targetLeverage,
-    maxMarketLeverage * MAX_TARGET_LEVERAGE_BUFFER_PERCENT
-  );
-
-  if (adjustedTargetLeverage === 0) {
-    return undefined;
-  }
-
-  const amount = getTransferAmountFromTargetLeverage(
-    price,
-    fees,
-    estOraclePriceAtExecution,
-    side,
-    orderSize,
-    positionIncreasingSize,
-    adjustedTargetLeverage,
-    ignoreSlippageAndOracleDrift
-  );
-  if (amount <= 0) {
-    return undefined;
-  }
-  return amount;
-}
-
-// for MARKET-ish orders
-const SLIPPAGE_BUFFER = 0.005;
-const ORACLE_BUFFER = 0.005;
-
 // for LIMIT-ish orders
 const FLAT_TRANSFER_BUFFER = 0.01;
-
-function getTransferAmountFromTargetLeverage(
-  price: number,
-  fees: number,
-  estOraclePriceAtExecution: number,
-  side: OrderSide,
-  orderSize: number,
-  increasingSize: number,
-  targetLeverage: number,
-  ignoreSlippageAndOracleDrift: boolean
-): number {
-  if (targetLeverage === 0 || increasingSize <= 0 || orderSize <= 0) {
-    return 0;
-  }
-
-  const slippageBuffer = ignoreSlippageAndOracleDrift ? 0 : SLIPPAGE_BUFFER;
-  const oracleBuffer = ignoreSlippageAndOracleDrift ? 0 : ORACLE_BUFFER;
-
-  const IMF = 1 / targetLeverage;
-
-  // maximize margin requirement by adding buffer to oracle
-  const margin = increasingSize * (estOraclePriceAtExecution * (1 + oracleBuffer)) * IMF;
-  // maximize fees by adding buffer to fill price
-  const feesAtFillPriceWithBuffer = fees * (1 + slippageBuffer);
-
-  // maximize slippage in each case by adding/removing buffer from actual expectations
-  const slippageLoss =
-    side === OrderSide.BUY
-      ? orderSize * (price * (1 + slippageBuffer) - estOraclePriceAtExecution * (1 - oracleBuffer))
-      : orderSize * (estOraclePriceAtExecution * (1 + oracleBuffer) - price * (1 - slippageBuffer));
-
-  return (
-    (margin + feesAtFillPriceWithBuffer + slippageLoss) *
-    (ignoreSlippageAndOracleDrift ? 1 + FLAT_TRANSFER_BUFFER : 1)
-  );
-}
 
 function calculateScaleWeightedAveragePrice(
   startPrice: number | undefined,

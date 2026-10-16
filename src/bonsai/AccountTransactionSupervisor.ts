@@ -341,9 +341,9 @@ export class AccountTransactionSupervisor {
   }
 
   /**
-   * Places every payload of one market in a single session. Isolated-margin transfers
-   * become collateral allocations, and the first order on a market creates the position
-   * at the market's initial margin ratio.
+   * Places every payload of one market in a single session. The first order on a market
+   * creates the position at the market's initial margin ratio, and the session ends by
+   * allocating whatever margin the orders leave the position short of.
    */
   private async executeSession(
     ctx: Context,
@@ -371,7 +371,6 @@ export class AccountTransactionSupervisor {
       closing && !createPosition && position != null
         ? { restoreImr: this.restoreImrFor(marketId, market, position) }
         : undefined;
-    const allocate = payloads.reduce((sum, p) => sum + (p.transferToSubaccountAmount ?? 0), 0);
     const tx = ctx.builder.session({
       ref: { account: ctx.account.account, cap: ctx.account.cap },
       marketId,
@@ -379,10 +378,10 @@ export class AccountTransactionSupervisor {
       options: {
         createPosition,
         initialMarginRatio: createPosition ? BigInt(market.initialMarginRatio) : undefined,
-        allocate:
-          allocate > 0
-            ? collateralToUnits(allocate, ctx.deployment.collateral.decimals)
-            : undefined,
+        // The engine allocates the missing initial margin at the prices the orders ran at,
+        // rounded up to a whole collateral unit. The payload's `transferToSubaccountAmount` is
+        // the form's estimate of that amount for its preview; dYdX transferred it ahead of the
+        // order, and any surplus stayed with the position.
         allocateMissingMargin: true,
         deallocateFreeCollateral: false,
         returnCollateralIfFlat,
