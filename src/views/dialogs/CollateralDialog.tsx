@@ -21,6 +21,8 @@ import { Icon, IconName } from '@/components/Icon';
 import { InputType } from '@/components/Input';
 import { Output, OutputType } from '@/components/Output';
 
+import { operationFailureToErrorParams } from '@/lib/errorHelpers';
+
 type Mode = 'deposit' | 'withdraw';
 
 type Balances = {
@@ -55,11 +57,12 @@ const CollateralDialog = ({
   const loadBalances = useCallback(async () => {
     const result = await accountTransactionManager.collateralBalances();
     if (isOperationFailure(result)) {
-      setError(result.errorString);
+      const { errorStringKey, errorMessage } = operationFailureToErrorParams(result);
+      setError(stringGetter({ key: errorStringKey, fallback: errorMessage ?? '' }));
       return;
     }
     setBalances(result.payload);
-  }, []);
+  }, [stringGetter]);
 
   useEffect(() => {
     loadBalances();
@@ -80,7 +83,8 @@ const CollateralDialog = ({
         : await accountTransactionManager.withdrawCollateral(value);
     setIsSubmitting(false);
     if (isOperationFailure(result)) {
-      setError(result.errorString);
+      const { errorStringKey, errorMessage } = operationFailureToErrorParams(result);
+      setError(stringGetter({ key: errorStringKey, fallback: errorMessage ?? '' }));
       return;
     }
     notify({

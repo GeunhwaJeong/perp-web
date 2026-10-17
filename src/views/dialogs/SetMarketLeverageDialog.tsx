@@ -131,7 +131,10 @@ export const SetMarketLeverageDialog = ({
   const errorMessage = useMemo(() => {
     if (errorMessageRaw != null) {
       const parsingResult = parseTransactionError('SetMarketLeverage', errorMessageRaw);
-      return stringGetter({ key: parsingResult?.stringKey ?? STRING_KEYS.UNKNOWN_ERROR });
+      return stringGetter({
+        key: parsingResult?.stringKey,
+        fallback: parsingResult?.message ?? stringGetter({ key: STRING_KEYS.UNKNOWN_ERROR }),
+      });
     }
     return undefined;
   }, [errorMessageRaw, stringGetter]);

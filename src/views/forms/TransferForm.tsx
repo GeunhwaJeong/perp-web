@@ -26,6 +26,7 @@ import { InputType } from '@/components/Input';
 import { Output, OutputType } from '@/components/Output';
 import { SelectItem, SelectMenu } from '@/components/SelectMenu';
 
+import { operationFailureToErrorParams } from '@/lib/errorHelpers';
 import { truncateAddress } from '@/lib/wallet';
 
 type TransferFormProps = {
@@ -83,7 +84,8 @@ export const TransferForm = ({
     const result = await accountTransactionManager.sendCoins({ asset, amount: value, recipient });
     setIsSubmitting(false);
     if (isOperationFailure(result)) {
-      setError(result.errorString);
+      const { errorStringKey, errorMessage } = operationFailureToErrorParams(result);
+      setError(stringGetter({ key: errorStringKey, fallback: errorMessage ?? '' }));
       return;
     }
     notify({

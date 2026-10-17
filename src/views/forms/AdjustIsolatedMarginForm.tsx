@@ -302,7 +302,10 @@ export const AdjustIsolatedMarginForm = ({
         'AdjustIsolatedMargin SubaccountTransfer',
         errorMessageRaw
       );
-      return stringGetter({ key: parsingResult?.stringKey ?? STRING_KEYS.UNKNOWN_ERROR });
+      return stringGetter({
+        key: parsingResult?.stringKey,
+        fallback: parsingResult?.message ?? stringGetter({ key: STRING_KEYS.UNKNOWN_ERROR }),
+      });
     }
     return undefined;
   }, [errorMessageRaw, stringGetter]);

@@ -156,8 +156,7 @@ const toOrderSpec = (
 // 0.02 HANEUL left in the wallet when sending the gas coin, enough for a few transactions.
 const GAS_RESERVE_UNITS = 20_000_000n;
 
-const failure = (message: string, stringKey?: string) =>
-  wrapSimpleError(FN, message, stringKey ?? STRING_KEYS.SOMETHING_WENT_WRONG);
+const failure = (message: string, stringKey?: string) => wrapSimpleError(FN, message, stringKey);
 
 /**
  * Write path for the perpetuals engine. Orders, cancels and closes become programmable
@@ -415,11 +414,11 @@ export class AccountTransactionSupervisor {
   private toFailure(error: unknown): OperationResult<never> {
     if (error instanceof HaneulTransactionError) {
       logBonsaiError(FN, error.message, { abort: error.abort, digest: error.digest });
-      return wrapOperationFailure(error.message, undefined);
+      return wrapOperationFailure(error.message, { message: error.message });
     }
     const message = error instanceof Error ? error.message : String(error);
     logBonsaiError(FN, message, { error });
-    return wrapOperationFailure(message, undefined);
+    return wrapOperationFailure(message, { message });
   }
 
   /**
