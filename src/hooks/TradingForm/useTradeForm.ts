@@ -1,3 +1,5 @@
+import { useEffect, useRef, useState } from 'react';
+
 import { accountTransactionManager } from '@/bonsai/AccountTransactionSupervisor';
 import { TradeFormInputData, TradeFormSummary, TradeFormType } from '@/bonsai/forms/trade/types';
 import { PlaceOrderPayload } from '@/bonsai/forms/triggers/types';
@@ -12,11 +14,14 @@ import { useTradeTypeOptions } from '@/views/forms/TradeForm/useTradeTypeOptions
 
 import { calculateCanAccountTrade } from '@/state/accountCalculators';
 import { getSubaccountId } from '@/state/accountInfoSelectors';
-import { useAppDispatch, useAppSelector } from '@/state/appTypes';
+import { useAppSelector } from '@/state/appTypes';
 import { getCurrentMarketIdIfTradeable } from '@/state/currentMarketSelectors';
 import { getCurrentMarketOraclePrice } from '@/state/perpetualsSelectors';
-import { tradeFormActions } from '@/state/tradeForm';
-import { getCurrentTradePageForm } from '@/state/tradeFormSelectors';
+import {
+  getClosePositionFormRawState,
+  getCurrentTradePageForm,
+  getTradeFormRawState,
+} from '@/state/tradeFormSelectors';
 
 import { track } from '@/lib/analytics/analytics';
 import { useDisappearingValue } from '@/lib/disappearingValue';
@@ -56,9 +61,21 @@ export const useTradeForm = ({
   onLastOrderIndexed: () => void;
 }) => {
   const [placeOrderError, setPlaceOrderError] = useDisappearingValue<string>();
+  const [isPlacingOrder, setIsPlacingOrder] = useState(false);
+  // The state updates a render late, and a second click or Enter can land before it does.
+  const placingRef = useRef(false);
 
-  const dispatch = useAppDispatch();
   const stringGetter = useStringGetter();
+
+  const isCloseForm =
+    source === TradeFormSource.ClosePositionForm || source === TradeFormSource.SimpleCloseForm;
+  const formInputs = useAppSelector(
+    isCloseForm ? getClosePositionFormRawState : getTradeFormRawState
+  );
+  // A failed order keeps its inputs and its reason; changing an input makes the reason stale.
+  useEffect(() => {
+    setPlaceOrderError(undefined);
+  }, [formInputs, setPlaceOrderError]);
 
   const { connectionError } = useApiState();
   const { complianceState } = useComplianceState();
@@ -110,12 +127,15 @@ export const useTradeForm = ({
     onSuccess?: () => void;
     onFailure?: () => void;
   } = {}) => {
+    if (placingRef.current) return;
     setPlaceOrderError(undefined);
     const payload = summary.tradePayload;
     const representativePayload = payload?.orderPayload ?? payload?.scaleOrderPayloads?.[0];
     if (payload == null || representativePayload == null || hasValidationErrors) {
       return;
     }
+    placingRef.current = true;
+    setIsPlacingOrder(true);
 
     // dYdX saved the leverage chosen for a new position here, once the order had picked its
     // subaccount. The leverage dialog writes it to the position on chain and the selection is read
@@ -136,7 +156,6 @@ export const useTradeForm = ({
       })
     );
 
-    dispatch(tradeFormActions.resetPrimaryInputs());
     logBonsaiInfo(
       source,
       source === TradeFormSource.ClosePositionForm
@@ -147,7 +166,13 @@ export const useTradeForm = ({
       }
     );
 
-    const result = await accountTransactionManager.placeCompoundOrder(payload, source);
+    let result;
+    try {
+      result = await accountTransactionManager.placeCompoundOrder(payload, source);
+    } finally {
+      placingRef.current = false;
+      setIsPlacingOrder(false);
+    }
     if (isOperationSuccess(result)) {
       setUnIndexedClientId(representativePayload.clientId.toString());
       onSuccess?.();
@@ -165,6 +190,7 @@ export const useTradeForm = ({
 
   return {
     placeOrder,
+    isPlacingOrder,
     unIndexedClientId,
     placeOrderError,
     shouldEnableTrade,

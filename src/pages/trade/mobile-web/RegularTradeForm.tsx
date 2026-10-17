@@ -91,6 +91,7 @@ const RegularTradeForm = () => {
   const {
     placeOrderError,
     placeOrder,
+    isPlacingOrder,
     tradingUnavailable,
     shouldEnableTrade,
     hasValidationErrors,
@@ -100,7 +101,7 @@ const RegularTradeForm = () => {
     onLastOrderIndexed,
   });
 
-  const { isErrorShownInOrderStatusToast, primaryAlert, shortAlertKey } = useTradeErrors({
+  const { primaryAlert, shortAlertKey } = useTradeErrors({
     placeOrderError,
   });
 
@@ -145,7 +146,7 @@ const RegularTradeForm = () => {
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     placeOrder({
-      onPlaceOrder: () => {
+      onSuccess: () => {
         dispatch(tradeFormActions.resetPrimaryInputs());
       },
     });
@@ -332,7 +333,6 @@ const RegularTradeForm = () => {
           }}
         >
           <TradeFormMessages
-            isErrorShownInOrderStatusToast={isErrorShownInOrderStatusToast}
             placeOrderError={placeOrderError}
             primaryAlert={primaryAlert}
             shouldPromptUserToPlaceLimitOrder={false}
@@ -348,6 +348,7 @@ const RegularTradeForm = () => {
             }}
             hasInput={isInputFilled}
             hasValidationErrors={hasValidationErrors}
+            isPlacingOrder={isPlacingOrder}
             onClearInputs={() => dispatch(tradeFormActions.resetPrimaryInputs())}
             shouldEnableTrade={shouldEnableTrade}
             showDeposit={false}

@@ -72,6 +72,7 @@ export const TradeForm = ({
   const {
     placeOrderError,
     placeOrder,
+    isPlacingOrder,
     hasValidationErrors,
     tradingUnavailable,
     shouldEnableTrade,
@@ -82,12 +83,7 @@ export const TradeForm = ({
     onLastOrderIndexed,
   });
 
-  const {
-    shouldPromptUserToPlaceLimitOrder,
-    isErrorShownInOrderStatusToast,
-    primaryAlert,
-    shortAlertKey,
-  } = useTradeErrors({
+  const { shouldPromptUserToPlaceLimitOrder, primaryAlert, shortAlertKey } = useTradeErrors({
     placeOrderError,
   });
 
@@ -159,7 +155,7 @@ export const TradeForm = ({
       case MobilePlaceOrderSteps.PreviewOrder:
       default: {
         placeOrder({
-          onPlaceOrder: () => {
+          onSuccess: () => {
             dispatch(tradeFormActions.resetPrimaryInputs());
           },
         });
@@ -210,7 +206,6 @@ export const TradeForm = ({
       slotAlerts={
         isPreviewStep ? undefined : (
           <TradeFormMessages
-            isErrorShownInOrderStatusToast={isErrorShownInOrderStatusToast}
             placeOrderError={placeOrderError}
             primaryAlert={formAlert}
             shouldPromptUserToPlaceLimitOrder={shouldPromptUserToPlaceLimitOrder}
@@ -227,6 +222,7 @@ export const TradeForm = ({
       currentStep={currentStep}
       hasInput={isInputFilled && (!currentStep || currentStep === MobilePlaceOrderSteps.EditOrder)}
       hasValidationErrors={hasValidationErrors}
+      isPlacingOrder={isPlacingOrder}
       onClearInputs={() => dispatch(tradeFormActions.resetPrimaryInputs())}
       shouldEnableTrade={shouldEnableTrade}
       showDeposit={needsDeposit}
@@ -244,11 +240,7 @@ export const TradeForm = ({
       {currentStep && currentStep !== MobilePlaceOrderSteps.EditOrder ? (
         <>
           <PositionPreview />
-          <TradeFormAlertContent
-            placeOrderError={placeOrderError}
-            isErrorShownInOrderStatusToast={isErrorShownInOrderStatusToast}
-            primaryAlert={formAlert}
-          />
+          <TradeFormAlertContent placeOrderError={placeOrderError} primaryAlert={formAlert} />
         </>
       ) : // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       currentStep && currentStep === MobilePlaceOrderSteps.EditOrder ? (

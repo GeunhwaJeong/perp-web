@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { timeUnits } from '@/constants/time';
 
@@ -17,16 +17,19 @@ export const useDisappearingValue = <T>(duration = timeUnits.second * 30) => {
     return () => clearTimeout(timeoutRef.current);
   }, []);
 
-  const setValueWithTimeout = (newValue: T | undefined) => {
-    clearTimeout(timeoutRef.current);
-    setValue(newValue);
+  const setValueWithTimeout = useCallback(
+    (newValue: T | undefined) => {
+      clearTimeout(timeoutRef.current);
+      setValue(newValue);
 
-    if (newValue !== undefined) {
-      timeoutRef.current = setTimeout(() => {
-        setValue(undefined);
-      }, duration);
-    }
-  };
+      if (newValue !== undefined) {
+        timeoutRef.current = setTimeout(() => {
+          setValue(undefined);
+        }, duration);
+      }
+    },
+    [duration]
+  );
 
   return [value, setValueWithTimeout] as const;
 };

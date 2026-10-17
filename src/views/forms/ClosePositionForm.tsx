@@ -125,6 +125,7 @@ export const ClosePositionForm = ({
   const {
     placeOrderError: closePositionError,
     placeOrder,
+    isPlacingOrder,
     shouldEnableTrade,
     tradingUnavailable,
     hasValidationErrors,
@@ -134,12 +135,7 @@ export const ClosePositionForm = ({
     onLastOrderIndexed,
   });
 
-  const {
-    shouldPromptUserToPlaceLimitOrder,
-    isErrorShownInOrderStatusToast,
-    primaryAlert,
-    shortAlertKey,
-  } = useTradeErrors({
+  const { shouldPromptUserToPlaceLimitOrder, primaryAlert, shortAlertKey } = useTradeErrors({
     placeOrderError: closePositionError,
     isClosingPosition: true,
   });
@@ -175,7 +171,7 @@ export const ClosePositionForm = ({
           onFailure: () => {
             setCurrentStep?.(MobilePlaceOrderSteps.PlaceOrderFailed);
           },
-          onPlaceOrder: () => {
+          onSuccess: () => {
             onClearInputs();
           },
         });
@@ -276,7 +272,6 @@ export const ClosePositionForm = ({
       </Collapsible>
 
       <TradeFormMessages
-        isErrorShownInOrderStatusToast={isErrorShownInOrderStatusToast}
         placeOrderError={closePositionError}
         primaryAlert={primaryAlert}
         shouldPromptUserToPlaceLimitOrder={shouldPromptUserToPlaceLimitOrder}
@@ -293,7 +288,6 @@ export const ClosePositionForm = ({
         <div tw="flexColumn gap-[--form-input-gap]">
           <PositionPreview />
           <TradeFormMessages
-            isErrorShownInOrderStatusToast={isErrorShownInOrderStatusToast}
             placeOrderError={closePositionError}
             primaryAlert={primaryAlert}
             shouldPromptUserToPlaceLimitOrder={shouldPromptUserToPlaceLimitOrder}
@@ -324,6 +318,7 @@ export const ClosePositionForm = ({
       <PlaceOrderButtonAndReceipt
         hasValidationErrors={hasValidationErrors}
         hasInput={!!amountInput}
+        isPlacingOrder={isPlacingOrder}
         onClearInputs={onClearInputs}
         actionStringKey={shortAlertKey}
         summary={summary}

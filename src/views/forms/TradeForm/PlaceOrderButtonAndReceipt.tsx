@@ -54,6 +54,8 @@ type ElementProps = {
   currentStep?: MobilePlaceOrderSteps;
   hasInput: boolean;
   hasValidationErrors?: boolean;
+  /** The order has gone out and its result is not back yet. */
+  isPlacingOrder?: boolean;
   onClearInputs: () => void;
   shouldEnableTrade: boolean;
   showDeposit?: boolean;
@@ -69,6 +71,7 @@ export const PlaceOrderButtonAndReceipt = ({
   currentStep,
   hasInput,
   hasValidationErrors,
+  isPlacingOrder = false,
   onClearInputs,
   shouldEnableTrade,
   showDeposit,
@@ -288,8 +291,8 @@ export const PlaceOrderButtonAndReceipt = ({
   const buttonState = currentStep
     ? buttonStatesPerStep[currentStep].buttonState
     : {
-        isDisabled: !shouldEnableTrade,
-        isLoading: hasMissingData,
+        isDisabled: !shouldEnableTrade || isPlacingOrder,
+        isLoading: hasMissingData || isPlacingOrder,
       };
 
   const depositButton = (

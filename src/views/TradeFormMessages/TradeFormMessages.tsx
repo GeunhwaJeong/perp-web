@@ -18,12 +18,10 @@ import { tradeFormActions } from '@/state/tradeForm';
 import { TradeFormAlertContent } from './TradeFormAlertContent';
 
 export const TradeFormMessages = ({
-  isErrorShownInOrderStatusToast,
   placeOrderError,
   primaryAlert,
   shouldPromptUserToPlaceLimitOrder,
 }: {
-  isErrorShownInOrderStatusToast: boolean;
   placeOrderError?: string;
   primaryAlert?: ValidationError;
   shouldPromptUserToPlaceLimitOrder: boolean;
@@ -39,11 +37,7 @@ export const TradeFormMessages = ({
         </AlertMessage>
       )}
 
-      <TradeFormAlertContent
-        placeOrderError={placeOrderError}
-        isErrorShownInOrderStatusToast={isErrorShownInOrderStatusToast}
-        primaryAlert={primaryAlert}
-      />
+      <TradeFormAlertContent placeOrderError={placeOrderError} primaryAlert={primaryAlert} />
 
       {shouldPromptUserToPlaceLimitOrder && (
         <$IconButton

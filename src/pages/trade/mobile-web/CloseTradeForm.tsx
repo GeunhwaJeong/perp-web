@@ -83,6 +83,7 @@ const CloseTradeForm = ({ market }: Props) => {
   const {
     placeOrderError: closePositionError,
     placeOrder,
+    isPlacingOrder,
     shouldEnableTrade,
     tradingUnavailable,
     hasValidationErrors,
@@ -92,7 +93,7 @@ const CloseTradeForm = ({ market }: Props) => {
     onLastOrderIndexed,
   });
 
-  const { isErrorShownInOrderStatusToast, primaryAlert, shortAlertKey } = useTradeErrors({
+  const { primaryAlert, shortAlertKey } = useTradeErrors({
     placeOrderError: closePositionError,
     isClosingPosition: true,
   });
@@ -120,7 +121,7 @@ const CloseTradeForm = ({ market }: Props) => {
   const onSubmit = (e: FormEvent) => {
     e.preventDefault();
     placeOrder({
-      onPlaceOrder: () => {
+      onSuccess: () => {
         onClearInputs();
       },
     });
@@ -227,7 +228,6 @@ const CloseTradeForm = ({ market }: Props) => {
           }}
         >
           <TradeFormMessages
-            isErrorShownInOrderStatusToast={isErrorShownInOrderStatusToast}
             placeOrderError={closePositionError}
             primaryAlert={primaryAlert}
             shouldPromptUserToPlaceLimitOrder={false}
@@ -238,6 +238,7 @@ const CloseTradeForm = ({ market }: Props) => {
             actionStringKey={shortAlertKey}
             hasInput={!!amountInput}
             hasValidationErrors={hasValidationErrors}
+            isPlacingOrder={isPlacingOrder}
             onClearInputs={onClearInputs}
             shouldEnableTrade={shouldEnableTrade}
             showDeposit={false}

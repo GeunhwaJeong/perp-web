@@ -95,12 +95,7 @@ export const SimpleCloseForm = ({
     onLastOrderIndexed,
   });
 
-  const {
-    shouldPromptUserToPlaceLimitOrder,
-    isErrorShownInOrderStatusToast,
-    primaryAlert,
-    shortAlertKey,
-  } = useTradeErrors({
+  const { shouldPromptUserToPlaceLimitOrder, primaryAlert, shortAlertKey } = useTradeErrors({
     placeOrderError,
     isClosingPosition: true,
   });
@@ -114,6 +109,8 @@ export const SimpleCloseForm = ({
     placeOrder({
       onPlaceOrder: (tradePayload) => {
         setPlaceOrderPayload(tradePayload);
+      },
+      onSuccess: () => {
         dispatch(closePositionFormActions.reset());
       },
       onFailure: () => {
@@ -381,7 +378,6 @@ export const SimpleCloseForm = ({
         }}
       >
         <TradeFormMessages
-          isErrorShownInOrderStatusToast={isErrorShownInOrderStatusToast}
           placeOrderError={placeOrderError}
           primaryAlert={primaryAlert}
           shouldPromptUserToPlaceLimitOrder={shouldPromptUserToPlaceLimitOrder}

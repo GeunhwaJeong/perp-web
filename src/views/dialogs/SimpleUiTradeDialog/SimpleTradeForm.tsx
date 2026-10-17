@@ -97,12 +97,7 @@ export const SimpleTradeForm = ({
     onLastOrderIndexed,
   });
 
-  const {
-    shouldPromptUserToPlaceLimitOrder,
-    isErrorShownInOrderStatusToast,
-    primaryAlert,
-    shortAlertKey,
-  } = useTradeErrors({
+  const { shouldPromptUserToPlaceLimitOrder, primaryAlert, shortAlertKey } = useTradeErrors({
     placeOrderError,
   });
 
@@ -115,6 +110,8 @@ export const SimpleTradeForm = ({
     placeOrder({
       onPlaceOrder: (tradePayload) => {
         setPlaceOrderPayload(tradePayload);
+      },
+      onSuccess: () => {
         dispatch(tradeFormActions.reset());
       },
       onFailure: () => {
@@ -434,7 +431,6 @@ export const SimpleTradeForm = ({
         }}
       >
         <TradeFormMessages
-          isErrorShownInOrderStatusToast={isErrorShownInOrderStatusToast}
           placeOrderError={placeOrderError}
           primaryAlert={primaryAlert}
           shouldPromptUserToPlaceLimitOrder={shouldPromptUserToPlaceLimitOrder}
