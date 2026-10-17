@@ -7,7 +7,7 @@ import styled from 'styled-components';
 
 import { AlertType } from '@/constants/alerts';
 import { ButtonAction, ButtonState, ButtonType } from '@/constants/buttons';
-import { DialogProps, SetMarketLeverageDialogProps } from '@/constants/dialogs';
+import { DialogProps, DialogTypes, SetMarketLeverageDialogProps } from '@/constants/dialogs';
 import { STRING_KEYS } from '@/constants/localization';
 
 import { useAccounts } from '@/hooks/useAccounts';
@@ -27,6 +27,7 @@ import { Slider } from '@/components/Slider';
 import { AccentTag } from '@/components/Tag';
 
 import { useAppDispatch, useAppSelector } from '@/state/appTypes';
+import { openDialog } from '@/state/dialogs';
 import { setSelectedMarketLeverage } from '@/state/raw';
 
 import { useDisappearingValue } from '@/lib/disappearingValue';
@@ -128,6 +129,16 @@ export const SetMarketLeverageDialog = ({
     leverageNumber != null &&
     leverageNumber > (MaybeBigNumber(effectiveSelectedLeverage)?.toNumber() ?? 0);
 
+  // The leverage is written through the trading account the first deposit opens, so until there
+  // is collateral the dialog offers the deposit, as the trade form does.
+  const needsDeposit = parentSubaccountSummary?.equity.lte(0) === true && currentPosition == null;
+
+  const onDeposit = () => {
+    // A dialog opened over another waits its turn, so the deposit opens as this one closes.
+    dispatch(openDialog(DialogTypes.Deposit2({})));
+    setIsOpen(false);
+  };
+
   const errorMessage = useMemo(() => {
     if (errorMessageRaw != null) {
       const parsingResult = parseTransactionError('SetMarketLeverage', errorMessageRaw);
@@ -156,8 +167,8 @@ export const SetMarketLeverageDialog = ({
   const onSave = async (formEvent?: React.FormEvent) => {
     formEvent?.preventDefault();
 
-    // Don't allow saving if below minimum
-    if (isBelowMinimum) {
+    // Don't allow saving below the minimum, or before there is an account to save to
+    if (isBelowMinimum || needsDeposit) {
       return;
     }
 
@@ -278,20 +289,31 @@ export const SetMarketLeverageDialog = ({
 
         {errorMessage && <AlertMessage type={AlertType.Error}>{errorMessage}</AlertMessage>}
 
-        <Button
-          type={ButtonType.Submit}
-          tw="w-full"
-          action={ButtonAction.Primary}
-          state={
-            isBelowMinimum || !hasLeverageChanged
-              ? ButtonState.Disabled
-              : isLoading
-                ? ButtonState.Loading
-                : ButtonState.Default
-          }
-        >
-          {stringGetter({ key: STRING_KEYS.SAVE })}
-        </Button>
+        {needsDeposit ? (
+          <Button
+            type={ButtonType.Button}
+            tw="w-full"
+            action={ButtonAction.Primary}
+            onClick={onDeposit}
+          >
+            {stringGetter({ key: STRING_KEYS.DEPOSIT_FUNDS })}
+          </Button>
+        ) : (
+          <Button
+            type={ButtonType.Submit}
+            tw="w-full"
+            action={ButtonAction.Primary}
+            state={
+              isBelowMinimum || !hasLeverageChanged
+                ? ButtonState.Disabled
+                : isLoading
+                  ? ButtonState.Loading
+                  : ButtonState.Default
+            }
+          >
+            {stringGetter({ key: STRING_KEYS.SAVE })}
+          </Button>
+        )}
       </form>
     </Dialog>
   );

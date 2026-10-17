@@ -4,10 +4,10 @@
  * What the app says when a transaction fails, on a running localnet. The write path knows why
  * (its own checks name the reason, and a chain rejection carries the engine's abort), and each
  * form is to show that reason rather than "Something went wrong", "Unknown error" or the error
- * as JSON. Checks the leverage dialog without a trading account, the transfer form with a name
- * that does not resolve, a post-only order the engine refuses from the trade form and a margin
- * removal the engine refuses from the margin dialog. Requires the fixture (`fixture.mjs setup` +
- * `push`), the indexer and API, and `pnpm dev`.
+ * as JSON. Checks the transfer form with a name that does not resolve, a post-only order the
+ * engine refuses from the trade form and a margin removal the engine refuses from the margin
+ * dialog (the leverage dialog offers a deposit before there is an account, see no-account.ts).
+ * Requires the fixture (`fixture.mjs setup` + `push`), the indexer and API, and `pnpm dev`.
  *
  *   PLAYWRIGHT=/path/to/node_modules/playwright pnpm exec tsx scripts/haneul-localnet/error-text.ts
  */
@@ -161,27 +161,8 @@ const waitForMessage = async (scope: any, label: string, expected: RegExp) => {
 };
 const shows = (text: string, expected: RegExp) => expected.test(text) && !GENERIC.test(text);
 
-// 1. The leverage dialog, before the wallet has a trading account.
-console.log('\n1 the leverage dialog without a trading account');
-const leverage = await openDialog('SetMarketLeverage', { marketId: MARKET });
-// The slider keeps a hidden input of its own; the leverage is typed in the visible one.
-await leverage.locator('input:visible').first().fill('5');
-await page.waitForTimeout(500);
-await leverage.locator('button[type="submit"]').click();
-const leverageText = await waitForMessage(
-  page.getByRole('dialog'),
-  'dialog',
-  /Deposit collateral to open a trading account first/
-);
-await page.screenshot({ path: `${screenshots}-1.png` });
-check(
-  'the leverage dialog says a trading account is needed',
-  shows(leverageText, /Deposit collateral to open a trading account first/)
-);
-await closeDialog();
-
-// 2. The transfer form, sending to a name that does not resolve.
-console.log('\n2 the transfer form with a name that does not resolve');
+// 1. The transfer form, sending to a name that does not resolve.
+console.log('\n1 the transfer form with a name that does not resolve');
 const NO_NAME =
   /is not a registered name, or points nowhere|Names are not available on this network/;
 const transfer = await openDialog('Transfer', {});
@@ -190,7 +171,7 @@ await transfer.locator('input').last().fill('0.1');
 await page.waitForTimeout(500);
 await transfer.locator('button[type="submit"]').click();
 const transferText = await waitForMessage(page.getByRole('dialog'), 'dialog', NO_NAME);
-await page.screenshot({ path: `${screenshots}-2.png` });
+await page.screenshot({ path: `${screenshots}-1.png` });
 check('the transfer form says the name does not resolve, in words', shows(transferText, NO_NAME));
 await closeDialog();
 
@@ -206,8 +187,8 @@ const fill = (actions: Array<[string, unknown]>) =>
     list.forEach(([type, payload]) => store.dispatch({ type: `TradeForm/${type}`, payload }));
   }, actions);
 
-// 3. A post-only bid above the asks: the engine refuses it rather than let it match.
-console.log('\n3 a post-only order the engine refuses');
+// 2. A post-only bid above the asks: the engine refuses it rather than let it match.
+console.log('\n2 a post-only order the engine refuses');
 await fill([
   ['setOrderType', 'LIMIT'],
   ['setSide', 'BUY'],
@@ -224,7 +205,7 @@ const orderText = await waitForMessage(
   'notification',
   /Post-only order would match immediately/
 );
-await page.screenshot({ path: `${screenshots}-3.png` });
+await page.screenshot({ path: `${screenshots}-2.png` });
 check(
   "the order's notification names the engine's rejection",
   shows(orderText, /Post-only order would match immediately/)
@@ -237,9 +218,9 @@ check(
 // Lets the trade form's message clear before the next order.
 await fill([]);
 
-// 4. The margin dialog offers what the position can spare, then $5 of it leaves another way
+// 3. The margin dialog offers what the position can spare, then $5 of it leaves another way
 // before the dialog's removal lands, so the engine refuses the dialog's amount.
-console.log('\n4 a margin removal the engine refuses');
+console.log('\n3 a margin removal the engine refuses');
 const before = await marketCollateral(acct.accountId);
 await fill([
   ['setOrderType', 'MARKET'],
@@ -297,22 +278,37 @@ await removal.getByText('100%', { exact: true }).first().click();
 await page.waitForTimeout(1_000);
 const offered = await removal.locator('input').first().inputValue();
 const beforeRemove = await marketCollateral(acct.accountId);
-const side = await supervisor('transferMargin', { marketId: MARKET, amount: 5, toMarket: false });
-check('$5 leaves the market first', side.type === 'success', JSON.stringify(side).slice(0, 120));
-// The dialog still holds its offer: the indexer has not shown the $5 leaving yet.
-const stillOffered = await removal.locator('input').first().inputValue();
+// Taking the $5 out ahead of the dialog would race the indexer, which can show it leaving and
+// lower the offer before the dialog sends. Instead the dialog's own removal takes the $5 first,
+// once, and then sends the amount the dialog offered.
+await page.evaluate((m: string) => {
+  const w = window as any;
+  const { supervisor: s } = w.haneulPerp;
+  const original = s.transferMargin.bind(s);
+  s.transferMargin = async (args: unknown) => {
+    s.transferMargin = original;
+    w.sideTransfer = JSON.parse(
+      JSON.stringify(await original({ marketId: m, amount: 5, toMarket: false }))
+    );
+    return original(args);
+  };
+}, MARKET);
 await removal.locator('button[type="submit"]').click();
-console.log(`  dialog offered ${offered}, still ${stillOffered} when sent`);
+console.log(`  dialog offered ${offered}`);
 const marginText = await waitForMessage(
   page.getByRole('dialog'),
   'dialog',
   /Insufficient free collateral/
 );
-await page.screenshot({ path: `${screenshots}-4.png` });
+await page.screenshot({ path: `${screenshots}-3.png` });
+const side = await page.evaluate(() => (window as any).sideTransfer ?? null);
+check('$5 leaves the market first', side?.type === 'success', JSON.stringify(side).slice(0, 120));
 const afterRemove = await marketCollateral(acct.accountId);
+// Funding settled by the $5 withdrawal can move a unit beside it; the dialog's $9.90 would not.
+const letOut = beforeRemove - afterRemove;
 check(
   'the chain let out only the $5 taken first',
-  beforeRemove - afterRemove === 5_000_000n,
+  letOut >= 4_999_000n && letOut <= 5_001_000n,
   `${tusd(beforeRemove)} → ${tusd(afterRemove)}`
 );
 check(
@@ -326,6 +322,6 @@ await supervisor('closeAllPositions');
 await page.waitForTimeout(5_000);
 
 await browser.close();
-console.log(`  screenshots ${screenshots}-{1,2,3,4}.png`);
+console.log(`  screenshots ${screenshots}-{1,2,3}.png`);
 console.log(`\n${passed} checks passed, ${failed.length} failed`);
 if (failed.length > 0) process.exit(1);
