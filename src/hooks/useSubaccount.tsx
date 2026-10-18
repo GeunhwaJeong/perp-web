@@ -13,20 +13,16 @@ import {
   wrapOperationSuccess,
 } from '@/bonsai/lib/operationResult';
 import { logBonsaiError, logBonsaiInfo } from '@/bonsai/logs';
-import { BonsaiCore } from '@/bonsai/ontology';
 import { Method } from '@cosmjs/tendermint-rpc';
 import { SubaccountClient, type LocalWallet } from '@dydxprotocol/v4-client-js';
 import Long from 'long';
 import { parseUnits } from 'viem';
 
-import { AMOUNT_RESERVED_FOR_GAS_USDC } from '@/constants/account';
 import { AnalyticsEvents, DEFAULT_TRANSACTION_MEMO, TransactionMemo } from '@/constants/analytics';
-import { DialogTypes } from '@/constants/dialogs';
 import { QUANTUM_MULTIPLIER } from '@/constants/numbers';
-import { DydxAddress, WalletType } from '@/constants/wallets';
+import { DydxAddress } from '@/constants/wallets';
 
-import { useAppDispatch, useAppSelector } from '@/state/appTypes';
-import { openDialog } from '@/state/dialogs';
+import { useAppDispatch } from '@/state/appTypes';
 import { clearLocalOrders } from '@/state/localOrders';
 
 import { track } from '@/lib/analytics/analytics';
@@ -57,10 +53,7 @@ export const useSubaccount = () => useContext(SubaccountContext);
 const useSubaccountContext = ({ localDydxWallet }: { localDydxWallet?: LocalWallet }) => {
   const dispatch = useAppDispatch();
   const { chainTokenDecimals } = useTokenConfigs();
-  const { sourceAccount } = useAccounts();
   const { compositeClient, faucetClient } = useDydxClient();
-
-  const isKeplr = sourceAccount.walletInfo?.name === WalletType.Keplr;
 
   const { getFaucetFunds, getNativeTokens } = useMemo(
     () => ({
@@ -95,31 +88,6 @@ const useSubaccountContext = ({ localDydxWallet }: { localDydxWallet?: LocalWall
   }, [dispatch, dydxAddress]);
 
   // ------ Deposit/Withdraw Methods ------ //
-  const balances = useAppSelector(BonsaiCore.account.balances.data);
-  const usdcCoinBalance = balances.usdcAmount;
-
-  const [showDepositDialog, setShowDepositDialog] = useState(true);
-
-  useEffect(() => {
-    if (isKeplr && usdcCoinBalance) {
-      if (showDepositDialog) {
-        const balanceAmount = parseFloat(usdcCoinBalance);
-        const usdcBalance = balanceAmount - AMOUNT_RESERVED_FOR_GAS_USDC;
-        const shouldDeposit = usdcBalance > 0 && usdcBalance.toFixed(2) !== '0.00';
-        if (shouldDeposit) {
-          dispatch(
-            openDialog(
-              DialogTypes.ConfirmPendingDeposit({
-                usdcBalance,
-              })
-            )
-          );
-        }
-      }
-      setShowDepositDialog(false);
-    }
-  }, [isKeplr, usdcCoinBalance, showDepositDialog, dispatch]);
-
   // Collateral moves through the perpetuals engine: the wallet's coins go into the trading
   // account (its balance is parent subaccount 0) and come back out of it.
   const deposit = useCallback(async (amount: number) => {

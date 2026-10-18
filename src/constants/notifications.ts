@@ -247,8 +247,6 @@ export enum TransferNotificationTypes {
 
 export enum CosmosWalletNotificationTypes {
   GasRebalance = 'gas-rebalance',
-  CancelOrphanedTriggers = 'cancel-orphaned-triggers',
-  ReclaimChildSubaccountFunds = 'reclaim-child-subaccount-funds',
 }
 
 export enum ReleaseUpdateNotificationIds {

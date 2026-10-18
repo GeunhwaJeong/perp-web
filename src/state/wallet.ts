@@ -87,12 +87,10 @@ export const walletSlice = createSlice({
 });
 
 export interface WalletEphemeralState {
-  localWalletNonce?: number;
   hdKeyNonce?: number;
 }
 
 const initialEphemeralState: WalletEphemeralState = {
-  localWalletNonce: undefined,
   hdKeyNonce: undefined,
 };
 
@@ -100,9 +98,6 @@ export const walletEphemeralSlice = createSlice({
   name: 'walletEphemeral',
   initialState: initialEphemeralState,
   reducers: {
-    setLocalWalletNonce: (state, action: PayloadAction<number | undefined>) => {
-      state.localWalletNonce = action.payload;
-    },
     setHdKeyNonce: (state, action: PayloadAction<number | undefined>) => {
       state.hdKeyNonce = action.payload;
     },
@@ -118,4 +113,4 @@ export const {
   setLocalWallet,
 } = walletSlice.actions;
 
-export const { setLocalWalletNonce, setHdKeyNonce } = walletEphemeralSlice.actions;
+export const { setHdKeyNonce } = walletEphemeralSlice.actions;

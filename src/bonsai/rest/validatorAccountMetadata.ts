@@ -14,7 +14,6 @@ import { createStoreEffect } from '../lib/createStoreEffect';
 import { loadableIdle } from '../lib/loadable';
 import { wrapAndLogBonsaiError } from '../logs';
 import { selectParentSubaccountInfo } from '../socketSelectors';
-import { createValidatorQueryStoreEffect } from './lib/indexerQueryStoreEffect';
 import { queryResultToLoadable } from './lib/queryResultToLoadable';
 import { safeSubscribeObserver } from './lib/safeSubscribe';
 
@@ -72,25 +71,4 @@ export function setUpAccountBalancesQuery(store: RootStore) {
     cleanupEffect();
     store.dispatch(setAccountBalancesRaw(loadableIdle()));
   };
-}
-
-export function setUpCompositeClientAccountCacheQuery(store: RootStore) {
-  return createValidatorQueryStoreEffect(store, {
-    name: 'compositeClientAccountCache',
-    selector: selectParentSubaccountInfo,
-    getQueryKey: (data) => ['compositeClientAccountCache', data.wallet],
-    getQueryFn: (compositeClient, data) => {
-      if (data.wallet == null) {
-        return null;
-      }
-      return async () => {
-        await compositeClient.populateAccountNumberCache(data.wallet!);
-        return true;
-      };
-    },
-    onResult: () => {},
-    onNoQuery: () => {},
-    refetchInterval: timeUnits.hour,
-    staleTime: timeUnits.hour,
-  });
 }

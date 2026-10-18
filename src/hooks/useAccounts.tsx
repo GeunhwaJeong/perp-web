@@ -53,13 +53,6 @@ const useAccountsContext = () => {
     [connectionStatus, currentAccount?.address]
   );
 
-  // perp-api has no route listing an address's subaccounts. The request answered 404, which this
-  // returned as no subaccounts; it now returns that without the request.
-  const getSubaccounts = useCallback(
-    async (_args: { dydxAddress: DydxAddress }): Promise<Subaccount[]> => [],
-    []
-  );
-
   useEffect(() => {
     dispatch(setLocalWallet({ address: dydxAddress, subaccountNumber: 0 }));
   }, [dispatch, dydxAddress]);
@@ -151,9 +144,6 @@ const useAccountsContext = () => {
 
     // Disconnect wallet / accounts
     disconnect,
-
-    // Account methods
-    getSubaccounts,
 
     // cosmos account
     dydxAccountGraz,

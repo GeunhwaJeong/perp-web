@@ -18,7 +18,6 @@ export const selectIsWalletStandardConnected = createAppSelector(
   (walletInfo) => walletInfo?.connectorType === ConnectorType.WalletStandard
 );
 
-export const getLocalWalletNonce = (state: RootState) => state.walletEphemeral.localWalletNonce;
 export const getHdKeyNonce = (state: RootState) => state.walletEphemeral.hdKeyNonce;
 
 // Cosmos and embedded-wallet connectors no longer exist; call sites that branch on them

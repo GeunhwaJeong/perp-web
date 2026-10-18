@@ -1,6 +1,4 @@
-import { setUpCancelOrphanedTriggerOrdersLifecycle } from './lifecycles/cancelTriggerOrdersLifecycle';
 import { setUpLocalOrdersOrdersSync } from './lifecycles/localOrders';
-import { setUpReclaimChildSubaccountBalancesLifecycle } from './lifecycles/reclaimChildSubaccountBalancesLifecycle';
 import { setUpAssetsQuery } from './rest/assets';
 import { setUpBlockTradingRewardsQuery } from './rest/blockTradingRewards';
 import {
@@ -19,11 +17,7 @@ import { setUpOrdersQuery } from './rest/orders';
 import { setUpSparklinesQuery } from './rest/sparklines';
 import { setUpTradeHistoryQuery } from './rest/tradeHistory';
 import { setUpTransfersQuery } from './rest/transfers';
-import {
-  setUpAccountBalancesQuery,
-  setUpCompositeClientAccountCacheQuery,
-} from './rest/validatorAccountMetadata';
-import { setUpMarketsFeeDiscountQuery } from './rest/validatorMarketsMetadata';
+import { setUpAccountBalancesQuery } from './rest/validatorAccountMetadata';
 import { setUpMarkets } from './websocket/markets';
 import { setUpOrderbook } from './websocket/orderbook';
 import { setUpParentSubaccount } from './websocket/parentSubaccount';
@@ -46,14 +40,10 @@ export const storeLifecycles = [
   setUpValidatorHeightQuery,
   setUpAccountBalancesQuery,
   setUpAccountFeesQuery,
-  setUpCompositeClientAccountCacheQuery,
   setUpFeeScheduleQuery,
   setUpLocalOrdersOrdersSync,
   setUpGeoQuery,
   setUpIndexerSourceAddressScreenV2Query,
   setUpIndexerLocalAddressScreenV2Query,
   setUpIndexerSolanaAddressScreenQuery,
-  setUpCancelOrphanedTriggerOrdersLifecycle,
-  setUpReclaimChildSubaccountBalancesLifecycle,
-  setUpMarketsFeeDiscountQuery,
 ] as const;

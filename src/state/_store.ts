@@ -6,7 +6,6 @@ import { persistReducer, persistStore } from 'redux-persist';
 import autoMergeLevel2 from 'redux-persist/lib/stateReconciler/autoMergeLevel2';
 import storage from 'redux-persist/lib/storage';
 
-import { hdKeyManager, localWalletManager } from '@/lib/hdKeyManager';
 import { transformOntologyObject } from '@/lib/transformOntology';
 
 import { accountSlice } from './account';
@@ -119,10 +118,6 @@ export const store = configureStore({
 });
 
 export const persistor = persistStore(store);
-
-// Set store so localWalletManager classes can getState and dispatch
-localWalletManager.setStore(store);
-hdKeyManager.setStore(store);
 
 export type RootStore = typeof store;
 export type RootState = ReturnType<typeof store.getState>;

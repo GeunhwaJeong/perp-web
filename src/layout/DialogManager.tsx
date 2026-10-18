@@ -8,7 +8,6 @@ import { AccountSecurityDialog } from '@/views/dialogs/AccountDialog/AccountSecu
 import { AcknowledgeTermsDialog } from '@/views/dialogs/AcknowledgeTermsDialog';
 import { AdjustIsolatedMarginDialog } from '@/views/dialogs/AdjustIsolatedMarginDialog';
 import { CancelAllOrdersConfirmationDialog } from '@/views/dialogs/CancelAllOrdersConfirmationDialog';
-import { CancelOrphanedTriggerOrdersDialog } from '@/views/dialogs/CancelOrphanedTriggerOrdersDialog';
 import { CancelPendingOrdersDialog } from '@/views/dialogs/CancelPendingOrdersDialog';
 import { CloseAllPositionsConfirmationDialog } from '@/views/dialogs/CloseAllPositionsConfirmationDialog';
 import { ClosePositionDialog } from '@/views/dialogs/ClosePositionDialog';
@@ -16,8 +15,6 @@ import {
   CollateralDepositDialog,
   CollateralWithdrawDialog,
 } from '@/views/dialogs/CollateralDialog';
-import { ComplianceConfigDialog } from '@/views/dialogs/ComplianceConfigDialog';
-import { ConfirmPendingDepositDialog } from '@/views/dialogs/ConfirmPendingDepositDialog';
 import { FillDetailsDialog } from '@/views/dialogs/DetailsDialog/FillDetailsDialog';
 import { OrderDetailsDialog } from '@/views/dialogs/DetailsDialog/OrderDetailsDialog';
 import { DisconnectDialog } from '@/views/dialogs/DisconnectDialog';
@@ -29,7 +26,6 @@ import { HelpDialog } from '@/views/dialogs/HelpDialog';
 import { PredictionMarketIntroDialog } from '@/views/dialogs/PredictionMarketIntroDialog';
 import { PreferencesDialog } from '@/views/dialogs/PreferencesDialog';
 import { RateLimitDialog } from '@/views/dialogs/RateLimitDialog';
-import { ReclaimChildSubaccountFundsDialog } from '@/views/dialogs/ReclaimChildSubaccountFundsDialog';
 import { RestrictedGeoDialog } from '@/views/dialogs/RestrictedGeoDialog';
 import { RestrictedWalletDialog } from '@/views/dialogs/RestrictedWalletDialog';
 import { SetMarketLeverageDialog } from '@/views/dialogs/SetMarketLeverageDialog';
@@ -40,7 +36,6 @@ import { TradeDialog } from '@/views/dialogs/TradeDialog';
 import { TransferDialog } from '@/views/dialogs/TransferDialog';
 import { TriggersDialog } from '@/views/dialogs/TriggersDialog';
 import { VaultDepositWithdrawDialog } from '@/views/dialogs/VaultDepositWithdrawDialog';
-import { WithdrawFromSubaccountDialog } from '@/views/dialogs/WithdrawFromSubaccountDialog';
 
 import { useAppDispatch, useAppSelector } from '@/state/appTypes';
 import { closeDialog, openDialog } from '@/state/dialogs';
@@ -68,12 +63,7 @@ export const DialogManager = React.memo(() => {
     CancelAllOrdersConfirmation: (args) => (
       <CancelAllOrdersConfirmationDialog {...args} {...modalProps} />
     ),
-    CancelOrphanedTriggers: (args) => (
-      <CancelOrphanedTriggerOrdersDialog {...args} {...modalProps} />
-    ),
     CancelPendingOrders: (args) => <CancelPendingOrdersDialog {...args} {...modalProps} />,
-    ComplianceConfig: (args) => <ComplianceConfigDialog {...args} {...modalProps} />,
-    ConfirmPendingDeposit: (args) => <ConfirmPendingDepositDialog {...args} {...modalProps} />,
     // Collateral moves straight between the wallet and the trading account on the engine.
     Deposit2: (args) => <CollateralDepositDialog {...args} {...modalProps} />,
     DisconnectWallet: (args) => <DisconnectDialog {...args} {...modalProps} />,
@@ -89,9 +79,6 @@ export const DialogManager = React.memo(() => {
     PredictionMarketIntro: (args) => <PredictionMarketIntroDialog {...args} {...modalProps} />,
     Preferences: (args) => <PreferencesDialog {...args} {...modalProps} />,
     RateLimit: (args) => <RateLimitDialog {...args} {...modalProps} />,
-    ReclaimChildSubaccountFunds: (args) => (
-      <ReclaimChildSubaccountFundsDialog {...args} {...modalProps} />
-    ),
     RestrictedGeo: (args) => <RestrictedGeoDialog {...args} {...modalProps} />,
     RestrictedWallet: (args) => <RestrictedWalletDialog {...args} {...modalProps} />,
     SetMarketLeverage: (args) => <SetMarketLeverageDialog {...args} {...modalProps} />,
@@ -103,6 +90,5 @@ export const DialogManager = React.memo(() => {
     Transfer: (args) => <TransferDialog {...args} {...modalProps} />,
     VaultDepositWithdraw: (args) => <VaultDepositWithdrawDialog {...args} {...modalProps} />,
     Withdraw2: (args) => <CollateralWithdrawDialog {...args} {...modalProps} />,
-    WithdrawFromSubaccount: (args) => <WithdrawFromSubaccountDialog {...args} {...modalProps} />,
   });
 });

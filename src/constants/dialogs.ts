@@ -18,12 +18,7 @@ export type AdjustIsolatedMarginDialogProps = {
 export type ClosePositionDialogProps = {};
 export type CloseAllPositionsConfirmationDialogProps = {};
 export type CancelAllOrdersConfirmationDialogProps = { marketId?: string };
-export type CancelOrphanedTriggersDialogProps = {};
 export type CancelPendingOrdersDialogProps = { marketId: string };
-export type ComplianceConfigDialogProps = {};
-export type ConfirmPendingDepositDialogProps = {
-  usdcBalance: number;
-};
 export type DisconnectWalletDialogProps = {};
 export type DisplaySettingsDialogProps = {};
 export type ExchangeOfflineDialogProps = { preventClose?: boolean };
@@ -43,7 +38,6 @@ export type PredictionMarketIntroDialogProps = {};
 export type PreferencesDialogProps = {};
 export type AccountSecurityDialogProps = { intent: 'recoveryPhrase' | 'enableBiometric' };
 export type RateLimitDialogProps = { preventClose?: boolean };
-export type ReclaimChildSubaccountFundsDialogProps = {};
 export type RestrictedGeoDialogProps = { preventClose?: boolean };
 export type RestrictedWalletDialogProps = { preventClose?: boolean };
 export type SelectMarginModeDialogProps = {};
@@ -92,19 +86,15 @@ export type TransferDialogProps = { selectedAsset?: DydxChainAsset };
 export type VaultDepositWithdrawDialogProps = { initialType?: 'DEPOSIT' | 'WITHDRAW' };
 export type WithdrawDialog2Props = {};
 export type DepositDialog2Props = {};
-export type WithdrawFromSubaccountDialogProps = {};
 export const DialogTypes = unionize(
   {
     AccountSecurity: ofType<AccountSecurityDialogProps>(),
     AcknowledgeTerms: ofType<AcknowledgeTermsDialogProps>(),
     AdjustIsolatedMargin: ofType<AdjustIsolatedMarginDialogProps>(),
     CancelAllOrdersConfirmation: ofType<CancelAllOrdersConfirmationDialogProps>(),
-    CancelOrphanedTriggers: ofType<CancelOrphanedTriggersDialogProps>(),
     CancelPendingOrders: ofType<CancelPendingOrdersDialogProps>(),
     CloseAllPositionsConfirmation: ofType<CloseAllPositionsConfirmationDialogProps>(),
     ClosePosition: ofType<ClosePositionDialogProps>(),
-    ComplianceConfig: ofType<ComplianceConfigDialogProps>(),
-    ConfirmPendingDeposit: ofType<ConfirmPendingDepositDialogProps>(),
     /* TODO: rename Deposit2 to Deposit once old deposit flow is deprecated */
     Deposit2: ofType<DepositDialog2Props>(),
     DisconnectWallet: ofType<DisconnectWalletDialogProps>(),
@@ -119,7 +109,6 @@ export const DialogTypes = unionize(
     PredictionMarketIntro: ofType<PredictionMarketIntroDialogProps>(),
     Preferences: ofType<PreferencesDialogProps>(),
     RateLimit: ofType<RateLimitDialogProps>(),
-    ReclaimChildSubaccountFunds: ofType<ReclaimChildSubaccountFundsDialogProps>(),
     RestrictedGeo: ofType<RestrictedGeoDialogProps>(),
     RestrictedWallet: ofType<RestrictedWalletDialogProps>(),
     SetMarketLeverage: ofType<SetMarketLeverageDialogProps>(),
@@ -131,7 +120,6 @@ export const DialogTypes = unionize(
     Triggers: ofType<TriggersDialogProps>(),
     VaultDepositWithdraw: ofType<VaultDepositWithdrawDialogProps>(),
     Withdraw2: ofType<WithdrawDialog2Props>(),
-    WithdrawFromSubaccount: ofType<WithdrawFromSubaccountDialogProps>(),
   },
   { tag: 'type' as const, value: 'props' as const }
 );
