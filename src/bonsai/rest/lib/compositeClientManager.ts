@@ -1,26 +1,17 @@
 import { createStoreEffect } from '@/bonsai/lib/createStoreEffect';
-import { getLazyStargateClient } from '@/bonsai/lib/lazyDynamicLibs';
 import { ResourceCacheManager } from '@/bonsai/lib/resourceCacheManager';
-import { logBonsaiError, logBonsaiInfo } from '@/bonsai/logs';
-import { type StargateClient } from '@cosmjs/stargate';
-import type { CompositeClient, IndexerClient } from '@dydxprotocol/v4-client-js';
-import { weakMapMemoize } from 'reselect';
+import { logBonsaiError } from '@/bonsai/logs';
+import { PerpIndexerClient } from '@/haneul/perp';
+import type { StargateClient } from '@cosmjs/stargate';
+import type { CompositeClient } from '@dydxprotocol/v4-client-js';
 
-import { AnalyticsUserProperties, DEFAULT_TRANSACTION_MEMO } from '@/constants/analytics';
-import {
-  DydxChainId,
-  DydxNetwork,
-  ENVIRONMENT_CONFIG_MAP,
-  TOKEN_CONFIG_MAP,
-} from '@/constants/networks';
+import { DydxNetwork, ENVIRONMENT_CONFIG_MAP } from '@/constants/networks';
 
 import { type AppDispatch, type RootStore } from '@/state/_store';
 import { getSelectedNetwork } from '@/state/appSelectors';
 import { setNetworkStateRaw } from '@/state/raw';
 
-import { identify } from '@/lib/analytics/analytics';
 import { withRetry } from '@/lib/asyncUtils';
-import { browserTimeOffsetPromise } from '@/lib/timeOffset';
 
 type ClientState<ClientType> = {
   dead: boolean;
@@ -38,7 +29,7 @@ export type CompositeClientWrapper = {
   refreshConnections: () => void;
 
   compositeClient: ClientState<CompositeClient>;
-  indexer: ClientState<IndexerClient>;
+  indexer: ClientState<PerpIndexerClient>;
   nobleClient: ClientState<StargateClient>;
 };
 
@@ -54,69 +45,16 @@ function makeCompositeClient({
   if (!networkConfig) {
     throw new Error(`Unknown network: ${network}`);
   }
-  const chainId = networkConfig.dydxChainId as DydxChainId;
-  const tokens = TOKEN_CONFIG_MAP[chainId];
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-  if (tokens == null) {
-    throw new Error(`Unknown chain id: ${chainId}`);
-  }
 
-  async function getIndexerConfig() {
+  async function initializeIndexerClient() {
     const indexerUrl = networkConfig.endpoints.indexers[0];
     if (indexerUrl == null) {
       throw new Error('No indexer urls found');
     }
-    return new (await getLazyIndexerConfig())(indexerUrl.api, indexerUrl.socket);
+    return new PerpIndexerClient(indexerUrl.api, indexerUrl.socket);
   }
 
-  async function initializeCompositeClient() {
-    const indexerConfig = await getIndexerConfig();
-    const validatorUrl = await getValidatorToUse(chainId, networkConfig.endpoints.validators ?? []);
-
-    const compositeClient = await (
-      await getLazyCompositeClient()
-    ).connect(
-      new (await getLazyNetwork())(
-        chainId,
-        indexerConfig,
-        new (await getLazyValidatorConfig())(
-          validatorUrl,
-          chainId,
-          {
-            USDC_DENOM: tokens.usdc.denom,
-            USDC_DECIMALS: tokens.usdc.decimals,
-            USDC_GAS_DENOM: tokens.usdc.gasDenom,
-            CHAINTOKEN_DENOM: tokens.chain.denom,
-            CHAINTOKEN_DECIMALS: tokens.chain.decimals,
-          },
-          {
-            broadcastPollIntervalMs: 3000,
-            broadcastTimeoutMs: 60000,
-          },
-          DEFAULT_TRANSACTION_MEMO,
-          true,
-          (await browserTimeOffsetPromise).offset
-        )
-      )
-    );
-    return compositeClient;
-  }
-
-  async function initializeNobleClient() {
-    return (await getLazyStargateClient()).connect(networkConfig.endpoints.nobleValidator ?? '');
-  }
-
-  async function initializeIndexerClient() {
-    return new (await getLazyIndexerClient())(await getIndexerConfig());
-  }
-
-  const clientWrapper = initializeClientWrapper(dispatch, network, {
-    compositeClient: initializeCompositeClient,
-    indexer: initializeIndexerClient,
-    nobleClient: initializeNobleClient,
-  });
-
-  return clientWrapper;
+  return initializeClientWrapper(dispatch, network, initializeIndexerClient);
 }
 
 export const CompositeClientManager = new ResourceCacheManager({
@@ -137,24 +75,6 @@ export function alwaysUseCurrentNetworkClient(store: RootStore) {
       CompositeClientManager.markDone({ network, dispatch: store.dispatch });
     };
   });
-}
-
-async function getValidatorToUse(chainId: DydxChainId, validatorEndpoints: string[]) {
-  const networkOptimizer = new (await getLazyNetworkOptimizer())();
-  // Timer to measure how long it takes to find the optimal node
-  const t0 = performance.now();
-  const validatorUrl = await networkOptimizer.findOptimalNode(validatorEndpoints, chainId);
-  const t1 = performance.now();
-
-  identify(AnalyticsUserProperties.BonsaiValidatorUrl(validatorUrl));
-  logBonsaiInfo('CompositeClientManager', 'findOptimalNode', {
-    validatorUrl,
-    validatorList: validatorEndpoints,
-    chainId,
-    duration: t1 - t0,
-  });
-
-  return validatorUrl;
 }
 
 function makeClientManager<ClientType>(args: {
@@ -224,14 +144,24 @@ function makeClientManager<ClientType>(args: {
   };
 }
 
+/**
+ * The dYdX validator and Noble clients talk to chains this app does not run on, so they are
+ * never created: their states stay empty and the queries built on them stay idle instead of
+ * failing. Chain reads and writes go through the Haneul gRPC client (src/haneul).
+ */
+function idleClientState<ClientType>(): ClientState<ClientType> {
+  return {
+    dead: false,
+    client: undefined,
+    currentOperationId: 0,
+    deferred: createDeferred<ClientType>(),
+  };
+}
+
 function initializeClientWrapper(
   dispatch: AppDispatch,
   network: DydxNetwork,
-  loads: {
-    compositeClient: () => Promise<CompositeClient>;
-    indexer: () => Promise<IndexerClient>;
-    nobleClient: () => Promise<StargateClient>;
-  }
+  loadIndexer: () => Promise<PerpIndexerClient>
 ) {
   dispatch(
     setNetworkStateRaw({
@@ -244,31 +174,8 @@ function initializeClientWrapper(
     })
   );
 
-  const compositeClient = makeClientManager({
-    load: loads.compositeClient,
-    onSuccess: (_v, client) =>
-      dispatch(
-        setNetworkStateRaw({
-          networkId: network,
-          stateToMerge: {
-            compositeClientReady: true,
-            compositeClientUrl: client.validatorClient.config.restEndpoint,
-          },
-        })
-      ),
-    onError: (e) => {
-      logBonsaiError('CompositeClientManager', 'error initializing composite client', { error: e });
-
-      dispatch(
-        setNetworkStateRaw({
-          networkId: network,
-          stateToMerge: { compositeClientReady: false, errorInitializing: true },
-        })
-      );
-    },
-  });
   const indexer = makeClientManager({
-    load: loads.indexer,
+    load: loadIndexer,
     onSuccess: () =>
       dispatch(
         setNetworkStateRaw({
@@ -286,36 +193,19 @@ function initializeClientWrapper(
       );
     },
   });
-  const nobleClient = makeClientManager({
-    load: loads.nobleClient,
-    onSuccess: () =>
-      dispatch(
-        setNetworkStateRaw({
-          networkId: network,
-          stateToMerge: { nobleClientReady: true },
-        })
-      ),
-    onError: (e) => {
-      logBonsaiError('CompositeClientManager', 'error initializing noble client', { error: e });
-      dispatch(
-        setNetworkStateRaw({
-          networkId: network,
-          stateToMerge: { nobleClientReady: false, errorInitializing: true },
-        })
-      );
-    },
-  });
-
-  const clients = [compositeClient, indexer, nobleClient];
+  const compositeClient = idleClientState<CompositeClient>();
+  const nobleClient = idleClientState<StargateClient>();
 
   const clientWrapper: CompositeClientWrapper = {
     dead: false,
-    compositeClient: compositeClient.clientState,
+    compositeClient,
     indexer: indexer.clientState,
-    nobleClient: nobleClient.clientState,
+    nobleClient,
     tearDown: () => {
       clientWrapper.dead = true;
-      clients.forEach((c) => c.tearDown());
+      indexer.tearDown();
+      compositeClient.dead = true;
+      nobleClient.dead = true;
       dispatch(
         setNetworkStateRaw({
           networkId: network,
@@ -331,10 +221,6 @@ function initializeClientWrapper(
       // The indexer client holds no connection to refresh.
     },
   };
-  // Only the indexer client is loaded. The dYdX validator and Noble clients talk to chains
-  // this app does not run on: left unloaded, the queries built on them stay idle instead of
-  // failing, and an unreachable dYdX node is not reported as a problem with this network.
-  // Chain reads and writes go through the Haneul gRPC client (src/haneul).
   indexer.load();
   return clientWrapper;
 }
@@ -364,28 +250,3 @@ function createDeferred<T>(): Deferred<T> {
 
   return { promise, resolve, reject, state };
 }
-
-// must lazy load separately to ensure best-possible tree shaking/static analysis
-const getLazyIndexerConfig = weakMapMemoize(async () => {
-  return (await import('@dydxprotocol/v4-client-js')).IndexerConfig;
-});
-
-const getLazyCompositeClient = weakMapMemoize(async () => {
-  return (await import('@dydxprotocol/v4-client-js')).CompositeClient;
-});
-
-const getLazyNetwork = weakMapMemoize(async () => {
-  return (await import('@dydxprotocol/v4-client-js')).Network;
-});
-
-const getLazyValidatorConfig = weakMapMemoize(async () => {
-  return (await import('@dydxprotocol/v4-client-js')).ValidatorConfig;
-});
-
-const getLazyIndexerClient = weakMapMemoize(async () => {
-  return (await import('@dydxprotocol/v4-client-js')).IndexerClient;
-});
-
-const getLazyNetworkOptimizer = weakMapMemoize(async () => {
-  return (await import('@dydxprotocol/v4-client-js')).NetworkOptimizer;
-});

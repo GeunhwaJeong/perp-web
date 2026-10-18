@@ -1,5 +1,5 @@
 import { dAppKit } from '@/haneul/dAppKit';
-import { IndexerClient } from '@dydxprotocol/v4-client-js';
+import type { PerpIndexerClient } from '@/haneul/perp';
 import { QueryObserver } from '@tanstack/react-query';
 import { omit } from 'lodash';
 
@@ -58,7 +58,7 @@ type IndexerHeightEntry = HeightEntry & {
 };
 
 const doIndexerHeightQuery = async (
-  indexerClient: IndexerClient
+  indexerClient: PerpIndexerClient
 ): Promise<Loadable<IndexerHeightEntry>> => {
   const requestTime = new Date().toISOString();
   try {

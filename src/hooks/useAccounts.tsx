@@ -11,7 +11,6 @@ import { useAppDispatch, useAppSelector } from '@/state/appTypes';
 import { setLocalWallet } from '@/state/wallet';
 import { getSourceAccount } from '@/state/walletSelectors';
 
-import { useDydxClient } from './useDydxClient';
 import { useLocalStorage } from './useLocalStorage';
 import { useWalletConnection } from './useWalletConnection';
 
@@ -47,7 +46,6 @@ const useAccountsContext = () => {
 
   const sourceAccount = useAppSelector(getSourceAccount);
 
-  const { indexerClient } = useDydxClient();
   const [dydxSubaccounts, setDydxSubaccounts] = useState<Subaccount[] | undefined>();
 
   const dydxAddress = useMemo(
@@ -55,23 +53,11 @@ const useAccountsContext = () => {
     [connectionStatus, currentAccount?.address]
   );
 
+  // perp-api has no route listing an address's subaccounts. The request answered 404, which this
+  // returned as no subaccounts; it now returns that without the request.
   const getSubaccounts = useCallback(
-    async ({ dydxAddress: address }: { dydxAddress: DydxAddress }) => {
-      try {
-        const response = await indexerClient?.account.getSubaccounts(address);
-        setDydxSubaccounts(response?.subaccounts);
-        return response?.subaccounts ?? [];
-      } catch (error) {
-        // 404 is expected if the user has no subaccounts
-        // 403 is expected if the user account is blocked
-        const status = error.status ?? error.response?.status;
-        if (status === 404 || status === 403) {
-          return [];
-        }
-        throw error;
-      }
-    },
-    [indexerClient]
+    async (_args: { dydxAddress: DydxAddress }): Promise<Subaccount[]> => [],
+    []
   );
 
   useEffect(() => {

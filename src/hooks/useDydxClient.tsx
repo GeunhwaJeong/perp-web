@@ -23,7 +23,6 @@ import { log } from '@/lib/telemetry';
 
 import { useEndpointsConfig } from './useEndpointsConfig';
 import { useLocalStorage } from './useLocalStorage';
-import { useRestrictions } from './useRestrictions';
 
 type DydxContextType = ReturnType<typeof useDydxClientContext>;
 const DydxContext = createContext<DydxContextType>({} as DydxContextType);
@@ -103,56 +102,25 @@ const useDydxClientContext = () => {
     }
   };
 
+  // perp-api has no vault routes. These requests answered 404, which each of these returned as
+  // undefined; they now return it without the request.
   const getMegavaultHistoricalPnl = useCallback(
-    async (resolution: PnlTickInterval = PnlTickInterval.day) => {
-      try {
-        return await indexerClient?.vault.getMegavaultHistoricalPnl(resolution);
-      } catch (error) {
-        log('useDydxClient/getMegavaultHistoricalPnl', error);
-        return undefined;
-      }
-    },
-    [indexerClient]
+    async (_resolution: PnlTickInterval = PnlTickInterval.day): Promise<any> => undefined,
+    []
   );
 
-  const getMegavaultPositions = useCallback(async () => {
-    try {
-      return await indexerClient?.vault.getMegavaultPositions();
-    } catch (error) {
-      log('useDydxClient/getMegavaultPositions', error);
-      return undefined;
-    }
-  }, [indexerClient]);
+  const getMegavaultPositions = useCallback(async (): Promise<any> => undefined, []);
 
-  const getVaultsHistoricalPnl = useCallback(async () => {
-    try {
-      return await indexerClient?.vault.getVaultsHistoricalPnl();
-    } catch (error) {
-      log('useDydxClient/getVaultsHistoricalPnl', error);
-      return undefined;
-    }
-  }, [indexerClient]);
+  const getVaultsHistoricalPnl = useCallback(async (): Promise<any> => undefined, []);
 
   const getAllAccountTransfersBetween = useCallback(
     async (
-      sourceAddress: string,
-      sourceSubaccountNumber: string,
-      recipientAddress: string,
-      recipientSubaccountNumber: string
-    ) => {
-      try {
-        return await indexerClient?.account.getTransfersBetween(
-          sourceAddress,
-          sourceSubaccountNumber,
-          recipientAddress,
-          recipientSubaccountNumber
-        );
-      } catch (error) {
-        log('useDydxClient/getAllAccountTransfersBetween', error);
-        return undefined;
-      }
-    },
-    [indexerClient]
+      _sourceAddress: string,
+      _sourceSubaccountNumber: string,
+      _recipientAddress: string,
+      _recipientSubaccountNumber: string
+    ): Promise<any> => undefined,
+    []
   );
 
   const getVaultWithdrawInfo = useCallback(
@@ -379,21 +347,6 @@ const useDydxClientContext = () => {
     return candlesInRange;
   };
 
-  const { updateSanctionedAddresses } = useRestrictions();
-
-  const screenAddresses = async ({ addresses }: { addresses: string[] }) => {
-    const promises = addresses.map((address) => indexerClient?.utility.screen(address));
-
-    const results = await Promise.all(promises);
-
-    const screenedAddresses = Object.fromEntries(
-      addresses.map((address, index) => [address, !!results[index]?.restricted])
-    );
-
-    updateSanctionedAddresses(screenedAddresses);
-    return screenedAddresses;
-  };
-
   const getPerpetualMarketSparklines = async ({
     period = 'SEVEN_DAYS',
   }: {
@@ -467,7 +420,6 @@ const useDydxClientContext = () => {
     getMarketTickSize,
     getAccountBalance,
     getPerpetualMarketSparklines,
-    screenAddresses,
     getWithdrawalAndTransferGatingStatus,
     getWithdrawalCapacityByDenom,
     getValidators,

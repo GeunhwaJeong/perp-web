@@ -7,8 +7,9 @@ import {
   selectIndexerReady,
   selectNobleClientReady,
 } from '@/bonsai/socketSelectors';
-import { type StargateClient } from '@cosmjs/stargate';
-import { CompositeClient, IndexerClient } from '@dydxprotocol/v4-client-js';
+import type { PerpIndexerClient } from '@/haneul/perp';
+import type { StargateClient } from '@cosmjs/stargate';
+import type { CompositeClient } from '@dydxprotocol/v4-client-js';
 import { QueryObserver, QueryObserverOptions, QueryObserverResult } from '@tanstack/react-query';
 
 import { timeUnits } from '@/constants/time';
@@ -64,7 +65,7 @@ type InfraSetupConfig<ClientType, T> = {
 
 export function createIndexerStoreEffect<T>(
   store: RootStore,
-  config: InfraSetupConfig<IndexerClient, T>
+  config: InfraSetupConfig<PerpIndexerClient, T>
 ) {
   const fullSelector = createAppSelector(
     [getSelectedNetwork, selectIndexerReady, selectIndexerClientKey, config.selector],
@@ -104,7 +105,7 @@ export function createIndexerStoreEffect<T>(
 
 export function createIndexerQueryStoreEffect<T, R>(
   store: RootStore,
-  config: QuerySetupConfig<IndexerClient, T, R>
+  config: QuerySetupConfig<PerpIndexerClient, T, R>
 ) {
   return createIndexerStoreEffect(store, {
     selector: config.selector,
