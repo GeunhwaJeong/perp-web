@@ -172,7 +172,12 @@ export class ChartLineShape {
 
   remove() {
     this.removed = true;
-    this.widget.unsubscribe('drawing_event', this.onDrawingEvent);
+    try {
+      this.widget.unsubscribe('drawing_event', this.onDrawingEvent);
+    } catch {
+      // Leaving the trade page disposes the widget before its lines are removed, and the disposed
+      // widget throws here; its subscriptions are gone with it.
+    }
     this.ready
       .then((api) => {
         if (api == null || this.id == null || this.gone) return;
