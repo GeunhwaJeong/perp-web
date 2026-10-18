@@ -128,12 +128,7 @@ function validateNonMarketInputData(
     );
   }
 
-  // The receipt prices orders at the market's base rates while no fee tier is known, so the
-  // rates are missing only when the market's are too.
-  if (
-    (inputData.userFeeStats.makerFeeRate ?? marketMakerFee(inputData)) == null ||
-    (inputData.userFeeStats.takerFeeRate ?? marketTakerFee(inputData)) == null
-  ) {
+  if (marketMakerFee(inputData) == null || marketTakerFee(inputData) == null) {
     errors.push(
       simpleValidationError({
         code: 'REQUIRED_RELEVANT_MARKETS',
@@ -158,7 +153,6 @@ function validateNonMarketInputData(
     );
   }
   // not validating since they only affect predicted reward and that's fine to be missing:
-  //   feeTiers: FeeTierSummary[] | undefined;
   //   rewardParams: RewardParamsSummary;
 
   return errors;

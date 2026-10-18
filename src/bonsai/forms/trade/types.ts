@@ -2,15 +2,14 @@ import { OrderbookProcessedData } from '@/bonsai/types/orderbookTypes';
 import { MarketsData, ParentSubaccountDataBase } from '@/bonsai/types/rawTypes';
 import {
   EquityTiersSummary,
-  FeeTierSummary,
   GroupedSubaccountSummary,
   PerpetualMarketSummary,
   RewardParamsSummary,
   SubaccountOrder,
   SubaccountPosition,
   SubaccountSummary,
-  UserStats,
 } from '@/bonsai/types/summaryTypes';
+import type { PerpFeeMultipliers } from '@/haneul/perp';
 import unionize, { ofType, UnionOf } from 'unionize';
 
 import { RecordValueType } from '@/lib/typeUtils';
@@ -268,12 +267,12 @@ export type TradeFormInputData = {
 
   currentTradeMarketOpenOrders: SubaccountOrder[]; // todo remove maybe
   allOpenOrders: SubaccountOrder[];
-  userFeeStats: UserStats;
+  /** The account's fee multipliers on the trade's market; undefined without an account. */
+  feeMultipliers: PerpFeeMultipliers | undefined;
 
   currentTradeMarket: RecordValueType<MarketsData> | undefined;
   currentTradeMarketSummary: PerpetualMarketSummary | undefined;
   currentTradeMarketOrderbook: OrderbookProcessedData | undefined;
-  feeTiers: FeeTierSummary[] | undefined;
   // Trading rewards were a dYdX token emission; there is no reward program on this engine.
   rewardParams: RewardParamsSummary | undefined;
   equityTiers: EquityTiersSummary | undefined;

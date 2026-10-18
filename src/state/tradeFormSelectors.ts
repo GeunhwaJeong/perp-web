@@ -28,10 +28,14 @@ const selectRawOrderbook = BonsaiHelpers.currentMarket.orderbook.selectGroupedDa
   state: RootState
 ) => ReturnType<typeof BonsaiHelpers.currentMarket.orderbook.selectGroupedData>;
 
+const selectCurrentMarketFeeMultipliers = createAppSelector(
+  [BonsaiCore.account.fees.data, BonsaiCore.markets.currentMarketId],
+  (fees, marketId) => (marketId != null ? fees?.multipliers[marketId] : undefined)
+);
+
 const getTradeFormInputData = createAppSelector(
   [
-    BonsaiCore.account.stats.data,
-    BonsaiCore.configs.feeTiers,
+    selectCurrentMarketFeeMultipliers,
     BonsaiRaw.parentSubaccountBase,
     BonsaiRaw.parentSubaccountRelevantMarkets,
     BonsaiRaw.selectedMarketLeverages,
@@ -44,8 +48,7 @@ const getTradeFormInputData = createAppSelector(
     getMarketOrderMaxSlippage,
   ],
   (
-    userFeeStats,
-    feeTiers,
+    feeMultipliers,
     rawParentSubaccountData,
     rawRelevantMarkets,
     selectedMarketLeverages,
@@ -68,8 +71,7 @@ const getTradeFormInputData = createAppSelector(
     currentTradeMarketSummary,
     currentTradeMarketOrderbook,
 
-    userFeeStats,
-    feeTiers,
+    feeMultipliers,
     rewardParams: undefined,
     equityTiers,
     marketOrderMaxSlippage,

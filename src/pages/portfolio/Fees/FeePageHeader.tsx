@@ -1,47 +1,33 @@
-import { useMemo } from 'react';
-
 import { BonsaiCore } from '@/bonsai/ontology';
 import styled from 'styled-components';
 
 import { STRING_KEYS } from '@/constants/localization';
 
+import { useFeeTiers } from '@/hooks/useFeeTiers';
 import { useLocaleSeparators } from '@/hooks/useLocaleSeparators';
-import { useStakingTierLevel } from '@/hooks/useStakingTierLevel';
 import { useStringGetter } from '@/hooks/useStringGetter';
+import { useTokenConfigs } from '@/hooks/useTokenConfigs';
 
 import { layoutMixins } from '@/styles/layoutMixins';
 
 import { Details } from '@/components/Details';
 import { formatNumberOutput, Output, OutputType } from '@/components/Output';
+import { FeeRate } from '@/views/FeeRate';
 
 import { useAppSelector } from '@/state/appTypes';
 import { getSelectedLocale } from '@/state/localizationSelectors';
 
+import { AttemptNumber } from '@/lib/numbers';
+
 export const FeePageHeader = () => {
   const stringGetter = useStringGetter();
-  const userStats = useAppSelector(BonsaiCore.account.stats.data);
-  const feeTiers = useAppSelector(BonsaiCore.configs.feeTiers);
-  const stakingTiers = useAppSelector(BonsaiCore.configs.stakingTiers);
-  const hasStakingTiers = stakingTiers != null && stakingTiers.length > 0;
   const { decimal: decimalSeparator, group: groupSeparator } = useLocaleSeparators();
   const selectedLocale = useAppSelector(getSelectedLocale);
-  const currentStakingDiscountLevel: number | undefined = useStakingTierLevel();
-
-  const feeTierOne = feeTiers?.[0];
-  // Until the fee schedule is indexed, the base rates of the first listed market stand in.
+  const { chainTokenLabel } = useTokenConfigs();
+  const { schedule, account, rates } = useFeeTiers();
+  const hasStakingTiers = (schedule?.stakingTiers.length ?? 0) > 0;
+  // A deployment without fee tiers charges each market's own rates; the first market's stand in.
   const baseMarket = Object.values(useAppSelector(BonsaiCore.markets.markets.data) ?? {})[0];
-  const accountStakingTier = useAppSelector(BonsaiCore.account.stakingTier.data);
-  const stakedTokens = accountStakingTier?.stakedBaseTokens;
-  const stakingTierDiscountPercent = accountStakingTier?.discountPercent;
-
-  const volume = useMemo(() => {
-    if (userStats.makerVolume30D !== undefined && userStats.takerVolume30D !== undefined) {
-      return userStats.makerVolume30D + userStats.takerVolume30D;
-    }
-    return null;
-  }, [userStats]);
-
-  const userFeeTier = userStats.feeTierId;
 
   const stakingTierDetails = hasStakingTiers ? (
     <div tw="flex flex-row">
@@ -53,11 +39,8 @@ export const FeePageHeader = () => {
           {
             key: 'staking-tier',
             label: stringGetter({ key: STRING_KEYS.STAKING_TIER }),
-            value: currentStakingDiscountLevel
-              ? stringGetter({
-                  key: STRING_KEYS.LEVEL_N,
-                  params: { LEVEL: currentStakingDiscountLevel },
-                })
+            value: rates?.level
+              ? stringGetter({ key: STRING_KEYS.LEVEL_N, params: { LEVEL: rates.level } })
               : stringGetter({ key: STRING_KEYS.NONE }),
           },
           {
@@ -66,7 +49,7 @@ export const FeePageHeader = () => {
             value: stringGetter({
               key: STRING_KEYS.PERCENT_OFF_FEES,
               params: {
-                PERCENT: formatNumberOutput(stakingTierDiscountPercent, OutputType.Percent, {
+                PERCENT: formatNumberOutput(rates?.discount ?? 0, OutputType.Percent, {
                   decimalSeparator,
                   groupSeparator,
                   selectedLocale,
@@ -75,13 +58,13 @@ export const FeePageHeader = () => {
             }),
           },
           {
-            key: 'staked-dydx',
-            label: 'Staked HANEUL',
+            key: 'staked',
+            label: `${stringGetter({ key: STRING_KEYS.STAKED })} ${chainTokenLabel}`,
             value: (
               <Output
                 tw="row gap-0.25"
                 type={OutputType.Asset}
-                value={stakedTokens}
+                value={account?.stake}
                 fractionDigits={2}
               />
             ),
@@ -101,10 +84,10 @@ export const FeePageHeader = () => {
             key: 'maker',
             label: stringGetter({ key: STRING_KEYS.YOUR_MAKER_FEE }),
             value: (
-              <Output
+              <FeeRate
                 tw="text-color-accent"
-                type={OutputType.SmallPercent}
-                value={userStats.makerFeeRate ?? baseMarket?.makerFee ?? feeTierOne?.maker}
+                rate={rates?.maker ?? AttemptNumber(baseMarket?.makerFee)}
+                before={rates?.tierMaker}
               />
             ),
           },
@@ -112,10 +95,10 @@ export const FeePageHeader = () => {
             key: 'taker',
             label: stringGetter({ key: STRING_KEYS.YOUR_TAKER_FEE }),
             value: (
-              <Output
+              <FeeRate
                 tw="text-color-accent"
-                type={OutputType.SmallPercent}
-                value={userStats.takerFeeRate ?? baseMarket?.takerFee ?? feeTierOne?.taker}
+                rate={rates?.taker ?? AttemptNumber(baseMarket?.takerFee)}
+                before={rates?.tierTaker}
               />
             ),
           },
@@ -129,24 +112,23 @@ export const FeePageHeader = () => {
           {
             key: 'fee-tier',
             label: <$CardLabel>{stringGetter({ key: STRING_KEYS.FEE_TIER })} </$CardLabel>,
-            value: (
-              <span>
-                {stringGetter({
-                  key: STRING_KEYS.FEE_TIER_N,
-                  params: { TIER: userFeeTier ?? feeTierOne?.tier },
-                })}
-              </span>
-            ),
+            value:
+              rates != null ? (
+                stringGetter({ key: STRING_KEYS.FEE_TIER_N, params: { TIER: rates.tierIndex + 1 } })
+              ) : (
+                <Output type={OutputType.Text} />
+              ),
           },
           {
             key: 'volume',
             label: (
               <$CardLabel>
                 <span>{stringGetter({ key: STRING_KEYS.TRAILING_VOLUME })}</span>
-                <span>{stringGetter({ key: STRING_KEYS._30D })}</span>
+                {/* A Haneul epoch is a day. */}
+                {schedule != null && <span>{`${schedule.windowEpochs}d`}</span>}
               </$CardLabel>
             ),
-            value: <Output type={OutputType.Fiat} value={volume} />,
+            value: <Output type={OutputType.Fiat} value={account?.volume} />,
           },
         ]}
       />

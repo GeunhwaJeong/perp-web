@@ -8,18 +8,10 @@ import { type RootStore } from '@/state/_store';
 import { appQueryClient } from '@/state/appQueryClient';
 import { getSelectedDydxChainId } from '@/state/appSelectors';
 import { createAppSelector } from '@/state/appTypes';
-import {
-  setAccountBalancesRaw,
-  setAccountFeeTierRaw,
-  setAccountStakingTierRaw,
-  setAccountStatsRaw,
-} from '@/state/raw';
-
-import { parseToPrimitives } from '@/lib/parseToPrimitives';
+import { setAccountBalancesRaw } from '@/state/raw';
 
 import { createStoreEffect } from '../lib/createStoreEffect';
 import { loadableIdle } from '../lib/loadable';
-import { mapLoadableData } from '../lib/mapLoadable';
 import { wrapAndLogBonsaiError } from '../logs';
 import { selectParentSubaccountInfo } from '../socketSelectors';
 import { createValidatorQueryStoreEffect } from './lib/indexerQueryStoreEffect';
@@ -79,93 +71,6 @@ export function setUpAccountBalancesQuery(store: RootStore) {
   return () => {
     cleanupEffect();
     store.dispatch(setAccountBalancesRaw(loadableIdle()));
-  };
-}
-
-export function setUpAccountStatsQuery(store: RootStore) {
-  const cleanupEffect = createValidatorQueryStoreEffect(store, {
-    name: 'accountStats',
-    selector: selectParentSubaccountInfo,
-    getQueryKey: (data) => ['accountStats', data.wallet],
-    getQueryFn: (compositeClient, data) => {
-      if (data.wallet == null) {
-        return null;
-      }
-      return () => compositeClient.validatorClient.get.getUserStats(data.wallet!);
-    },
-    onResult: (result) => {
-      store.dispatch(
-        setAccountStatsRaw(
-          mapLoadableData(queryResultToLoadable(result), (data) => {
-            return parseToPrimitives(data);
-          })
-        )
-      );
-    },
-    onNoQuery: () => store.dispatch(setAccountStatsRaw(loadableIdle())),
-    refetchInterval: timeUnits.minute,
-    staleTime: timeUnits.minute,
-  });
-  return () => {
-    cleanupEffect();
-    store.dispatch(setAccountStatsRaw(loadableIdle()));
-  };
-}
-
-export function setUpAccountFeeTierQuery(store: RootStore) {
-  const cleanupEffect = createValidatorQueryStoreEffect(store, {
-    name: 'accountFeeTier',
-    selector: selectParentSubaccountInfo,
-    getQueryKey: (data) => ['userFeeTier', data.wallet],
-    getQueryFn: (compositeClient, data) => {
-      if (data.wallet == null) {
-        return null;
-      }
-      return () => compositeClient.validatorClient.get.getUserFeeTier(data.wallet!);
-    },
-    onResult: (result) => {
-      store.dispatch(
-        setAccountFeeTierRaw(
-          mapLoadableData(queryResultToLoadable(result), (d) => parseToPrimitives(d).tier)
-        )
-      );
-    },
-    onNoQuery: () => store.dispatch(setAccountFeeTierRaw(loadableIdle())),
-    refetchInterval: timeUnits.hour,
-    staleTime: timeUnits.hour,
-  });
-  return () => {
-    cleanupEffect();
-    store.dispatch(setAccountFeeTierRaw(loadableIdle()));
-  };
-}
-
-export function setUpAccountStakingTierQuery(store: RootStore) {
-  const cleanupEffect = createValidatorQueryStoreEffect(store, {
-    name: 'accountStakingTier',
-    selector: selectParentSubaccountInfo,
-    getQueryKey: (data) => ['userStakingTier', data.wallet],
-    getQueryFn: (compositeClient, data) => {
-      if (data.wallet == null) {
-        return null;
-      }
-      return () => compositeClient.validatorClient.get.getUserStakingTier(data.wallet!);
-    },
-    onResult: (result) => {
-      store.dispatch(
-        setAccountStakingTierRaw(
-          mapLoadableData(queryResultToLoadable(result), (d) => parseToPrimitives(d))
-        )
-      );
-    },
-    onNoQuery: () => store.dispatch(setAccountStakingTierRaw(loadableIdle())),
-    // Due to computation optimization on protocol side, User's staking tier can take up to 15 min to update once they stake more tokens.
-    // So we're refetching every 5 minutes to ensure the latest data is displayed.
-    refetchInterval: timeUnits.minute * 5,
-    staleTime: timeUnits.minute * 5,
-  });
-  return () => {
-    cleanupEffect();
   };
 }
 

@@ -3,7 +3,6 @@ import { calculateEffectiveMarketImfFromSelectedLeverage } from '@/bonsai/calcul
 import { CanvasOrderbookLine } from '@/bonsai/types/orderbookTypes';
 import { ParentSubaccountDataBase } from '@/bonsai/types/rawTypes';
 import {
-  FeeTierSummary,
   OrderStatus,
   RewardParamsSummary,
   SubaccountOrder,
@@ -135,7 +134,7 @@ export function calculateTradeInfo(
                 );
               }
             ),
-            feeRate: accountData.userFeeStats.takerFeeRate ?? marketTakerFee(accountData) ?? 0,
+            feeRate: marketTakerFee(accountData) ?? 0,
             transferToSubaccountAmount: calculateIsolatedTransferAmount(
               trade,
               calculated.summary?.size?.size ?? 0,
@@ -148,8 +147,7 @@ export function calculateTradeInfo(
             reward: calculateTakerReward(
               calculated.marketOrder?.usdcSize,
               calculated.marketOrder?.totalFees,
-              accountData.rewardParams,
-              accountData.feeTiers
+              accountData.rewardParams
             ),
           };
         });
@@ -208,7 +206,7 @@ export function calculateTradeInfo(
 
           const size = calculated.marketOrder?.size;
           const usdcSize = mapIfPresent(price, size, (p, s) => p * s);
-          const feeRate = accountData.userFeeStats.takerFeeRate ?? marketTakerFee(accountData) ?? 0;
+          const feeRate = marketTakerFee(accountData) ?? 0;
           const totalFees = calculateTradeFeeAfterDiscounts(
             accountData,
             mapIfPresent(usdcSize, (u) => u * feeRate)
@@ -258,12 +256,7 @@ export function calculateTradeInfo(
             payloadPrice,
             startPrice: undefined,
             endPrice: undefined,
-            reward: calculateTakerReward(
-              usdcSize,
-              totalFees,
-              accountData.rewardParams,
-              accountData.feeTiers
-            ),
+            reward: calculateTakerReward(usdcSize, totalFees, accountData.rewardParams),
           };
         });
       case TradeFormType.SCALE:
@@ -272,9 +265,7 @@ export function calculateTradeInfo(
           const execution = trade.execution;
           const isMaker = timeInForce === TimeInForce.GTT || execution === ExecutionType.POST_ONLY;
 
-          const feeRate = isMaker
-            ? (accountData.userFeeStats.makerFeeRate ?? marketMakerFee(accountData))
-            : (accountData.userFeeStats.takerFeeRate ?? marketTakerFee(accountData));
+          const feeRate = isMaker ? marketMakerFee(accountData) : marketTakerFee(accountData);
 
           const startPrice = AttemptNumber(trade.scaleStartPrice);
           const endPrice = AttemptNumber(trade.scaleEndPrice);
@@ -336,8 +327,7 @@ export function calculateTradeInfo(
               : calculateTakerReward(
                   inputSummary.size?.usdcSize,
                   totalFees,
-                  accountData.rewardParams,
-                  accountData.feeTiers
+                  accountData.rewardParams
                 ),
           };
         });
@@ -350,9 +340,7 @@ export function calculateTradeInfo(
             (trade.type === TradeFormType.LIMIT && timeInForce === TimeInForce.GTT) ||
             execution === ExecutionType.POST_ONLY;
 
-          const feeRate = isMaker
-            ? (accountData.userFeeStats.makerFeeRate ?? marketMakerFee(accountData))
-            : (accountData.userFeeStats.takerFeeRate ?? marketTakerFee(accountData));
+          const feeRate = isMaker ? marketMakerFee(accountData) : marketTakerFee(accountData);
           const price = AttemptNumber(trade.limitPrice);
           const inputSummary = calculateLimitOrderInputSummary(
             trade.size,
@@ -403,8 +391,7 @@ export function calculateTradeInfo(
               : calculateTakerReward(
                   inputSummary.size?.usdcSize,
                   totalFees,
-                  accountData.rewardParams,
-                  accountData.feeTiers
+                  accountData.rewardParams
                 ),
           };
         });
@@ -580,7 +567,7 @@ function createMarketOrder(
       simulateMarketOrder(
         effectiveSizeTarget,
         orderbook,
-        accountData.userFeeStats.takerFeeRate ?? marketTakerFee(accountData) ?? 0,
+        marketTakerFee(accountData) ?? 0,
         accountData.currentTradeMarketSummary?.marketFeeDiscountMultiplier,
         oraclePrice,
         equity,
@@ -956,8 +943,7 @@ const FEE_REBATE_PERCENT = CURRENT_SURGE_REWARDS_DETAILS.rebateFraction;
 function calculateTakerReward(
   usdcSize: number | undefined,
   fee: number | undefined,
-  rewardsParams: RewardParamsSummary | undefined,
-  feeTiers: FeeTierSummary[] | undefined
+  rewardsParams: RewardParamsSummary | undefined
 ): number | undefined {
   const tokenPrice = rewardsParams?.tokenPrice;
   if (IS_FEE_REBATE_TIME) {
@@ -967,7 +953,6 @@ function calculateTakerReward(
   }
   const feeMultiplier = rewardsParams?.feeMultiplier;
   const notional = usdcSize;
-  const maxMakerRebate = findMaxMakerRebate(feeTiers);
 
   if (
     fee != null &&
@@ -978,9 +963,7 @@ function calculateTakerReward(
     tokenPrice > 0.0
   ) {
     return (
-      ((fee - maxMakerRebate * notional - fee * MAX_POSSIBLE_TAKER_REV_SHARE) *
-        feeMultiplier *
-        RATE_LOST_TO_REV_SHARES) /
+      ((fee - fee * MAX_POSSIBLE_TAKER_REV_SHARE) * feeMultiplier * RATE_LOST_TO_REV_SHARES) /
       tokenPrice
     );
   }
@@ -1003,16 +986,6 @@ function calculateMakerReward(
     return (fee * feeMultiplier * RATE_LOST_TO_REV_SHARES) / tokenPrice;
   }
   return undefined;
-}
-
-function findMaxMakerRebate(feeTiers: FeeTierSummary[] | undefined): number {
-  if (feeTiers == null || feeTiers.length === 0) return 0.0;
-
-  const negativeRates = feeTiers.map((tier) => tier.maker ?? 0.0).filter((rate) => rate < 0.0);
-
-  if (negativeRates.length === 0) return 0.0;
-
-  return Math.abs(Math.min(...negativeRates));
 }
 
 function calculateMarketOrderSlippage(
@@ -1230,12 +1203,18 @@ function generateGeometricWeights(
   return { weights, totalWeight };
 }
 
-// The engine charges each market's base rates; the account's tier multipliers are applied on
-// chain and are not indexed yet, so the base rate is the estimate when no tier is known.
+// The engine charges the market's rates scaled by the multipliers of the account's fee tier cached
+// on the market, which are 1 while none is cached or once it has expired.
 export const marketTakerFee = (accountData: TradeFormInputData) =>
-  AttemptNumber(accountData.currentTradeMarketSummary?.takerFee);
+  mapIfPresent(
+    AttemptNumber(accountData.currentTradeMarketSummary?.takerFee),
+    (rate) => rate * (accountData.feeMultipliers?.taker ?? 1)
+  );
 export const marketMakerFee = (accountData: TradeFormInputData) =>
-  AttemptNumber(accountData.currentTradeMarketSummary?.makerFee);
+  mapIfPresent(
+    AttemptNumber(accountData.currentTradeMarketSummary?.makerFee),
+    (rate) => rate * (accountData.feeMultipliers?.maker ?? 1)
+  );
 
 function calculateTradeFeeAfterDiscounts(
   accountData: TradeFormInputData,

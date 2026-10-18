@@ -31,13 +31,11 @@ import {
 } from '../calculators/subaccount';
 import { calculateTrades } from '../calculators/trades';
 import { calculateTransfers } from '../calculators/transfers';
-import { calculateAccountStakingTier } from '../calculators/userStats';
 import { mergeLoadableStatus } from '../lib/mapLoadable';
 import { selectParentSubaccountInfo } from '../socketSelectors';
 import { SubaccountFillType, SubaccountTrade, SubaccountTransfer } from '../types/summaryTypes';
 import { selectLatestIndexerHeight, selectLatestValidatorHeight } from './apiStatus';
 import {
-  selectRawAccountStakingTierData,
   selectRawBlockTradingRewardsLiveData,
   selectRawBlockTradingRewardsRest,
   selectRawBlockTradingRewardsRestData,
@@ -345,11 +343,6 @@ export const selectAccountNobleWalletAddress = createAppSelector(
 
     return nobleWalletAddress;
   }
-);
-
-export const selectAccountStakingTier = createAppSelector(
-  [selectRawAccountStakingTierData],
-  (stakingTier) => calculateAccountStakingTier(stakingTier)
 );
 
 export const selectAccountTradeHistory = createAppSelector(

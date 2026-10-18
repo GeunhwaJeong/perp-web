@@ -9,6 +9,7 @@ import {
   setUpIndexerSourceAddressScreenV2Query,
 } from './rest/compliance';
 import { setUpConfigTiersQuery } from './rest/configTiers';
+import { setUpAccountFeesQuery, setUpFeeScheduleQuery } from './rest/fees';
 import { setUpFillsQuery } from './rest/fills';
 import { setUpGeoQuery } from './rest/geo';
 import { setUpIndexerHeightQuery, setUpValidatorHeightQuery } from './rest/height';
@@ -21,9 +22,6 @@ import { setUpTradeHistoryQuery } from './rest/tradeHistory';
 import { setUpTransfersQuery } from './rest/transfers';
 import {
   setUpAccountBalancesQuery,
-  setUpAccountFeeTierQuery,
-  setUpAccountStakingTierQuery,
-  setUpAccountStatsQuery,
   setUpCompositeClientAccountCacheQuery,
 } from './rest/validatorAccountMetadata';
 import { setUpMarketsFeeDiscountQuery } from './rest/validatorMarketsMetadata';
@@ -47,11 +45,11 @@ export const storeLifecycles = [
   setUpSparklinesQuery,
   setUpIndexerHeightQuery,
   setUpValidatorHeightQuery,
-  setUpAccountStatsQuery,
   setUpAccountBalancesQuery,
-  setUpAccountFeeTierQuery,
+  setUpAccountFeesQuery,
   setUpCompositeClientAccountCacheQuery,
   setUpConfigTiersQuery,
+  setUpFeeScheduleQuery,
   setUpLocalOrdersOrdersSync,
   setUpGeoQuery,
   setUpIndexerSourceAddressScreenV2Query,
@@ -60,5 +58,4 @@ export const storeLifecycles = [
   setUpCancelOrphanedTriggerOrdersLifecycle,
   setUpReclaimChildSubaccountBalancesLifecycle,
   setUpMarketsFeeDiscountQuery,
-  setUpAccountStakingTierQuery,
 ] as const;

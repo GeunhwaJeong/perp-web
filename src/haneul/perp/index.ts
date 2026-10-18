@@ -3,6 +3,7 @@ export * from './builders';
 export * from './config';
 export * from './errors';
 export * from './execution';
+export * from './fees';
 export * from './prices';
 export * from './tickets';
 export * from './units';

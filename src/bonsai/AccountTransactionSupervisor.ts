@@ -27,6 +27,8 @@ import {
   limitPriceToUnits,
   priceToUnits,
   readAccount,
+  readAccountFees,
+  readFeeSchedule,
   readPosition,
   selectPriceUpdates,
   sizeToUnits,
@@ -472,6 +474,10 @@ export class AccountTransactionSupervisor {
     try {
       const result = await signAndExecute(tx);
       this.markPosition(ctx, marketId);
+      // Ending the session cached the account's fee tier on the market for its next sessions.
+      appQueryClient
+        .invalidateQueries({ queryKey: ['haneul', 'accountFees'] })
+        .catch(() => undefined);
       const returned = eventsOf(result.events, '::events::DeallocatedCollateral');
       if (returned.length > 0) {
         this.forgetWalletAccount(ctx.deployment, ctx.address);
@@ -1136,6 +1142,20 @@ export class AccountTransactionSupervisor {
       })
     );
     return Object.fromEntries(entries.filter((e): e is readonly [string, number] => e != null));
+  }
+
+  public async readFeeSchedule() {
+    const deployment = await loadPerpDeployment(dAppKit.stores.$currentNetwork.get());
+    return deployment ? readFeeSchedule(dAppKit.getClient(), deployment) : undefined;
+  }
+
+  public async readAccountFees() {
+    const wallet = await this.walletContext();
+    if (isOperationFailure(wallet)) return undefined;
+    const ctx = await this.context();
+    const account = isOperationFailure(ctx) ? undefined : ctx.payload.account;
+    const { deployment, address } = wallet.payload;
+    return readAccountFees(dAppKit.getClient(), deployment, address, account);
   }
 
   public tearDown(): void {

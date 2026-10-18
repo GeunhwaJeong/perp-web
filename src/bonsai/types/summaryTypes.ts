@@ -269,11 +269,6 @@ export type PendingIsolatedPosition = {
   orders: SubaccountOrder[];
 };
 
-export type AccountStats = {
-  takerNotional: string;
-  makerNotional: string;
-};
-
 export interface ApiState {
   status: ApiStatus;
   haltedBlock?: number | undefined;
@@ -364,44 +359,17 @@ export type PerpetualMarketFeeDiscount = NonNullable<
   ToPrimitives<FeeTierModule.QueryAllMarketFeeDiscountParamsResponse['params']>
 >;
 
-export type UserFeeTier = NonNullable<ToPrimitives<FeeTierModule.QueryUserFeeTierResponse['tier']>>;
-export type UserStakingTier = NonNullable<ToPrimitives<FeeTierModule.QueryUserStakingTierResponse>>;
-export interface UserStakingTierSummary {
-  feeTierName: string;
-  discountPercent: number | undefined;
-  stakedBaseTokens: string | undefined;
-}
-
 export type EquityTiers = NonNullable<
   ToPrimitives<ClobModule.QueryEquityTierLimitConfigurationResponse['equityTierLimitConfig']>
 >;
-export type FeeTiers = NonNullable<
-  ToPrimitives<FeeTierModule.QueryPerpetualFeeParamsResponse['params']>
->;
-export type StakingTiers = NonNullable<
-  ToPrimitives<FeeTierModule.QueryStakingTiersResponse['stakingTiers']>
->;
 export type ConfigTiers = {
-  feeTiers: FeeTiers | undefined;
   equityTiers: EquityTiers | undefined;
-  stakingTiers: StakingTiers | undefined;
 };
 
 export type RewardsParams = NonNullable<ToPrimitives<RewardsModule.QueryParamsResponse['params']>>;
 export type TokenPriceResponse = NonNullable<
   ToPrimitives<PricesModule.QueryMarketPriceResponse['marketPrice']>
 >;
-
-export interface FeeTierSummary {
-  id: string;
-  tier: string;
-  symbol: string;
-  volume: number;
-  totalShare?: number;
-  makerShare?: number;
-  maker?: number;
-  taker?: number;
-}
 
 export interface EquityTierSummary {
   requiredTotalNetCollateralUSD: number;
@@ -412,16 +380,6 @@ export interface EquityTierSummary {
 export interface EquityTiersSummary {
   shortTermOrderEquityTiers: EquityTierSummary[];
   statefulOrderEquityTiers: EquityTierSummary[];
-}
-
-export interface UserStats {
-  feeTierId?: string;
-  stakingTierId?: string;
-  makerFeeRate?: number;
-  takerFeeRate?: number;
-  makerVolume30D?: number;
-  takerVolume30D?: number;
-  stakingTierDiscount?: number;
 }
 
 export interface PerpetualMarketFee {

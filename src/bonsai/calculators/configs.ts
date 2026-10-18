@@ -1,45 +1,11 @@
-import BigNumber from 'bignumber.js';
-
 import { QUANTUM_MULTIPLIER } from '@/constants/numbers';
 
 import { isTruthy } from '@/lib/isTruthy';
 import { MustBigNumber } from '@/lib/numbers';
 
-import {
-  EquityTiers,
-  EquityTiersSummary,
-  EquityTierSummary,
-  FeeTiers,
-  FeeTierSummary,
-} from '../types/summaryTypes';
+import { EquityTiers, EquityTiersSummary, EquityTierSummary } from '../types/summaryTypes';
 
 const QUANTUM_MULTIPLIER_BN = MustBigNumber(QUANTUM_MULTIPLIER);
-
-export function calculateFeeTiers(payload: FeeTiers | undefined): FeeTierSummary[] | undefined {
-  return payload?.tiers
-    .map((tier) => {
-      const volume = MustBigNumber(tier.absoluteVolumeRequirement)
-        .div(QUANTUM_MULTIPLIER_BN)
-        .integerValue(BigNumber.ROUND_FLOOR)
-        .toNumber();
-
-      return {
-        id: tier.name,
-        tier: tier.name,
-        symbol: '≥',
-        volume,
-        totalShare: MustBigNumber(tier.totalVolumeShareRequirementPpm)
-          .div(QUANTUM_MULTIPLIER_BN)
-          .toNumber(),
-        makerShare: MustBigNumber(tier.makerVolumeShareRequirementPpm)
-          .div(QUANTUM_MULTIPLIER_BN)
-          .toNumber(),
-        maker: MustBigNumber(tier.makerFeePpm).div(QUANTUM_MULTIPLIER_BN).toNumber(),
-        taker: MustBigNumber(tier.takerFeePpm).div(QUANTUM_MULTIPLIER_BN).toNumber(),
-      };
-    })
-    .filter(isTruthy);
-}
 
 function createEquityTier(
   current: { usdTncRequired: string; limit: number },

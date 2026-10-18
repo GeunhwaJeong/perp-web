@@ -16,26 +16,14 @@ export function setUpConfigTiersQuery(store: RootStore) {
     selector: () => true,
     getQueryKey: () => ['configTiers'],
     getQueryFn: (compositeClient) => {
-      return () =>
-        Promise.all([
-          compositeClient.validatorClient.get.getEquityTierLimitConfiguration(),
-          compositeClient.validatorClient.get.getFeeTiers(),
-          compositeClient.validatorClient.get.getAllStakingTiers(),
-        ]);
+      return () => compositeClient.validatorClient.get.getEquityTierLimitConfiguration();
     },
-    onResult: (results) => {
+    onResult: (result) => {
       store.dispatch(
         setConfigTiers(
-          mapLoadableData(queryResultToLoadable(results), (data) => {
-            const equity = parseToPrimitives(data[0]).equityTierLimitConfig;
-            const fees = parseToPrimitives(data[1]).params;
-            const staking = parseToPrimitives(data[2]).stakingTiers;
-            return {
-              equityTiers: equity,
-              feeTiers: fees,
-              stakingTiers: staking,
-            };
-          })
+          mapLoadableData(queryResultToLoadable(result), (data) => ({
+            equityTiers: parseToPrimitives(data).equityTierLimitConfig,
+          }))
         )
       );
     },

@@ -31,8 +31,8 @@ export const Fees = () => {
   const stringGetter = useStringGetter();
   const { isNotTablet } = useBreakpoints();
   const [tabValue, setTabValue] = useState<TabValues>(TabValues.Fees);
-  const stakingTiers = useAppSelector(BonsaiCore.configs.stakingTiers);
-  const hasStakingTiers = stakingTiers != null && stakingTiers.length > 0;
+  const schedule = useAppSelector(BonsaiCore.configs.feeSchedule);
+  const hasStakingTiers = (schedule?.stakingTiers.length ?? 0) > 0;
 
   return (
     <AttachedExpandingSection>

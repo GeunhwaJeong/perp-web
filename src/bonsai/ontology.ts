@@ -1,3 +1,4 @@
+import type { PerpAccountFees, PerpFeeSchedule } from '@/haneul/perp';
 import { HeightResponse } from '@dydxprotocol/v4-client-js';
 import BigNumber from 'bignumber.js';
 
@@ -42,7 +43,6 @@ import {
   selectAccountOrdersLoading,
   selectAccountOrderTickets,
   selectAccountOrderTicketsLoading,
-  selectAccountStakingTier,
   selectAccountTradesWithLeverage,
   selectAccountTradeHistoryLoading,
   selectAccountTransfers,
@@ -81,6 +81,8 @@ import {
 } from './selectors/assets';
 import { selectAccountBalances, selectAccountNobleUsdcBalance } from './selectors/balances';
 import {
+  selectRawAccountFeesData,
+  selectRawFeeScheduleData,
   selectRawIndexerHeightDataLoading,
   selectRawMarketsData,
   selectRawParentSubaccountData,
@@ -88,7 +90,7 @@ import {
   selectRawValidatorHeightDataLoading,
 } from './selectors/base';
 import { selectCompliance, selectComplianceLoading } from './selectors/compliance';
-import { selectEquityTiers, selectFeeTiers, selectStakingTiers } from './selectors/configs';
+import { selectEquityTiers } from './selectors/configs';
 import { selectCurrentMarketOrderbookLoading } from './selectors/markets';
 import {
   selectCurrentMarketDepthChart,
@@ -108,7 +110,6 @@ import {
   selectEffectiveSelectedMarketLeverage,
   selectMarketSummaryById,
 } from './selectors/summary';
-import { selectUserStats } from './selectors/userStats';
 import { selectClientInitializationError } from './socketSelectors';
 import { DepositUsdcProps, WithdrawUsdcProps } from './types/operationTypes';
 import { DepthChartData, OrderbookProcessedData } from './types/orderbookTypes';
@@ -121,22 +122,18 @@ import {
   ChildSubaccountSummaries,
   Compliance,
   EquityTiersSummary,
-  FeeTierSummary,
   GroupedSubaccountSummary,
   PendingIsolatedPosition,
   PerpetualMarketSummaries,
   PerpetualMarketSummary,
   StablePerpetualMarketSummaries,
   StablePerpetualMarketSummary,
-  StakingTiers,
   SubaccountFill,
   SubaccountOrder,
   SubaccountPosition,
   SubaccountTrade,
   SubaccountTransfer,
   TWAPSubaccountOrder,
-  UserStakingTierSummary,
-  UserStats,
 } from './types/summaryTypes';
 import { useCurrentMarketTradesValue } from './websocket/trades';
 
@@ -199,17 +196,14 @@ interface BonsaiCoreShape {
       data: BasicSelector<IndexerHistoricalBlockTradingReward[]>;
       loading: BasicSelector<LoadableStatus>;
     };
-    stats: {
-      data: BasicSelector<UserStats>;
+    fees: {
+      data: BasicSelector<PerpAccountFees | undefined>;
     };
     balances: {
       data: BasicSelector<AccountBalances>;
     };
     nobleUsdcBalance: {
       data: BasicSelector<string | undefined>;
-    };
-    stakingTier: {
-      data: BasicSelector<UserStakingTierSummary | undefined>;
     };
   };
   markets: {
@@ -237,9 +231,8 @@ interface BonsaiCoreShape {
     clientInitializationError: BasicSelector<boolean | undefined>;
   };
   configs: {
-    feeTiers: BasicSelector<FeeTierSummary[] | undefined>;
+    feeSchedule: BasicSelector<PerpFeeSchedule | undefined>;
     equityTiers: BasicSelector<EquityTiersSummary | undefined>;
-    stakingTiers: BasicSelector<StakingTiers | undefined>;
   };
   compliance: { data: BasicSelector<Compliance>; loading: BasicSelector<LoadableStatus> };
 }
@@ -299,17 +292,14 @@ export const BonsaiCore: BonsaiCoreShape = {
       data: selectAccountBlockTradingRewards,
       loading: selectAccountBlockRewardsLoading,
     },
-    stats: {
-      data: selectUserStats,
+    fees: {
+      data: selectRawAccountFeesData,
     },
     balances: {
       data: selectAccountBalances,
     },
     nobleUsdcBalance: {
       data: selectAccountNobleUsdcBalance,
-    },
-    stakingTier: {
-      data: selectAccountStakingTier,
     },
   },
   markets: {
@@ -338,8 +328,7 @@ export const BonsaiCore: BonsaiCoreShape = {
   },
   configs: {
     equityTiers: selectEquityTiers,
-    feeTiers: selectFeeTiers,
-    stakingTiers: selectStakingTiers,
+    feeSchedule: selectRawFeeScheduleData,
   },
   compliance: { data: selectCompliance, loading: selectComplianceLoading },
 };

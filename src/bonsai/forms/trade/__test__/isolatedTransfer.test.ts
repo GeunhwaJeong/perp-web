@@ -142,7 +142,7 @@ const inputData = (
   rawSelectedMarketLeverages: { 'BTC-USD': 10 },
   currentTradeMarketOpenOrders: openOrders,
   allOpenOrders: openOrders,
-  userFeeStats: {},
+  feeMultipliers: undefined,
   currentTradeMarket: markets['BTC-USD'],
   currentTradeMarketSummary: marketSummary,
   currentTradeMarketOrderbook: {
@@ -154,7 +154,6 @@ const inputData = (
     groupingTickSize: 1,
     groupingTickSizeDecimals: 0,
   },
-  feeTiers: undefined,
   rewardParams: undefined,
   equityTiers: undefined,
   marketOrderMaxSlippage: 0.01,

@@ -61,15 +61,10 @@ export const selectRawBlockTradingRewardsRest = (state: RootState) =>
 export const selectRawIndexerHeight = (state: RootState) => state.raw.heights.indexerHeight;
 export const selectRawValidatorHeight = (state: RootState) => state.raw.heights.validatorHeight;
 
-export const selectRawConfigFeeTiers = (state: RootState) => state.raw.configs.data?.feeTiers;
 export const selectRawConfigEquityTiers = (state: RootState) => state.raw.configs.data?.equityTiers;
-export const selectRawConfigStakingTiers = (state: RootState) =>
-  state.raw.configs.data?.stakingTiers;
+export const selectRawFeeScheduleData = (state: RootState) => state.raw.feeSchedule.data;
 
-export const selectRawAccountFeeTierData = (state: RootState) => state.raw.account.feeTier.data;
-export const selectRawAccountStakingTierData = (state: RootState) =>
-  state.raw.account.stakingTier.data;
-export const selectRawAccountStatsData = (state: RootState) => state.raw.account.stats.data;
+export const selectRawAccountFeesData = (state: RootState) => state.raw.account.fees.data;
 
 export const selectRawAccountBalancesData = (state: RootState) => state.raw.account.balances.data;
 export const selectRawAccountNobleUsdcBalanceData = (state: RootState) =>

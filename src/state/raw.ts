@@ -8,14 +8,12 @@ import {
   ParentSubaccountData,
 } from '@/bonsai/types/rawTypes';
 import {
-  AccountStats,
   ComplianceResponse,
   ConfigTiers,
   GeoState,
   PerpetualMarketFeeDiscount,
-  UserFeeTier,
-  UserStakingTier,
 } from '@/bonsai/types/summaryTypes';
+import type { PerpAccountFees, PerpFeeSchedule } from '@/haneul/perp';
 import { Coin } from '@cosmjs/proto-signing';
 import { HeightResponse } from '@dydxprotocol/v4-client-js';
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
@@ -92,9 +90,7 @@ export interface RawDataState {
   account: {
     balances: Loadable<Coin[]>;
     nobleUsdcBalance: Loadable<Coin>;
-    stats: Loadable<AccountStats | undefined>;
-    feeTier: Loadable<UserFeeTier | undefined>;
-    stakingTier: Loadable<UserStakingTier | undefined>;
+    fees: Loadable<PerpAccountFees | undefined>;
     parentSubaccount: Loadable<ParentSubaccountData>;
     fills: Loadable<IndexerCompositeFillResponse>;
     orders: Loadable<OrdersData>;
@@ -111,6 +107,7 @@ export interface RawDataState {
     validatorHeight: HeightState;
   };
   configs: Loadable<ConfigTiers>;
+  feeSchedule: Loadable<PerpFeeSchedule | undefined>;
   compliance: ComplianceState;
 }
 
@@ -128,9 +125,7 @@ const initialState: RawDataState = {
     parentSubaccount: loadableIdle(),
     balances: loadableIdle(),
     nobleUsdcBalance: loadableIdle(),
-    stats: loadableIdle(),
-    feeTier: loadableIdle(),
-    stakingTier: loadableIdle(),
+    fees: loadableIdle(),
     fills: loadableIdle(),
     orders: loadableIdle(),
     orderTickets: loadableIdle(),
@@ -144,6 +139,7 @@ const initialState: RawDataState = {
     validatorHeight: { lastFewResults: [], latest: loadableIdle() },
   },
   configs: loadableIdle(),
+  feeSchedule: loadableIdle(),
   compliance: {
     geoHeaders: loadableIdle(),
     geo: loadableIdle(),
@@ -180,20 +176,14 @@ export const rawSlice = createSlice({
       setAccountNobleUsdcBalanceRaw: (state, action: PayloadAction<Loadable<Coin>>) => {
         state.account.nobleUsdcBalance = action.payload;
       },
-      setAccountStatsRaw: (state, action: PayloadAction<Loadable<AccountStats | undefined>>) => {
-        state.account.stats = action.payload;
-      },
-      setAccountFeeTierRaw: (state, action: PayloadAction<Loadable<UserFeeTier | undefined>>) => {
-        state.account.feeTier = action.payload;
-      },
-      setAccountStakingTierRaw: (
-        state,
-        action: PayloadAction<Loadable<UserStakingTier | undefined>>
-      ) => {
-        state.account.stakingTier = action.payload;
+      setAccountFeesRaw: (state, action: PayloadAction<Loadable<PerpAccountFees | undefined>>) => {
+        state.account.fees = action.payload;
       },
       setConfigTiers: (state, action: PayloadAction<Loadable<ConfigTiers>>) => {
         state.configs = action.payload;
+      },
+      setFeeScheduleRaw: (state, action: PayloadAction<Loadable<PerpFeeSchedule | undefined>>) => {
+        state.feeSchedule = action.payload;
       },
       setAccountFillsRaw: (
         state,
@@ -362,7 +352,7 @@ export const {
   setSparklines,
   setParentSubaccountRaw,
   setAccountBalancesRaw,
-  setAccountStatsRaw,
+  setAccountFeesRaw,
   setAccountFillsRaw,
   setAccountTradesRaw,
   setAccountNobleUsdcBalanceRaw,
@@ -373,10 +363,9 @@ export const {
   setNetworkStateRaw,
   setIndexerHeightRaw,
   setValidatorHeightRaw,
-  setAccountFeeTierRaw,
-  setAccountStakingTierRaw,
   setMarketsFeeDiscountsRaw,
   setConfigTiers,
+  setFeeScheduleRaw,
   setComplianceGeoRaw,
   setComplianceGeoHeadersRaw,
   setLocalAddressScreenV2Raw,
