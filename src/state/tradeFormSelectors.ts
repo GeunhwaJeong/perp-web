@@ -44,7 +44,6 @@ const getTradeFormInputData = createAppSelector(
     BonsaiHelpers.currentMarket.marketInfo,
     selectRawOrderbook,
     BonsaiRaw.currentMarket,
-    BonsaiCore.configs.equityTiers,
     getMarketOrderMaxSlippage,
   ],
   (
@@ -57,7 +56,6 @@ const getTradeFormInputData = createAppSelector(
     currentTradeMarketSummary,
     currentTradeMarketOrderbook,
     currentTradeMarket,
-    equityTiers,
     marketOrderMaxSlippage
   ): TradeFormInputData => ({
     rawParentSubaccountData,
@@ -73,7 +71,6 @@ const getTradeFormInputData = createAppSelector(
 
     feeMultipliers,
     rewardParams: undefined,
-    equityTiers,
     marketOrderMaxSlippage,
   })
 );

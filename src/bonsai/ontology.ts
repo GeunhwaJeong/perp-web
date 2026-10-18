@@ -3,7 +3,6 @@ import { HeightResponse } from '@dydxprotocol/v4-client-js';
 import BigNumber from 'bignumber.js';
 
 import { GroupingMultiplier } from '@/constants/orderbook';
-import { AccountAuthenticator } from '@/constants/validators';
 import {
   IndexerFundingPaymentResponseObject,
   IndexerHistoricalBlockTradingReward,
@@ -24,7 +23,6 @@ import { Loadable, LoadableStatus } from './lib/loadable';
 import { useCurrentMarketHistoricalFunding } from './rest/funding';
 import { useFundingPayments } from './rest/fundingPayments';
 import { SubaccountPnlTick, useParentSubaccountHistoricalPnls } from './rest/historicalPnl';
-import { useAuthorizedAccounts } from './rest/permissionedKeys';
 import {
   StakingDelegationsResult,
   StakingRewards,
@@ -90,7 +88,6 @@ import {
   selectRawValidatorHeightDataLoading,
 } from './selectors/base';
 import { selectCompliance, selectComplianceLoading } from './selectors/compliance';
-import { selectEquityTiers } from './selectors/configs';
 import { selectCurrentMarketOrderbookLoading } from './selectors/markets';
 import {
   selectCurrentMarketDepthChart,
@@ -121,7 +118,6 @@ import {
   AssetData,
   ChildSubaccountSummaries,
   Compliance,
-  EquityTiersSummary,
   GroupedSubaccountSummary,
   PendingIsolatedPosition,
   PerpetualMarketSummaries,
@@ -232,7 +228,6 @@ interface BonsaiCoreShape {
   };
   configs: {
     feeSchedule: BasicSelector<PerpFeeSchedule | undefined>;
-    equityTiers: BasicSelector<EquityTiersSummary | undefined>;
   };
   compliance: { data: BasicSelector<Compliance>; loading: BasicSelector<LoadableStatus> };
 }
@@ -327,7 +322,6 @@ export const BonsaiCore: BonsaiCoreShape = {
     apiState: selectApiState,
   },
   configs: {
-    equityTiers: selectEquityTiers,
     feeSchedule: selectRawFeeScheduleData,
   },
   compliance: { data: selectCompliance, loading: selectComplianceLoading },
@@ -464,7 +458,6 @@ export const BonsaiHelpers: BonsaiHelpersShape = {
 };
 
 interface BonsaiHooksShape {
-  useAuthorizedAccounts: () => Loadable<AccountAuthenticator[]>;
   useCurrentMarketHistoricalFunding: () => Loadable<HistoricalFundingObject[]>;
   useCurrentMarketLiveTrades: () => Loadable<IndexerWsTradesUpdateObject>;
   useParentSubaccountHistoricalPnls: () => Loadable<SubaccountPnlTick[]>;
@@ -475,7 +468,6 @@ interface BonsaiHooksShape {
 }
 
 export const BonsaiHooks: BonsaiHooksShape = {
-  useAuthorizedAccounts,
   useCurrentMarketHistoricalFunding,
   useCurrentMarketLiveTrades: useCurrentMarketTradesValue,
   useFundingPayments,

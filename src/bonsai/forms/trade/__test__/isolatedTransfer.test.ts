@@ -155,7 +155,6 @@ const inputData = (
     groupingTickSizeDecimals: 0,
   },
   rewardParams: undefined,
-  equityTiers: undefined,
   marketOrderMaxSlippage: 0.01,
 });
 

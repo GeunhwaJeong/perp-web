@@ -1,7 +1,6 @@
 import { OrderbookProcessedData } from '@/bonsai/types/orderbookTypes';
 import { MarketsData, ParentSubaccountDataBase } from '@/bonsai/types/rawTypes';
 import {
-  EquityTiersSummary,
   GroupedSubaccountSummary,
   PerpetualMarketSummary,
   RewardParamsSummary,
@@ -275,7 +274,6 @@ export type TradeFormInputData = {
   currentTradeMarketOrderbook: OrderbookProcessedData | undefined;
   // Trading rewards were a dYdX token emission; there is no reward program on this engine.
   rewardParams: RewardParamsSummary | undefined;
-  equityTiers: EquityTiersSummary | undefined;
   /** The user's market-order slippage cap, as a fraction. */
   marketOrderMaxSlippage: number;
 };

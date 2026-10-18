@@ -9,7 +9,6 @@ import {
 } from '@/bonsai/types/rawTypes';
 import {
   ComplianceResponse,
-  ConfigTiers,
   GeoState,
   PerpetualMarketFeeDiscount,
 } from '@/bonsai/types/summaryTypes';
@@ -106,7 +105,6 @@ export interface RawDataState {
     indexerHeight: HeightState;
     validatorHeight: HeightState;
   };
-  configs: Loadable<ConfigTiers>;
   feeSchedule: Loadable<PerpFeeSchedule | undefined>;
   compliance: ComplianceState;
 }
@@ -138,7 +136,6 @@ const initialState: RawDataState = {
     indexerHeight: { lastFewResults: [], latest: loadableIdle() },
     validatorHeight: { lastFewResults: [], latest: loadableIdle() },
   },
-  configs: loadableIdle(),
   feeSchedule: loadableIdle(),
   compliance: {
     geoHeaders: loadableIdle(),
@@ -178,9 +175,6 @@ export const rawSlice = createSlice({
       },
       setAccountFeesRaw: (state, action: PayloadAction<Loadable<PerpAccountFees | undefined>>) => {
         state.account.fees = action.payload;
-      },
-      setConfigTiers: (state, action: PayloadAction<Loadable<ConfigTiers>>) => {
-        state.configs = action.payload;
       },
       setFeeScheduleRaw: (state, action: PayloadAction<Loadable<PerpFeeSchedule | undefined>>) => {
         state.feeSchedule = action.payload;
@@ -364,7 +358,6 @@ export const {
   setIndexerHeightRaw,
   setValidatorHeightRaw,
   setMarketsFeeDiscountsRaw,
-  setConfigTiers,
   setFeeScheduleRaw,
   setComplianceGeoRaw,
   setComplianceGeoHeadersRaw,

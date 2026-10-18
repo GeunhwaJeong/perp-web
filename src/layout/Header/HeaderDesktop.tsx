@@ -86,12 +86,6 @@ export const HeaderDesktop = () => {
                 );
               },
             },
-            {
-              value: 'ApiTradingKeys',
-              slotBefore: <Icon iconName={IconName.Passkey} />,
-              label: stringGetter({ key: STRING_KEYS.API_TRADING_KEYS }),
-              onClick: () => dispatch(openDialog(DialogTypes.TradingKeys())),
-            },
             !!mintscanBase && {
               value: 'MINTSCAN',
               slotBefore: <Icon iconName={IconName.Mintscan} />,

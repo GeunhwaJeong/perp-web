@@ -5,7 +5,7 @@ import {
   simpleValidationError,
   ValidationError,
 } from '@/bonsai/lib/validationErrors';
-import { OrderFlags, OrderStatus } from '@/bonsai/types/summaryTypes';
+import { OrderStatus } from '@/bonsai/types/summaryTypes';
 import { OrderType } from '@dydxprotocol/v4-client-js';
 import { isEmpty } from 'lodash';
 
@@ -25,7 +25,6 @@ import {
 } from '@/types/indexer/indexerApiGen';
 
 import { assertNever } from '@/lib/assertNever';
-import { mapIfPresent } from '@/lib/do';
 import { AttemptNumber, MustNumber } from '@/lib/numbers';
 
 import { validateTriggerOrder } from '../triggers/errors';
@@ -35,7 +34,6 @@ import { marketMakerFee, marketTakerFee } from './tradeInfo';
 import {
   ExecutionType,
   OrderSide,
-  TimeInForce,
   TradeForm,
   TradeFormInputData,
   TradeFormSummary,
@@ -67,7 +65,6 @@ export function calculateTradeFormErrors(
   errors.push(...validateRestrictions(inputData, summary));
   errors.push(...validateTradeFormSummaryFields(summary));
   errors.push(...validateBracketOrders(inputData, summary));
-  errors.push(...validateEquityTiers(inputData, summary));
 
   return errors;
 }
@@ -1008,84 +1005,6 @@ function validateTradeFormSummaryFields(summary: TradeFormSummary): ValidationEr
   }
 
   return errors;
-}
-
-function validateEquityTiers(inputData: TradeFormInputData, summary: TradeFormSummary) {
-  const subaccountToUse = summary.tradePayload?.orderPayload?.subaccountNumber;
-  if (subaccountToUse == null) {
-    return [];
-  }
-  if (inputData.equityTiers == null) {
-    return [];
-  }
-  const relevantOpenOrders = inputData.allOpenOrders.filter(
-    (o) => o.subaccountNumber === subaccountToUse && o.orderFlags !== OrderFlags.SHORT_TERM
-  );
-  const subaccountEquity = mapIfPresent(
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    summary.accountDetailsBefore?.subaccountSummaries?.[subaccountToUse]?.equity.toNumber() ?? 0,
-    summary.tradePayload?.orderPayload?.transferToSubaccountAmount,
-    (equity, transferAmount) => {
-      return equity + transferAmount;
-    }
-  );
-  if (subaccountEquity == null) {
-    return [];
-  }
-  const myEquityTierLimit = inputData.equityTiers.statefulOrderEquityTiers.find(
-    (t) =>
-      subaccountEquity >= t.requiredTotalNetCollateralUSD &&
-      subaccountEquity < (t.nextLevelRequiredTotalNetCollateralUSD ?? Number.MAX_SAFE_INTEGER)
-  );
-  if (myEquityTierLimit == null) {
-    return [];
-  }
-
-  const isShortTerm =
-    summary.effectiveTrade.type === TradeFormType.MARKET ||
-    (summary.effectiveTrade.type === TradeFormType.LIMIT &&
-      summary.effectiveTrade.timeInForce === TimeInForce.IOC);
-
-  const ordersToOpen =
-    summary.effectiveTrade.type === TradeFormType.SCALE // Scale order types will only contain scaleOrderPayloads in the payload
-      ? (summary.tradePayload?.scaleOrderPayloads?.length ?? 0)
-      : (isShortTerm ? 0 : 1) +
-        (summary.tradePayload?.triggersPayloads?.filter((t) => t.placePayload != null).length ?? 0);
-
-  if (ordersToOpen <= 0) {
-    return [];
-  }
-
-  if (relevantOpenOrders.length + ordersToOpen > myEquityTierLimit.maxOrders) {
-    const nextTierEquity =
-      myEquityTierLimit.nextLevelRequiredTotalNetCollateralUSD ?? Number.MAX_SAFE_INTEGER;
-    return [
-      simpleValidationError({
-        code: 'OPEN_ORDERS_EXCEEDS_EQUITY_TIER_LIMIT',
-        type: ErrorType.error,
-        learnMoreUrlKey: 'equityTiersLearnMore',
-        textKey: STRING_KEYS.TRIGGERS_EQUITY_TIER_ERROR,
-        textParams: {
-          CURRENT_EQUITY: {
-            value: subaccountEquity,
-            format: ErrorFormat.Price,
-            decimals: 0,
-          },
-          NEXT_TIER_EQUITY: {
-            value: nextTierEquity,
-            format: ErrorFormat.Price,
-            decimals: 0,
-          },
-          MAX_ORDERS: {
-            value: `${Math.round(myEquityTierLimit.maxOrders)}`,
-            format: ErrorFormat.String,
-            decimals: 0,
-          },
-        },
-      }),
-    ];
-  }
-  return [];
 }
 
 function validateBracketOrders(

@@ -12,7 +12,3 @@ export const getLazyNobleWallet = weakMapMemoize(async () => {
 export const getLazyStargateClient = weakMapMemoize(async () => {
   return (await import('@cosmjs/stargate')).StargateClient;
 });
-
-export const getLazyTradingKeyUtils = weakMapMemoize(async () => {
-  return (await import('@dydxprotocol/v4-client-js')).tradingKeyUtils;
-});

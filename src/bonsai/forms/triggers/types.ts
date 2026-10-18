@@ -1,6 +1,4 @@
-import { MarketsData, ParentSubaccountDataBase } from '@/bonsai/types/rawTypes';
 import {
-  EquityTiersSummary,
   MarketInfo,
   PositionUniqueId,
   SubaccountOrder,
@@ -52,13 +50,6 @@ export interface TriggerOrderInputData {
   position?: SubaccountPosition;
   market?: MarketInfo;
   existingTriggerOrders?: SubaccountOrder[];
-
-  // these are only for checking equity tier issues
-  rawParentSubaccountData: ParentSubaccountDataBase | undefined;
-  rawRelevantMarkets: MarketsData | undefined;
-  selectedMarketLeverages: { [marketId: string]: number };
-  equityTiers: EquityTiersSummary | undefined;
-  allOpenOrders?: SubaccountOrder[];
 }
 
 export interface TriggerOrderActions {

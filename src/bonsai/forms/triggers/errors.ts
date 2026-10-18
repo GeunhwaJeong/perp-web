@@ -1,18 +1,16 @@
 import { getSimpleOrderStatus } from '@/bonsai/calculators/orders';
-import { calculateChildSubaccountSummaries } from '@/bonsai/calculators/subaccount';
 import {
   ErrorFormat,
   ErrorType,
   simpleValidationError,
   ValidationError,
 } from '@/bonsai/lib/validationErrors';
-import { MarketInfo, OrderFlags, OrderStatus } from '@/bonsai/types/summaryTypes';
+import { MarketInfo, OrderStatus } from '@/bonsai/types/summaryTypes';
 
 import { STRING_KEYS } from '@/constants/localization';
 import { IndexerPerpetualPositionStatus, IndexerPositionSide } from '@/types/indexer/indexerApiGen';
 
-import { calc, mapIfPresent } from '@/lib/do';
-import { isTruthy } from '@/lib/isTruthy';
+import { calc } from '@/lib/do';
 import { AttemptBigNumber, AttemptNumber, MustBigNumber, MustNumber } from '@/lib/numbers';
 import { isPresent } from '@/lib/typeUtils';
 
@@ -110,7 +108,7 @@ export function getErrors(
   }
 
   if (summary.payload != null) {
-    validationErrors.push(...validateTriggerOrderPayloadForEquityTiers(summary.payload, inputData));
+    validationErrors.push(...validateTriggerOrderPayloadForEngine(summary.payload));
   }
 
   return validationErrors;
@@ -289,55 +287,11 @@ function validateCustomSize(
   return [];
 }
 
-function validateTriggerOrderPayloadForEquityTiers(
-  payload: TriggerOrdersPayload,
-  inputData: TriggerOrderInputData
-) {
-  const deletedOrderIds = new Set(
-    payload.payloads.map((c) => c.cancelPayload?.orderId).filter(isTruthy)
-  );
-  const placeOrders = payload.payloads.map((p) => p.placePayload).filter(isPresent);
-  const subaccountToUse = placeOrders[0]?.subaccountNumber;
-  if (placeOrders.length === 0 || subaccountToUse == null) {
-    return [];
-  }
-  if (inputData.allOpenOrders == null || inputData.equityTiers == null) {
-    return [errors.cantCalculateEquityTier()];
-  }
-  const relevantOpenOrders = inputData.allOpenOrders.filter(
-    (o) =>
-      o.subaccountNumber === subaccountToUse &&
-      !deletedOrderIds.has(o.id) &&
-      o.orderFlags !== OrderFlags.SHORT_TERM
-  );
-  const subaccountEquity = mapIfPresent(
-    inputData.rawParentSubaccountData,
-    inputData.rawRelevantMarkets,
-    (subaccountData, markets) =>
-      calculateChildSubaccountSummaries(subaccountData, markets, inputData.selectedMarketLeverages)[
-        `${subaccountToUse}`
-      ]?.equity.toNumber()
-  );
-  if (subaccountEquity == null) {
-    return [errors.cantCalculateEquityTier()];
-  }
-  const myEquityTierLimit = inputData.equityTiers.statefulOrderEquityTiers.find(
-    (t) =>
-      subaccountEquity >= t.requiredTotalNetCollateralUSD &&
-      subaccountEquity < (t.nextLevelRequiredTotalNetCollateralUSD ?? Number.MAX_SAFE_INTEGER)
-  );
-  if (myEquityTierLimit == null) {
-    return [errors.cantCalculateEquityTier()];
-  }
-
-  if (relevantOpenOrders.length + placeOrders.length > myEquityTierLimit.maxOrders) {
-    return [
-      errors.equityTierError(
-        subaccountEquity,
-        myEquityTierLimit.nextLevelRequiredTotalNetCollateralUSD ?? Number.MAX_SAFE_INTEGER,
-        myEquityTierLimit.maxOrders
-      ),
-    ];
+// Nothing executes stop-loss or take-profit orders on the engine until a keeper does, and the
+// account transaction supervisor refuses to place them; the form says so instead of the submit.
+function validateTriggerOrderPayloadForEngine(payload: TriggerOrdersPayload) {
+  if (payload.payloads.some((p) => p.placePayload != null)) {
+    return [errors.conditionalOrdersUnavailable()];
   }
   return [];
 }
@@ -360,40 +314,11 @@ class TriggerOrderFormValidationErrors {
     });
   }
 
-  cantCalculateEquityTier(): ValidationError {
+  conditionalOrdersUnavailable(): ValidationError {
     return simpleValidationError({
-      code: 'MISSING_DATA_FOR_EQUITY_TIER',
+      code: 'CONDITIONAL_ORDERS_UNAVAILABLE',
       type: ErrorType.error,
-    });
-  }
-
-  equityTierError(
-    currentEquity: number,
-    nextTierEquity: number,
-    maxOrders: number
-  ): ValidationError {
-    return simpleValidationError({
-      code: 'OPEN_ORDERS_EXCEEDS_EQUITY_TIER_LIMIT',
-      type: ErrorType.error,
-      learnMoreUrlKey: 'equityTiersLearnMore',
-      textKey: STRING_KEYS.TRIGGERS_EQUITY_TIER_ERROR,
-      textParams: {
-        CURRENT_EQUITY: {
-          value: currentEquity,
-          format: ErrorFormat.Price,
-          decimals: 0,
-        },
-        NEXT_TIER_EQUITY: {
-          value: nextTierEquity,
-          format: ErrorFormat.Price,
-          decimals: 0,
-        },
-        MAX_ORDERS: {
-          value: `${Math.round(maxOrders)}`,
-          format: ErrorFormat.String,
-          decimals: 0,
-        },
-      },
+      titleKey: STRING_KEYS.COMING_SOON,
     });
   }
 

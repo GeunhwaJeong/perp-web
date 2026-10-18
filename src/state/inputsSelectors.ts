@@ -1,5 +1,5 @@
 import { TriggerOrderInputData } from '@/bonsai/forms/triggers/types';
-import { BonsaiCore, BonsaiForms, BonsaiHelpers, BonsaiRaw } from '@/bonsai/ontology';
+import { BonsaiForms, BonsaiHelpers } from '@/bonsai/ontology';
 
 import { ENVIRONMENT_CONFIG_MAP } from '@/constants/networks';
 
@@ -48,34 +48,11 @@ const getSubaccountConditionalOrdersForTriggers = createAppSelector(
 );
 
 const getTriggersFormInputData = createAppSelector(
-  [
-    getSubaccountConditionalOrdersForTriggers,
-    getTriggersFormMarket,
-    getTriggersFormPosition,
-    BonsaiCore.account.openOrders.data,
-    BonsaiCore.configs.equityTiers,
-    BonsaiRaw.parentSubaccountBase,
-    BonsaiRaw.parentSubaccountRelevantMarkets,
-    BonsaiRaw.selectedMarketLeverages,
-  ],
-  (
+  [getSubaccountConditionalOrdersForTriggers, getTriggersFormMarket, getTriggersFormPosition],
+  (existingTriggerOrders, market, position): TriggerOrderInputData => ({
     existingTriggerOrders,
     market,
     position,
-    allOpenOrders,
-    equityTiers,
-    rawParentSubaccountData,
-    rawRelevantMarkets,
-    selectedMarketLeverages
-  ): TriggerOrderInputData => ({
-    existingTriggerOrders,
-    market,
-    position,
-    equityTiers,
-    allOpenOrders,
-    rawParentSubaccountData,
-    rawRelevantMarkets,
-    selectedMarketLeverages: selectedMarketLeverages ?? {},
   })
 );
 

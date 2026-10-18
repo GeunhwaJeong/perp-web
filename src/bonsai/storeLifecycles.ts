@@ -8,7 +8,6 @@ import {
   setUpIndexerSolanaAddressScreenQuery,
   setUpIndexerSourceAddressScreenV2Query,
 } from './rest/compliance';
-import { setUpConfigTiersQuery } from './rest/configTiers';
 import { setUpAccountFeesQuery, setUpFeeScheduleQuery } from './rest/fees';
 import { setUpFillsQuery } from './rest/fills';
 import { setUpGeoQuery } from './rest/geo';
@@ -48,7 +47,6 @@ export const storeLifecycles = [
   setUpAccountBalancesQuery,
   setUpAccountFeesQuery,
   setUpCompositeClientAccountCacheQuery,
-  setUpConfigTiersQuery,
   setUpFeeScheduleQuery,
   setUpLocalOrdersOrdersSync,
   setUpGeoQuery,

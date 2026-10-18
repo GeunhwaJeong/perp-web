@@ -7,7 +7,6 @@ import {
 } from '@/bonsai/forms/adjustIsolatedMargin';
 import { TransferPayload, TransferToken } from '@/bonsai/forms/transfers';
 import { TriggerOrdersPayload } from '@/bonsai/forms/triggers/types';
-import { getLazyTradingKeyUtils } from '@/bonsai/lib/lazyDynamicLibs';
 import {
   isOperationFailure,
   wrapOperationFailure,
@@ -15,7 +14,6 @@ import {
 } from '@/bonsai/lib/operationResult';
 import { logBonsaiError, logBonsaiInfo } from '@/bonsai/logs';
 import { BonsaiCore } from '@/bonsai/ontology';
-import { IndexedTx } from '@cosmjs/stargate';
 import { Method } from '@cosmjs/tendermint-rpc';
 import { SubaccountClient, type LocalWallet } from '@dydxprotocol/v4-client-js';
 import Long from 'long';
@@ -27,7 +25,6 @@ import { DialogTypes } from '@/constants/dialogs';
 import { QUANTUM_MULTIPLIER } from '@/constants/numbers';
 import { DydxAddress, WalletType } from '@/constants/wallets';
 
-import { appQueryClient } from '@/state/appQueryClient';
 import { useAppDispatch, useAppSelector } from '@/state/appTypes';
 import { openDialog } from '@/state/dialogs';
 import { clearLocalOrders } from '@/state/localOrders';
@@ -38,13 +35,10 @@ import { stringifyTransactionError } from '@/lib/errors';
 import { isTruthy } from '@/lib/isTruthy';
 import { parseToPrimitives } from '@/lib/parseToPrimitives';
 import { log } from '@/lib/telemetry';
-import { sleep } from '@/lib/timeUtils';
 
 import { useAccounts } from './useAccounts';
 import { useDydxClient } from './useDydxClient';
 import { useTokenConfigs } from './useTokenConfigs';
-
-const AUTHORIZED_KEY_UPDATE_DELAY = 1700;
 
 type SubaccountContextType = ReturnType<typeof useSubaccountContext>;
 const SubaccountContext = createContext<SubaccountContextType>({} as SubaccountContextType);
@@ -604,90 +598,6 @@ const useSubaccountContext = ({ localDydxWallet }: { localDydxWallet?: LocalWall
     [subaccountClient, compositeClient, createTransferMessage]
   );
 
-  const createRandomTradingKeyWallet = useCallback(async () => {
-    return (await getLazyTradingKeyUtils()).createNewRandomDydxWallet();
-  }, []);
-
-  const authorizeTradingKeyWallet = useCallback(
-    async (tradingKeyWallet: Awaited<ReturnType<typeof createRandomTradingKeyWallet>>) => {
-      if (tradingKeyWallet == null) {
-        throw new Error('trading key wallet is invalid');
-      }
-
-      if (subaccountClient == null) {
-        throw new Error('local wallet client not initialized');
-      }
-
-      if (compositeClient == null) {
-        throw new Error('Missing compositeClient or localWallet');
-      }
-
-      const { data, type } = await (
-        await getLazyTradingKeyUtils()
-      ).getAuthorizeNewTradingKeyArguments({
-        generatedWalletPubKey: tradingKeyWallet.publicKey,
-      });
-      try {
-        const creationResult = await compositeClient.addAuthenticator(subaccountClient, type, data);
-
-        if ((creationResult as IndexedTx | undefined)?.code !== 0) {
-          throw new Error('create authenticator operation failed');
-        }
-      } catch (error) {
-        const parsed = stringifyTransactionError(error);
-        logBonsaiError(
-          'useSubaccount/authorizeTradingKeyWallet',
-          'Failed to authorize trading key wallet',
-          {
-            parsed,
-          }
-        );
-      } finally {
-        await sleep(AUTHORIZED_KEY_UPDATE_DELAY);
-        await appQueryClient.invalidateQueries({
-          exact: false,
-          queryKey: ['validator', 'permissionedKeys', 'authorizedAccounts'],
-        });
-      }
-
-      return tradingKeyWallet;
-    },
-    [compositeClient, subaccountClient]
-  );
-
-  const removeAuthorizedKey = useCallback(
-    async (idToRemove: string) => {
-      if (subaccountClient == null) {
-        throw new Error('local wallet client not initialized');
-      }
-
-      if (compositeClient == null) {
-        throw new Error('Missing compositeClient or localWallet');
-      }
-
-      try {
-        await compositeClient.removeAuthenticator(subaccountClient, idToRemove);
-      } catch (error) {
-        const parsed = stringifyTransactionError(error);
-        logBonsaiError(
-          'useSubaccount/removeAuthorizedKey',
-          'Failed to remove authorized trading key wallet',
-          {
-            parsed,
-            idToRemove,
-          }
-        );
-      } finally {
-        await sleep(AUTHORIZED_KEY_UPDATE_DELAY);
-        await appQueryClient.invalidateQueries({
-          exact: false,
-          queryKey: ['validator', 'permissionedKeys', 'authorizedAccounts'],
-        });
-      }
-    },
-    [compositeClient, subaccountClient]
-  );
-
   return {
     // Deposit/Withdraw/Faucet Methods
     deposit,
@@ -718,11 +628,6 @@ const useSubaccountContext = ({ localDydxWallet }: { localDydxWallet?: LocalWall
     getVaultAccountInfo,
     depositToMegavault,
     withdrawFromMegavault,
-
-    // Permissioned Keys
-    createRandomTradingKeyWallet,
-    authorizeTradingKeyWallet,
-    removeAuthorizedKey,
 
     updateLeverage,
     subaccountNumber,

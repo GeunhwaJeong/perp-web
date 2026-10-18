@@ -1,5 +1,4 @@
 import {
-  ClobModule,
   ComplianceReason,
   FeeTierModule,
   PricesModule,
@@ -359,28 +358,10 @@ export type PerpetualMarketFeeDiscount = NonNullable<
   ToPrimitives<FeeTierModule.QueryAllMarketFeeDiscountParamsResponse['params']>
 >;
 
-export type EquityTiers = NonNullable<
-  ToPrimitives<ClobModule.QueryEquityTierLimitConfigurationResponse['equityTierLimitConfig']>
->;
-export type ConfigTiers = {
-  equityTiers: EquityTiers | undefined;
-};
-
 export type RewardsParams = NonNullable<ToPrimitives<RewardsModule.QueryParamsResponse['params']>>;
 export type TokenPriceResponse = NonNullable<
   ToPrimitives<PricesModule.QueryMarketPriceResponse['marketPrice']>
 >;
-
-export interface EquityTierSummary {
-  requiredTotalNetCollateralUSD: number;
-  nextLevelRequiredTotalNetCollateralUSD?: number;
-  maxOrders: number;
-}
-
-export interface EquityTiersSummary {
-  shortTermOrderEquityTiers: EquityTierSummary[];
-  statefulOrderEquityTiers: EquityTierSummary[];
-}
 
 export interface PerpetualMarketFee {
   clobPairId: number;
