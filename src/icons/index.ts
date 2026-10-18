@@ -91,8 +91,6 @@ export { default as QrIcon } from './qr.svg';
 export { default as QuestionMarkIcon } from './question-mark.svg';
 export { default as RefreshIcon } from './refresh.svg';
 export { default as ResendIcon } from './resend.svg';
-export { default as RewardStarIcon } from './reward-star.svg';
-export { default as RewardStarsIcon } from './rewards-stars.svg';
 export { default as RocketIcon } from './rocket.svg';
 export { default as RoundedArrowIcon } from './rounded-arrow.svg';
 export { default as ScopeIcon } from './scope.svg';
