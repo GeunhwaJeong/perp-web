@@ -103,7 +103,6 @@ const useAccountsContext = () => {
 
   // Kept for call sites that still read the previous account model.
   const hdKey = undefined as PrivateInformation | undefined;
-  const localDydxWallet = undefined as LocalWallet | undefined;
   const localNobleWallet = undefined as LocalWallet | undefined;
   const nobleAddress = undefined as string | undefined;
   const osmosisAddress = undefined as string | undefined;
@@ -131,7 +130,6 @@ const useAccountsContext = () => {
 
     // Trading account
     hdKey,
-    localDydxWallet,
     dydxAddress,
     currentAccount,
 

@@ -1,14 +1,11 @@
 import { useCallback, useMemo } from 'react';
 
-import { SelectedGasDenom } from '@dydxprotocol/v4-client-js';
-
 import { TradeLayouts } from '@/constants/layout';
 import { STRING_KEYS } from '@/constants/localization';
 import { MenuConfig } from '@/constants/menus';
 import { isDev } from '@/constants/networks';
 import { NotificationCategoryPreferences } from '@/constants/notifications';
 
-import { useDydxClient } from '@/hooks/useDydxClient';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useStringGetter } from '@/hooks/useStringGetter';
 
@@ -92,7 +89,6 @@ export const usePreferenceMenu = (): MenuConfig<
     [stringGetter, getItem]
   );
 
-  const { setSelectedGasDenom, selectedGasDenom } = useDydxClient();
   const selectedLayout = useAppSelector(getSelectedTradeLayout);
 
   const otherSection = useMemo(
@@ -131,24 +127,6 @@ export const usePreferenceMenu = (): MenuConfig<
         ...(isDev
           ? [
               {
-                value: OtherPreference.GasToken,
-                label: 'Pay gas with USDC',
-                slotAfter: (
-                  <Switch
-                    name={OtherPreference.GasToken}
-                    checked={selectedGasDenom === SelectedGasDenom.USDC}
-                    onCheckedChange={() => null}
-                  />
-                ),
-                onSelect: () => {
-                  setSelectedGasDenom(
-                    selectedGasDenom === SelectedGasDenom.USDC
-                      ? SelectedGasDenom.NATIVE
-                      : SelectedGasDenom.USDC
-                  );
-                },
-              },
-              {
                 value: OtherPreference.ReverseLayout,
                 label: 'Reverse Layout',
                 slotAfter: (
@@ -172,15 +150,7 @@ export const usePreferenceMenu = (): MenuConfig<
           : []),
       ].filter(isTruthy),
     }),
-    [
-      stringGetter,
-      defaultToAllMarkets,
-      chatEnabled,
-      selectedGasDenom,
-      setSelectedGasDenom,
-      dispatch,
-      selectedLayout,
-    ]
+    [stringGetter, defaultToAllMarkets, chatEnabled, dispatch, selectedLayout]
   );
 
   return [notificationSection, otherSection];

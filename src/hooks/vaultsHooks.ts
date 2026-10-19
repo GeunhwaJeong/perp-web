@@ -36,15 +36,28 @@ import { appQueryClient } from '../state/appQueryClient';
 import { useAppSelector } from '../state/appTypes';
 import { useAccounts } from './useAccounts';
 import { useDebounce } from './useDebounce';
-import { useDydxClient } from './useDydxClient';
 import { useEnvConfig } from './useEnvConfig';
 import { useStringGetter } from './useStringGetter';
-import { useSubaccount } from './useSubaccount';
 
 const vaultQueryOptions = {
   staleTime: timeUnits.minute / 4,
   refetchInterval: timeUnits.minute / 3,
 };
+
+// The vault reads came from perp-api, which has no vault routes, and from the dYdX validator
+// client, which is never created here, so they all answered nothing. They answer nothing without
+// a request until the vault screens read the engine's vault.
+const getMegavaultHistoricalPnl = async (_resolution: PnlTickInterval): Promise<any> => undefined;
+const getVaultsHistoricalPnl = async (): Promise<any> => undefined;
+const getMegavaultPositions = async (): Promise<any> => undefined;
+const getVaultAccountInfo = async (): Promise<any> => undefined;
+const getAllAccountTransfersBetween = async (
+  _sourceAddress: string,
+  _sourceSubaccountNumber: string,
+  _recipientAddress: string,
+  _recipientSubaccountNumber: string
+): Promise<any> => undefined;
+const getVaultWithdrawInfo = async (_shares: number): Promise<any> => undefined;
 
 export function useForceRefreshVaultDetails() {
   return useCallback(
@@ -57,7 +70,6 @@ export function useForceRefreshVaultDetails() {
 }
 
 export const useLoadedVaultDetails = () => {
-  const { getMegavaultHistoricalPnl } = useDydxClient();
   const megavaultHistoryStartDateMs = useEnvConfig('megavaultHistoryStartDateMs');
 
   const vaultDetailsResult = useQuery({
@@ -145,7 +157,6 @@ const useDebouncedMarketsData = () => {
 };
 
 export const useLoadedVaultPositions = () => {
-  const { getVaultsHistoricalPnl, getMegavaultPositions } = useDydxClient();
   const marketsMap = useDebouncedMarketsData();
 
   const { data: subvaultHistories } = useQuery({
@@ -196,14 +207,12 @@ export function useForceRefreshVaultAccount() {
 }
 
 export const useLoadedVaultAccount = () => {
-  const { getAllAccountTransfersBetween, compositeClient } = useDydxClient();
   const { dydxAddress } = useAccounts();
-  const { getVaultAccountInfo } = useSubaccount();
 
   const accountVaultQueryResult = useQuery({
-    queryKey: ['vaultAccount', dydxAddress, compositeClient != null],
+    queryKey: ['vaultAccount', dydxAddress],
     queryFn: wrapAndLogBonsaiError(async () => {
-      if (dydxAddress == null || compositeClient == null) {
+      if (dydxAddress == null) {
         return wrapNullable(undefined);
       }
       const [account, transfers] = await Promise.all([
@@ -255,8 +264,6 @@ export const useVaultFormSlippage = () => {
   const amount = useVaultFormAmountDebounced();
   const operation = useAppSelector((state) => state.vaults.vaultForm.operation);
   const vaultBalance = useLoadedVaultAccount().data;
-  const { getVaultWithdrawInfo } = useDydxClient();
-  const { compositeClient } = useDydxClient();
 
   const slippageQueryResult = useQuery({
     queryKey: [
@@ -265,7 +272,6 @@ export const useVaultFormSlippage = () => {
       operation,
       vaultBalance?.balanceUsdc,
       vaultBalance?.balanceShares,
-      compositeClient != null,
     ],
     queryFn: wrapAndLogBonsaiError(async () => {
       if (operation === 'DEPOSIT' || amount.trim() === '') {

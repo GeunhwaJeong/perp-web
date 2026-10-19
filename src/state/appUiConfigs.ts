@@ -26,7 +26,6 @@ export enum AppColorMode {
 export enum OtherPreference {
   DisplayAllMarketsDefault = 'DisplayAllMarketsDefault',
   EnableChat = 'EnableChat',
-  GasToken = 'GasToken',
   ReverseLayout = 'ReverseLayout',
 }
 

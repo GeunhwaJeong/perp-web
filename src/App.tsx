@@ -12,7 +12,6 @@ import { AppRoute, DEFAULT_TRADE_ROUTE } from '@/constants/routes';
 import { AccountsProvider } from '@/hooks/useAccounts';
 import { AppThemeAndColorModeProvider } from '@/hooks/useAppThemeAndColorMode';
 import { DialogAreaProvider, useDialogArea } from '@/hooks/useDialogArea';
-import { DydxProvider } from '@/hooks/useDydxClient';
 import { LocaleProvider } from '@/hooks/useLocaleSeparators';
 import { NotificationsProvider } from '@/hooks/useNotifications';
 import { RestrictionProvider } from '@/hooks/useRestrictions';
@@ -294,7 +293,6 @@ const providers = [
   wrapProvider(WagmiProvider, { config, reconnectOnMount: false }),
   wrapProvider(LocaleProvider),
   wrapProvider(RestrictionProvider),
-  wrapProvider(DydxProvider),
   wrapProvider(HaneulWalletProvider),
   wrapProvider(WalletConnectionProvider),
   wrapProvider(AccountsProvider),

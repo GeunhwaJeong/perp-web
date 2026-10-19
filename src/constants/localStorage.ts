@@ -9,9 +9,6 @@ export enum LocalStorageKey {
   KeplrCompliance = 'dydx.KeplrCompliance',
   SolDerivedAddresses = 'dydx.SolDerivedAddresses',
 
-  // Gas
-  SelectedGasDenom = 'dydx.SelectedGasDenom',
-
   // Notifications
   Notifications = 'dydx.Notifications',
   NotificationsLastUpdated = 'dydx.NotificationsLastUpdated',

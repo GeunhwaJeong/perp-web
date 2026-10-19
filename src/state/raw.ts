@@ -39,7 +39,6 @@ interface NetworkState {
   indexerClientReady: boolean;
   compositeClientReady: boolean;
   compositeClientUrl: string | undefined;
-  nobleClientReady: boolean;
   errorInitializing: boolean;
 }
 
@@ -300,7 +299,6 @@ export const rawSlice = createSlice({
           compositeClientReady: false,
           compositeClientUrl: undefined,
           indexerClientReady: false,
-          nobleClientReady: false,
           errorInitializing: false,
         }),
         ...stateToMerge,

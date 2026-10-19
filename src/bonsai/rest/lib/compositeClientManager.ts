@@ -2,7 +2,6 @@ import { createStoreEffect } from '@/bonsai/lib/createStoreEffect';
 import { ResourceCacheManager } from '@/bonsai/lib/resourceCacheManager';
 import { logBonsaiError } from '@/bonsai/logs';
 import { PerpIndexerClient } from '@/haneul/perp';
-import type { StargateClient } from '@cosmjs/stargate';
 import type { CompositeClient } from '@dydxprotocol/v4-client-js';
 
 import { DydxNetwork, ENVIRONMENT_CONFIG_MAP } from '@/constants/networks';
@@ -25,12 +24,10 @@ export type CompositeClientWrapper = {
   dead?: boolean;
   // makes dead
   tearDown: () => void;
-  // only really refreshes the composite and noble clients
   refreshConnections: () => void;
 
   compositeClient: ClientState<CompositeClient>;
   indexer: ClientState<PerpIndexerClient>;
-  nobleClient: ClientState<StargateClient>;
 };
 
 function makeCompositeClient({
@@ -145,9 +142,9 @@ function makeClientManager<ClientType>(args: {
 }
 
 /**
- * The dYdX validator and Noble clients talk to chains this app does not run on, so they are
- * never created: their states stay empty and the queries built on them stay idle instead of
- * failing. Chain reads and writes go through the Haneul gRPC client (src/haneul).
+ * The dYdX validator client talks to a chain this app does not run on, so it is never created:
+ * its state stays empty and the staking queries built on it stay idle instead of failing. Chain
+ * reads and writes go through the Haneul gRPC client (src/haneul).
  */
 function idleClientState<ClientType>(): ClientState<ClientType> {
   return {
@@ -169,7 +166,6 @@ function initializeClientWrapper(
       stateToMerge: {
         compositeClientReady: false,
         indexerClientReady: false,
-        nobleClientReady: false,
       },
     })
   );
@@ -194,25 +190,21 @@ function initializeClientWrapper(
     },
   });
   const compositeClient = idleClientState<CompositeClient>();
-  const nobleClient = idleClientState<StargateClient>();
 
   const clientWrapper: CompositeClientWrapper = {
     dead: false,
     compositeClient,
     indexer: indexer.clientState,
-    nobleClient,
     tearDown: () => {
       clientWrapper.dead = true;
       indexer.tearDown();
       compositeClient.dead = true;
-      nobleClient.dead = true;
       dispatch(
         setNetworkStateRaw({
           networkId: network,
           stateToMerge: {
             compositeClientReady: false,
             indexerClientReady: false,
-            nobleClientReady: false,
           },
         })
       );
