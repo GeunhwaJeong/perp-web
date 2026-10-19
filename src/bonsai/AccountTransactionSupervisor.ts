@@ -158,6 +158,9 @@ const toOrderSpec = (
 // 0.02 HANEUL left in the wallet when sending the gas coin, enough for a few transactions.
 const GAS_RESERVE_UNITS = 20_000_000n;
 
+// The indexer recorded a deposit about two seconds after its transaction on localnet.
+const TRANSFERS_REFRESH_DELAY_MS = 3_000;
+
 const failure = (message: string, stringKey?: string) => wrapSimpleError(FN, message, stringKey);
 
 /**
@@ -226,6 +229,20 @@ export class AccountTransactionSupervisor {
   /** Drops the cached account so the next operation reads its balance and caps again. */
   private forgetWalletAccount(deployment: PerpDeployment, address: string) {
     this.accounts.delete(`${deployment.network}:${address}`);
+  }
+
+  /**
+   * The account channel carries no transfers, so the transfer history learns of a deposit or a
+   * withdrawal only by reading perp-api again: now, and once more after the indexer has had time
+   * to record the transaction.
+   */
+  private refreshTransfers() {
+    const refresh = () =>
+      appQueryClient
+        .invalidateQueries({ queryKey: ['indexer', 'account', 'transfers'] })
+        .catch(() => undefined);
+    refresh();
+    setTimeout(refresh, TRANSFERS_REFRESH_DELAY_MS);
   }
 
   private async ensurePosition(ctx: Context, marketId: string) {
@@ -896,6 +913,7 @@ export class AccountTransactionSupervisor {
       appQueryClient
         .invalidateQueries({ queryKey: ['validator', 'accountBalances'] })
         .catch(() => undefined);
+      this.refreshTransfers();
       logBonsaiInfo(FN, 'collateral deposited', {
         digest: result.digest,
         amount,
@@ -950,6 +968,7 @@ export class AccountTransactionSupervisor {
       appQueryClient
         .invalidateQueries({ queryKey: ['validator', 'accountBalances'] })
         .catch(() => undefined);
+      this.refreshTransfers();
       logBonsaiInfo(FN, 'collateral withdrawn', {
         digest: result.digest,
         amount,

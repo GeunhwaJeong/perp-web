@@ -1,3 +1,5 @@
+import { IndexerRequestError } from '@/haneul/perp';
+
 import { IndexerParentSubaccountTransferResponse } from '@/types/indexer/indexerApiGen';
 import { isParentSubaccountTransferResponse } from '@/types/indexer/indexerChecks';
 
@@ -31,11 +33,8 @@ export function setUpTransfersQuery(store: RootStore) {
             data.subaccount!
           );
         } catch (e) {
-          if (
-            e?.message != null &&
-            e?.message.indexOf('404') >= 0 &&
-            e.message.indexOf('No subaccount found with address') >= 0
-          ) {
+          // perp-api answers 404 for an address that has no trading account yet.
+          if (e instanceof IndexerRequestError && e.status === 404) {
             const res: IndexerParentSubaccountTransferResponse = { transfers: [] };
             return res;
           }
