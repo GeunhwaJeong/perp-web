@@ -5,7 +5,6 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { matchPath, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { PersistGate } from 'redux-persist/integration/react';
 import styled, { css, StyleSheetManager, WebTarget } from 'styled-components';
-import { WagmiProvider } from 'wagmi';
 
 import { AppRoute, DEFAULT_TRADE_ROUTE } from '@/constants/routes';
 
@@ -22,7 +21,6 @@ import '@/styles/constants.css';
 import '@/styles/fonts.css';
 import { GlobalStyle } from '@/styles/globalStyle';
 import { layoutMixins } from '@/styles/layoutMixins';
-import '@/styles/web3modal.css';
 
 import { GuardedMobileRoute } from '@/components/GuardedMobileRoute';
 import { LoadingSpace } from '@/components/Loading/LoadingSpinner';
@@ -33,7 +31,6 @@ import { HeaderDesktop } from '@/layout/Header/HeaderDesktop';
 import { NotificationsToastArea } from '@/layout/NotificationsToastArea';
 
 import { parseLocationHash } from '@/lib/urlUtils';
-import { config } from '@/lib/wagmi';
 
 import { BonsaiCore } from './bonsai/ontology';
 import { ComplianceBanner } from './components/ComplianceBanner';
@@ -289,8 +286,6 @@ const wrapProvider = (Component: React.ComponentType<any>, props?: any) => {
 const providers = [
   wrapProvider(StatsigProvider),
   wrapProvider(QueryClientProvider, { client: appQueryClient }),
-  // EVM read-only provider kept for the transfer dialogs until they move to native deposits.
-  wrapProvider(WagmiProvider, { config, reconnectOnMount: false }),
   wrapProvider(LocaleProvider),
   wrapProvider(RestrictionProvider),
   wrapProvider(HaneulWalletProvider),

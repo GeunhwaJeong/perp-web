@@ -1,9 +1,8 @@
 import { useContext, useMemo, useState } from 'react';
 
-import styled, { css } from 'styled-components';
+import styled from 'styled-components';
 
 import { ASSET_ICON_MAP } from '@/constants/assets';
-import { CHAIN_INFO } from '@/constants/chains';
 
 import { LoadingContext } from '@/contexts/LoadingContext';
 
@@ -26,13 +25,11 @@ export const AssetIcon = ({
   logoUrl,
   symbol,
   className,
-  chainId,
   isLoading = false,
 }: {
   logoUrl?: Nullable<string>;
   symbol?: Nullable<string>;
   className?: string;
-  chainId?: string;
   isLoading?: boolean;
 }) => {
   const [isError, setIsError] = useState(false);
@@ -40,12 +37,11 @@ export const AssetIcon = ({
 
   const placeHolderElement = useMemo(
     () => (
-      <$Container className={className} $hasChainIcon={!!chainId}>
+      <$Container className={className}>
         <Placeholder className={className} symbol={symbol ?? ''} />
-        {chainId && <$ChainIcon src={CHAIN_INFO[chainId]?.icon} alt={CHAIN_INFO[chainId]?.name} />}
       </$Container>
     ),
-    [chainId, className, symbol]
+    [className, symbol]
   );
 
   if (isLoading || isAssetIconLoading) {
@@ -57,7 +53,7 @@ export const AssetIcon = ({
   }
 
   return logoUrl ? (
-    <$Container className={className} $hasChainIcon={!!chainId}>
+    <$Container className={className}>
       <$ContainerBackground />
       <$AssetIcon
         src={logoUrl}
@@ -72,20 +68,18 @@ export const AssetIcon = ({
           }
         }}
       />
-      {chainId && <$ChainIcon src={CHAIN_INFO[chainId]?.icon} alt={CHAIN_INFO[chainId]?.name} />}
     </$Container>
   ) : isAssetSymbol(symbol) ? (
-    <$Container className={className} $hasChainIcon={!!chainId}>
+    <$Container className={className}>
       <$ContainerBackground />
       <$AssetIcon src={ASSET_ICON_MAP[symbol]} alt={symbol} />
-      {chainId && <$ChainIcon src={CHAIN_INFO[chainId]?.icon} alt={CHAIN_INFO[chainId]?.name} />}
     </$Container>
   ) : (
     placeHolderElement
   );
 };
 
-const $Container = styled.div<{ $hasChainIcon?: boolean }>`
+const $Container = styled.div`
   height: var(--asset-icon-size, 1em);
   min-height: var(--asset-icon-size, 1em);
   width: var(--asset-icon-size, 1em);
@@ -95,12 +89,7 @@ const $Container = styled.div<{ $hasChainIcon?: boolean }>`
   display: flex;
   align-items: center;
   justify-content: center;
-
-  ${({ $hasChainIcon }) =>
-    !$hasChainIcon &&
-    css`
-      overflow: hidden;
-    `}
+  overflow: hidden;
 `;
 
 const $AssetIcon = styled.img`
@@ -144,16 +133,6 @@ const $Placeholder = styled.div`
     height: 100%;
     font-size: 0.5em;
   }
-`;
-
-const $ChainIcon = styled.img`
-  position: absolute;
-  bottom: -2px;
-  right: -2px;
-  height: 50%;
-  width: 50%;
-  border-radius: 9px;
-  border: 2px solid var(--asset-icon-chain-icon-borderColor, var(--color-layer-4));
 `;
 
 const $LoadingAssetIcon = styled(LoadingAssetIcon)`

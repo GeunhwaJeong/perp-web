@@ -1,4 +1,3 @@
-import { NOBLE_BECH32_PREFIX } from '@dydxprotocol/v4-client-js';
 import { isEqual, keyBy, orderBy, pick } from 'lodash';
 import { shallowEqual } from 'react-redux';
 
@@ -9,7 +8,6 @@ import { IndexerOrderTicket } from '@/types/indexer/indexerManual';
 import { createAppSelector } from '@/state/appTypes';
 import { getCurrentMarketIdIfTradeable } from '@/state/currentMarketSelectors';
 
-import { convertBech32Address } from '@/lib/addressUtils';
 import { BIG_NUMBERS, MaybeBigNumber } from '@/lib/numbers';
 
 import { calculateBlockRewards } from '../calculators/blockRewards';
@@ -327,22 +325,6 @@ export const selectAccountOrderTickets = createAppSelector(
 export const selectAccountOrderTicketsLoading = createAppSelector(
   [selectRawOrderTicketsRest, selectRawParentSubaccount],
   mergeLoadableStatus
-);
-
-export const selectAccountNobleWalletAddress = createAppSelector(
-  [selectParentSubaccountInfo],
-  (parentSubaccountInfo) => {
-    if (parentSubaccountInfo.wallet == null) {
-      return undefined;
-    }
-
-    const nobleWalletAddress = convertBech32Address({
-      address: parentSubaccountInfo.wallet,
-      bech32Prefix: NOBLE_BECH32_PREFIX,
-    });
-
-    return nobleWalletAddress;
-  }
 );
 
 export const selectAccountTradeHistory = createAppSelector(
