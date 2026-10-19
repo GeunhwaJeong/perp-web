@@ -23,7 +23,7 @@ import { Candle, RESOLUTION_MAP } from '@/constants/candles';
 import { StringGetterFunction, SupportedLocales } from '@/constants/localization';
 import { DEFAULT_MARKETID } from '@/constants/markets';
 
-import { useDydxClient } from '@/hooks/useDydxClient';
+import { usePerpIndexerReads } from '@/hooks/usePerpIndexerReads';
 
 import { Themes } from '@/styles/themes';
 
@@ -59,7 +59,7 @@ const configurationData: DatafeedConfiguration = {
 
 export const getDydxDatafeed = (
   store: RootStore,
-  getCandlesForDatafeed: ReturnType<typeof useDydxClient>['getCandlesForDatafeed'],
+  getCandlesForDatafeed: ReturnType<typeof usePerpIndexerReads>['getCandlesForDatafeed'],
   localeSeparators: {
     group?: string;
     decimal?: string;

@@ -34,8 +34,8 @@ import {
 import { orEmptyObj } from '@/lib/typeUtils';
 
 import { useBreakpoints } from '../useBreakpoints';
-import { useDydxClient } from '../useDydxClient';
 import { useLocaleSeparators } from '../useLocaleSeparators';
+import { usePerpIndexerReads } from '../usePerpIndexerReads';
 import { useSimpleUiEnabled } from '../useSimpleUiEnabled';
 import { useStringGetter } from '../useStringGetter';
 import { useTradingViewLimitOrder } from './useTradingViewLimitOrder';
@@ -73,7 +73,7 @@ export const useTradingView = ({
   const selectedLocale = useAppSelector(getSelectedLocale);
   const selectedNetwork = useAppSelector(getSelectedNetwork);
 
-  const { getCandlesForDatafeed } = useDydxClient();
+  const { getCandlesForDatafeed } = usePerpIndexerReads();
 
   const savedTvChartConfig = useAppSelector(getTvChartConfig);
 

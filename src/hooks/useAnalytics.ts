@@ -23,7 +23,7 @@ import { identify, track } from '@/lib/analytics/analytics';
 import { useAccounts } from './useAccounts';
 import { useApiState } from './useApiState';
 import { useBreakpoints } from './useBreakpoints';
-import { useDydxClient } from './useDydxClient';
+import { usePerpIndexerReads } from './usePerpIndexerReads';
 import { useSelectedNetwork } from './useSelectedNetwork';
 import { useSimpleUiEnabled } from './useSimpleUiEnabled';
 import { useAllStatsigGateValues } from './useStatsig';
@@ -31,7 +31,7 @@ import { useAllStatsigGateValues } from './useStatsig';
 export const useAnalytics = () => {
   const latestCommit = import.meta.env.VITE_LAST_ORIGINAL_COMMIT;
   const { sourceAccount, selectedWallet, dydxAddress } = useAccounts();
-  const { indexerClient } = useDydxClient();
+  const { indexerClient } = usePerpIndexerReads();
   const statsigConfig = useAllStatsigGateValues();
   /** User properties */
 

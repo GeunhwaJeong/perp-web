@@ -10,8 +10,8 @@ import { ButtonAction, ButtonSize } from '@/constants/buttons';
 import { STRING_KEYS } from '@/constants/localization';
 
 import { useAccounts } from '@/hooks/useAccounts';
-import { useDydxClient } from '@/hooks/useDydxClient';
 import { useLocaleSeparators } from '@/hooks/useLocaleSeparators';
+import { usePerpIndexerReads } from '@/hooks/usePerpIndexerReads';
 import { useStringGetter } from '@/hooks/useStringGetter';
 import { useLoadedVaultAccountTransfers } from '@/hooks/vaultsHooks';
 
@@ -40,7 +40,7 @@ export const ExportHistoryDropdown = (props: ExportHistoryDropdownProps) => {
   const subaccountNumber = useAppSelector(getSubaccountId);
   const { dydxAddress } = useAccounts();
   const isAccountConnected = useAppSelector(getIsAccountConnected);
-  const { requestAllAccountFills, requestAllAccountTransfers } = useDydxClient();
+  const { requestAllAccountFills, requestAllAccountTransfers } = usePerpIndexerReads();
   const [checkedTrades, setCheckedTrades] = useState(true);
   const [checkedTransfers, setCheckedTransfers] = useState(true);
   const [checkedVaultTransfers, setCheckedVaultTransfers] = useState(false);
