@@ -24,14 +24,6 @@ import { useCurrentMarketHistoricalFunding } from './rest/funding';
 import { useFundingPayments } from './rest/fundingPayments';
 import { SubaccountPnlTick, useParentSubaccountHistoricalPnls } from './rest/historicalPnl';
 import {
-  StakingDelegationsResult,
-  StakingRewards,
-  UnbondingDelegation,
-  useStakingDelegations,
-  useStakingRewards,
-  useUnbondingDelegations,
-} from './rest/staking';
-import {
   getCurrentMarketAccountFills,
   selectAccountBlockRewardsLoading,
   selectAccountBlockTradingRewards,
@@ -461,9 +453,6 @@ interface BonsaiHooksShape {
   useCurrentMarketHistoricalFunding: () => Loadable<HistoricalFundingObject[]>;
   useCurrentMarketLiveTrades: () => Loadable<IndexerWsTradesUpdateObject>;
   useParentSubaccountHistoricalPnls: () => Loadable<SubaccountPnlTick[]>;
-  useStakingRewards: () => Loadable<StakingRewards>;
-  useUnbondingDelegations: () => Loadable<UnbondingDelegation[]>;
-  useStakingDelegations: () => Loadable<StakingDelegationsResult>;
   useFundingPayments: () => Loadable<IndexerFundingPaymentResponseObject[]>;
 }
 
@@ -472,9 +461,6 @@ export const BonsaiHooks: BonsaiHooksShape = {
   useCurrentMarketLiveTrades: useCurrentMarketTradesValue,
   useFundingPayments,
   useParentSubaccountHistoricalPnls,
-  useStakingRewards,
-  useUnbondingDelegations,
-  useStakingDelegations,
 };
 
 export const BonsaiForms = {

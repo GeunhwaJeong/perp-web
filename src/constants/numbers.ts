@@ -28,7 +28,6 @@ export const MIN_CCTP_TRANSFER_AMOUNT = 11;
 export const MIN_DEPOSIT_AMOUNT = 10;
 export const MAX_PRICE_IMPACT = 0.02; // 2%
 export const DEFAULT_GAS_LIMIT = 160000;
-export const COSMOS_GAS_RESERVE = 0.05;
 export const EVM_GAS_RESERVE_AMOUNT = 0.01;
 export const MIN_USDC_AMOUNT_FOR_AUTO_SWEEP = 0.05;
 

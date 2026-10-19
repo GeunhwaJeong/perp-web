@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react';
 
-import { selectCompositeClientKey, selectIndexerClientKey } from '@/bonsai/socketSelectors';
+import { selectIndexerClientKey } from '@/bonsai/socketSelectors';
 
 import { getSelectedNetwork } from '@/state/appSelectors';
 import { useAppDispatch, useAppSelector } from '@/state/appTypes';
@@ -45,14 +45,4 @@ export function useIndexerClient() {
   const indexerKey = useAppSelector(selectIndexerClientKey);
   const manager = useCompositeClientManager();
   return { indexerClient: manager?.indexer.client, key: indexerKey };
-}
-
-export function useCompositeClient() {
-  const clientKey = useAppSelector(selectCompositeClientKey);
-  const manager = useCompositeClientManager();
-
-  return {
-    compositeClient: manager?.compositeClient.client,
-    key: clientKey,
-  };
 }

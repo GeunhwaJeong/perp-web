@@ -1,10 +1,8 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-
-import { type LocalWallet, type Subaccount } from '@dydxprotocol/v4-client-js';
+import { createContext, useCallback, useContext, useEffect, useMemo } from 'react';
 
 import { OnboardingGuard, OnboardingState } from '@/constants/account';
 import { LocalStorageKey } from '@/constants/localStorage';
-import { DydxAddress, PrivateInformation } from '@/constants/wallets';
+import { DydxAddress } from '@/constants/wallets';
 
 import { setOnboardingGuard, setOnboardingState } from '@/state/account';
 import { useAppDispatch, useAppSelector } from '@/state/appTypes';
@@ -28,9 +26,7 @@ export const useAccounts = () => useContext(AccountsContext)!;
  * Account state derived from the connected Haneul wallet.
  *
  * The connected account is the trading account: there is no derived key, no secondary
- * chain wallets and no signature-based onboarding step. Fields that other screens still
- * read from the previous account model are kept in the return shape as `undefined` so
- * the write path can be swapped out separately.
+ * chain wallets and no signature-based onboarding step.
  */
 const useAccountsContext = () => {
   const dispatch = useAppDispatch();
@@ -45,8 +41,6 @@ const useAccountsContext = () => {
   } = useWalletConnection();
 
   const sourceAccount = useAppSelector(getSourceAccount);
-
-  const [dydxSubaccounts, setDydxSubaccounts] = useState<Subaccount[] | undefined>();
 
   const dydxAddress = useMemo(
     () => (connectionStatus === 'connected' ? (currentAccount?.address as DydxAddress) : undefined),
@@ -67,12 +61,6 @@ const useAccountsContext = () => {
     }
   }, [connectionStatus, dydxAddress, dispatch]);
 
-  useEffect(() => {
-    if (!dydxAddress) {
-      setDydxSubaccounts(undefined);
-    }
-  }, [dydxAddress]);
-
   // Onboarding conditions
   const [hasAcknowledgedTerms, saveHasAcknowledgedTerms] = useLocalStorage({
     key: LocalStorageKey.OnboardingHasAcknowledgedTerms,
@@ -88,37 +76,24 @@ const useAccountsContext = () => {
     );
   }, [dispatch, hasAcknowledgedTerms]);
 
+  // This guard came from the dYdX subaccount list; a connected Haneul account has no such
+  // lookup to wait for.
   useEffect(() => {
     dispatch(
       setOnboardingGuard({
         guard: OnboardingGuard.hasPreviousTransactions,
-        value: Boolean(dydxSubaccounts?.length),
+        value: false,
       })
     );
-  }, [dispatch, dydxSubaccounts]);
+  }, [dispatch]);
 
   const disconnect = useCallback(async () => {
     await selectWallet(undefined);
   }, [selectWallet]);
 
-  // Kept for call sites that still read the previous account model.
-  const hdKey = undefined as PrivateInformation | undefined;
-  const localNobleWallet = undefined as LocalWallet | undefined;
-  const nobleAddress = undefined as string | undefined;
-  const osmosisAddress = undefined as string | undefined;
-  const neutronAddress = undefined as string | undefined;
-  const setWalletFromSignature = useCallback(
-    async (_signature: string) => dydxAddress,
-    [dydxAddress]
-  );
-  const dydxAccountGraz = undefined as
-    | Record<string, { bech32Address?: string } | undefined>
-    | undefined;
-
   return {
     // Wallet connection
     sourceAccount,
-    localNobleWallet,
 
     // Wallet selection
     selectWallet,
@@ -126,24 +101,14 @@ const useAccountsContext = () => {
     selectedWalletError,
     availableWallets,
 
-    setWalletFromSignature,
-
     // Trading account
-    hdKey,
     dydxAddress,
     currentAccount,
-
-    nobleAddress,
-    osmosisAddress,
-    neutronAddress,
 
     // Onboarding state
     saveHasAcknowledgedTerms,
 
     // Disconnect wallet / accounts
     disconnect,
-
-    // cosmos account
-    dydxAccountGraz,
   };
 };

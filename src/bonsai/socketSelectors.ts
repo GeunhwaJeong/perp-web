@@ -36,30 +36,11 @@ export const selectIndexerReady = createAppSelector(
   }
 );
 
-export const selectCompositeClientReady = createAppSelector(
-  [getSelectedNetwork, (state: RootState) => state.raw.network],
-  (network, networks) => {
-    return !!networks[network]?.compositeClientReady;
-  }
-);
-
-export const selectCompositeClientUrl = createAppSelector(
-  [getSelectedNetwork, (state: RootState) => state.raw.network],
-  (network, networks) => {
-    return networks[network]?.compositeClientUrl;
-  }
-);
-
 export const selectClientInitializationError = createAppSelector(
   [getSelectedNetwork, (state: RootState) => state.raw.network],
   (network, networks) => {
     return !!networks[network]?.errorInitializing;
   }
-);
-
-export const selectCompositeClientKey = createAppSelector(
-  [getSelectedNetwork, selectCompositeClientReady, selectCompositeClientUrl],
-  (network, ready, url) => `${network}-${ready}-${url}`
 );
 
 export const selectIndexerClientKey = createAppSelector(

@@ -2,7 +2,6 @@ import { createStoreEffect } from '@/bonsai/lib/createStoreEffect';
 import { ResourceCacheManager } from '@/bonsai/lib/resourceCacheManager';
 import { logBonsaiError } from '@/bonsai/logs';
 import { PerpIndexerClient } from '@/haneul/perp';
-import type { CompositeClient } from '@dydxprotocol/v4-client-js';
 
 import { DydxNetwork, ENVIRONMENT_CONFIG_MAP } from '@/constants/networks';
 
@@ -26,7 +25,6 @@ export type CompositeClientWrapper = {
   tearDown: () => void;
   refreshConnections: () => void;
 
-  compositeClient: ClientState<CompositeClient>;
   indexer: ClientState<PerpIndexerClient>;
 };
 
@@ -141,20 +139,6 @@ function makeClientManager<ClientType>(args: {
   };
 }
 
-/**
- * The dYdX validator client talks to a chain this app does not run on, so it is never created:
- * its state stays empty and the staking queries built on it stay idle instead of failing. Chain
- * reads and writes go through the Haneul gRPC client (src/haneul).
- */
-function idleClientState<ClientType>(): ClientState<ClientType> {
-  return {
-    dead: false,
-    client: undefined,
-    currentOperationId: 0,
-    deferred: createDeferred<ClientType>(),
-  };
-}
-
 function initializeClientWrapper(
   dispatch: AppDispatch,
   network: DydxNetwork,
@@ -164,7 +148,6 @@ function initializeClientWrapper(
     setNetworkStateRaw({
       networkId: network,
       stateToMerge: {
-        compositeClientReady: false,
         indexerClientReady: false,
       },
     })
@@ -189,21 +172,16 @@ function initializeClientWrapper(
       );
     },
   });
-  const compositeClient = idleClientState<CompositeClient>();
-
   const clientWrapper: CompositeClientWrapper = {
     dead: false,
-    compositeClient,
     indexer: indexer.clientState,
     tearDown: () => {
       clientWrapper.dead = true;
       indexer.tearDown();
-      compositeClient.dead = true;
       dispatch(
         setNetworkStateRaw({
           networkId: network,
           stateToMerge: {
-            compositeClientReady: false,
             indexerClientReady: false,
           },
         })

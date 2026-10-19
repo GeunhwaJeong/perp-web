@@ -37,8 +37,6 @@ import { autoBatchAllReducers } from './autoBatchHelpers';
 
 interface NetworkState {
   indexerClientReady: boolean;
-  compositeClientReady: boolean;
-  compositeClientUrl: string | undefined;
   errorInitializing: boolean;
 }
 
@@ -296,8 +294,6 @@ export const rawSlice = createSlice({
       const { networkId, stateToMerge } = action.payload;
       state.network[networkId] = {
         ...(state.network[networkId] ?? {
-          compositeClientReady: false,
-          compositeClientUrl: undefined,
           indexerClientReady: false,
           errorInitializing: false,
         }),
