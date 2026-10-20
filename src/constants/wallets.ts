@@ -1,4 +1,3 @@
-import { type onboarding } from '@dydxprotocol/v4-client-js';
 import { type EIP6963ProviderInfo } from 'mipd';
 
 import { STRING_KEYS } from '@/constants/localization';
@@ -151,8 +150,6 @@ export const getSignTypedData = (selectedDydxChainId: DydxChainId) =>
       action: WALLETS_CONFIG_MAP[selectedDydxChainId].signTypedDataAction,
     },
   }) as const;
-
-export type PrivateInformation = ReturnType<typeof onboarding.deriveHDKeyFromEthereumSignature>;
 
 export type EvmAddress = `0x${string}`;
 export type SolAddress = `${string}`;

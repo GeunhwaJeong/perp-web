@@ -1,9 +1,6 @@
-import { VaultModule } from '@dydxprotocol/v4-client-js';
-
 import { STRING_KEYS } from '@/constants/localization';
 
 import { MustBigNumber } from '@/lib/numbers';
-import { ToPrimitives } from '@/lib/parseToPrimitives';
 
 import { ErrorType, simpleValidationError, ValidationError } from '../lib/validationErrors';
 import { VaultAccount } from './vaultAccount';
@@ -208,7 +205,13 @@ export function calculateSharesToWithdraw(
   return Math.floor(amountToUse / shareValue);
 }
 
-type OnChainSlippageResponse = ToPrimitives<VaultModule.QueryMegavaultWithdrawalInfoResponse>;
+// The megavault withdrawal info query of the dYdX vault module, with its numbers as strings.
+type OnChainSlippageResponse = {
+  sharesToWithdraw?: { numShares: string };
+  expectedQuoteQuantums: string;
+  megavaultEquity: string;
+  totalShares?: { numShares: string };
+};
 
 export function validateVaultForm(
   formData: VaultFormData,

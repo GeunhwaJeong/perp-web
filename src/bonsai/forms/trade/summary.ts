@@ -10,8 +10,12 @@ import {
 } from '@/bonsai/calculators/subaccount';
 import { ApplyTradeProps, SubaccountOperations } from '@/bonsai/types/operationTypes';
 import { MarketsData, ParentSubaccountDataBase } from '@/bonsai/types/rawTypes';
-import { PositionUniqueId } from '@/bonsai/types/summaryTypes';
-import { OrderExecution, OrderTimeInForce, OrderType } from '@dydxprotocol/v4-client-js';
+import {
+  OrderExecution,
+  OrderTimeInForce,
+  OrderType,
+  PositionUniqueId,
+} from '@/bonsai/types/summaryTypes';
 import { isEmpty, mapValues, orderBy } from 'lodash';
 import { weakMapMemoize } from 'reselect';
 

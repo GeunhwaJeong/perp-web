@@ -1,6 +1,5 @@
 import { BonsaiHelpers } from '@/bonsai/ontology';
-import { OrderStatus } from '@/bonsai/types/summaryTypes';
-import { OrderSide } from '@dydxprotocol/v4-client-js';
+import { OrderSide, OrderStatus } from '@/bonsai/types/summaryTypes';
 import { sum } from 'lodash';
 
 import { STRING_KEYS } from '@/constants/localization';

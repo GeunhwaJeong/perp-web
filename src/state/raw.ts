@@ -10,11 +10,11 @@ import {
 import {
   ComplianceResponse,
   GeoState,
+  HeightResponse,
   PerpetualMarketFeeDiscount,
 } from '@/bonsai/types/summaryTypes';
 import type { PerpAccountFees, PerpFeeSchedule } from '@/haneul/perp';
 import { Coin } from '@cosmjs/proto-signing';
-import { HeightResponse } from '@dydxprotocol/v4-client-js';
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { WritableDraft } from 'immer';
 

@@ -1,10 +1,8 @@
-import { VaultModule } from '@dydxprotocol/v4-client-js';
 import { orderBy, sumBy } from 'lodash';
 
 import { IndexerTransferBetweenResponse, IndexerTransferType } from '@/types/indexer/indexerApiGen';
 
 import { MaybeNumber, MustBigNumber } from '@/lib/numbers';
-import { ToPrimitives } from '@/lib/parseToPrimitives';
 
 export interface VaultAccount {
   balanceUsdc?: number;
@@ -43,8 +41,17 @@ function calculateShareValue(balanceUsdc?: number, balanceShares?: number): numb
   return undefined;
 }
 
+// The megavault owner shares query of the dYdX vault module, with its numbers as strings.
+type MegavaultOwnerShares = {
+  address: string;
+  shares?: { numShares: string };
+  shareUnlocks: Array<{ shares?: { numShares: string }; unlockBlockHeight: number }>;
+  equity: string;
+  withdrawableEquity: string;
+};
+
 export function calculateUserVaultInfo(
-  vaultInfo: ToPrimitives<VaultModule.QueryMegavaultOwnerSharesResponse> | undefined,
+  vaultInfo: MegavaultOwnerShares | undefined,
   vaultTransfers: IndexerTransferBetweenResponse
 ): VaultAccount {
   const presentValue = (MaybeNumber(vaultInfo?.equity) ?? 0) / 1_000_000;

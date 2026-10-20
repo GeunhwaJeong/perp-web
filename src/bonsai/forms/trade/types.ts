@@ -2,6 +2,7 @@ import { OrderbookProcessedData } from '@/bonsai/types/orderbookTypes';
 import { MarketsData, ParentSubaccountDataBase } from '@/bonsai/types/rawTypes';
 import {
   GroupedSubaccountSummary,
+  OrderSide,
   PerpetualMarketSummary,
   RewardParamsSummary,
   SubaccountOrder,
@@ -38,10 +39,7 @@ export enum TimeInForce {
   IOC = 'IOC',
 }
 
-export enum OrderSide {
-  BUY = 'BUY',
-  SELL = 'SELL',
-}
+export { OrderSide };
 
 export enum MarginMode {
   CROSS = 'CROSS',

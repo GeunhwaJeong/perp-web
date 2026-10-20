@@ -1,4 +1,4 @@
-import { OrderSide } from '@dydxprotocol/v4-client-js';
+import { OrderSide } from '@/bonsai/types/summaryTypes';
 import { ofType, unionize, UnionOf } from 'unionize';
 
 export type DepositUsdcProps = {

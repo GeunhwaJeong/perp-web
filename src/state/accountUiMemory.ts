@@ -1,4 +1,4 @@
-import { HeightResponse } from '@dydxprotocol/v4-client-js';
+import { HeightResponse } from '@/bonsai/types/summaryTypes';
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 
 import { DydxNetwork } from '@/constants/networks';

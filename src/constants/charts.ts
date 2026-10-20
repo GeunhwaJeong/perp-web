@@ -1,4 +1,4 @@
-import { OrderSide } from '@dydxprotocol/v4-client-js';
+import { OrderSide } from '@/bonsai/types/summaryTypes';
 
 import { Nullable } from '@/lib/typeUtils';
 

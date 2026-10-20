@@ -3,8 +3,7 @@ import { useMemo } from 'react';
 import { PlaceOrderPayload } from '@/bonsai/forms/triggers/types';
 import { getSimpleOrderStatus } from '@/bonsai/lib/subaccountUtils';
 import { BonsaiHelpers } from '@/bonsai/ontology';
-import { OrderStatus } from '@/bonsai/types/summaryTypes';
-import { OrderSide, OrderType } from '@dydxprotocol/v4-client-js';
+import { OrderSide, OrderStatus, OrderType } from '@/bonsai/types/summaryTypes';
 
 import { ButtonAction, ButtonSize, ButtonType } from '@/constants/buttons';
 import { STRING_KEYS } from '@/constants/localization';

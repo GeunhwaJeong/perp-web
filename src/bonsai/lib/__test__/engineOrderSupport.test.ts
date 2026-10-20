@@ -1,4 +1,4 @@
-import { OrderType } from '@dydxprotocol/v4-client-js';
+import { OrderType } from '@/bonsai/types/summaryTypes';
 import { describe, expect, it } from 'vitest';
 
 import { unsupportedOrderTypeReason } from '../engineOrderSupport';

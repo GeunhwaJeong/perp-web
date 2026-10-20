@@ -1,4 +1,4 @@
-import { OrderSide } from '@dydxprotocol/v4-client-js';
+import { OrderSide } from '@/bonsai/types/summaryTypes';
 import type { IChartingLibraryWidget } from 'public/tradingview/charting_library';
 
 import type { ChartLineShape } from '@/lib/tradingView/chartLineShape';

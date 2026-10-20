@@ -1,6 +1,5 @@
 import { getSimpleOrderStatus } from '@/bonsai/lib/subaccountUtils';
-import { OrderStatus, SubaccountOrder } from '@/bonsai/types/summaryTypes';
-import { OrderType } from '@dydxprotocol/v4-client-js';
+import { OrderStatus, OrderType, SubaccountOrder } from '@/bonsai/types/summaryTypes';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import { keyBy } from 'lodash';

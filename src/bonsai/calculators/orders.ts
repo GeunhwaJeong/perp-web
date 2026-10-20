@@ -1,4 +1,10 @@
-import { HeightResponse } from '@dydxprotocol/v4-client-js';
+import {
+  HeightResponse,
+  OrderFlags,
+  OrderStatus,
+  SubaccountOrder,
+  TWAPSubaccountOrder,
+} from '@/bonsai/types/summaryTypes';
 import { mapValues, maxBy, orderBy } from 'lodash';
 
 import { NUM_PARENT_SUBACCOUNTS } from '@/constants/account';
@@ -16,12 +22,6 @@ import { MaybeBigNumber, MustBigNumber } from '@/lib/numbers';
 
 import { mergeObjects } from '../lib/mergeObjects';
 import { OrdersData } from '../types/rawTypes';
-import {
-  OrderFlags,
-  OrderStatus,
-  SubaccountOrder,
-  TWAPSubaccountOrder,
-} from '../types/summaryTypes';
 import { getPositionUniqueId } from './helpers';
 
 export function calculateOpenOrders<T extends SubaccountOrder>(orders: T[]): T[] {

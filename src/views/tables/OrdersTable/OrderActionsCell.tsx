@@ -2,8 +2,7 @@ import { useCallback, useState } from 'react';
 
 import { accountTransactionManager } from '@/bonsai/AccountTransactionSupervisor';
 import { isOperationFailure } from '@/bonsai/lib/operationResult';
-import { OrderStatus } from '@/bonsai/types/summaryTypes';
-import { OrderFlags } from '@dydxprotocol/v4-client-js';
+import { OrderFlags, OrderStatus } from '@/bonsai/types/summaryTypes';
 import styled from 'styled-components';
 
 import { AnalyticsEvents } from '@/constants/analytics';

@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unnecessary-condition */
-import { HeightResponse } from '@dydxprotocol/v4-client-js';
+import { ApiState, ApiStatus, HeightResponse } from '@/bonsai/types/summaryTypes';
 
 import { timeUnits } from '@/constants/time';
 
@@ -9,7 +9,6 @@ import { assertNever } from '@/lib/assertNever';
 
 import { isLoadableError, isLoadableSuccess } from '../lib/loadable';
 import { logBonsaiError, logBonsaiInfo } from '../logs';
-import { ApiState, ApiStatus } from '../types/summaryTypes';
 
 enum NetworkStatus {
   UNKNOWN = 'UNKNOWN',

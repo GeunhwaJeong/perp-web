@@ -1,6 +1,5 @@
 import { useMemo } from 'react';
 
-import { TradingRewardAggregationPeriod } from '@dydxprotocol/v4-client-js';
 import { useQuery } from '@tanstack/react-query';
 
 import { EMPTY_ARR } from '@/constants/objects';
@@ -44,7 +43,7 @@ export function useHistoricalTradingRewards() {
           // eslint-disable-next-line no-await-in-loop
           const thisResult = await indexerClient.account.getHistoricalTradingRewardsAggregations(
             address,
-            TradingRewardAggregationPeriod.DAILY,
+            'DAILY',
             undefined,
             // one second before oldest current result
             mapIfPresent(allResults.at(-1), (r) =>

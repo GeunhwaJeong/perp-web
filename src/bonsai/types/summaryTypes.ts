@@ -1,11 +1,4 @@
 import {
-  ComplianceReason,
-  FeeTierModule,
-  PricesModule,
-  RewardsModule,
-} from '@dydxprotocol/v4-client-js';
-
-import {
   IndexerAPITimeInForce,
   IndexerOrderSide,
   IndexerOrderType,
@@ -18,8 +11,6 @@ import {
   IndexerWsBaseMarketObject,
   IndexerWsTradeResponseObject,
 } from '@/types/indexer/indexerManual';
-
-import { ToPrimitives } from '@/lib/parseToPrimitives';
 
 import type { SubaccountPnlTick } from '../rest/historicalPnl';
 
@@ -163,6 +154,44 @@ export enum OrderFlags {
   CONDITIONAL = '32',
   TWAP = '128',
   TWAP_SUBORDER = '256',
+}
+
+/**
+ * The order enums the forms, the tables and the engine bridge share. The values are the strings
+ * the dYdX v4 client used, which the indexer's order responses and the stored orders still carry.
+ */
+export enum OrderSide {
+  BUY = 'BUY',
+  SELL = 'SELL',
+}
+
+export enum OrderType {
+  LIMIT = 'LIMIT',
+  MARKET = 'MARKET',
+  STOP_LIMIT = 'STOP_LIMIT',
+  TAKE_PROFIT_LIMIT = 'TAKE_PROFIT',
+  STOP_MARKET = 'STOP_MARKET',
+  TAKE_PROFIT_MARKET = 'TAKE_PROFIT_MARKET',
+  TWAP = 'TWAP',
+  TWAP_SUBORDER = 'TWAP_SUBORDER',
+}
+
+export enum OrderTimeInForce {
+  GTT = 'GTT',
+  IOC = 'IOC',
+  FOK = 'FOK',
+}
+
+export enum OrderExecution {
+  DEFAULT = 'DEFAULT',
+  IOC = 'IOC',
+  FOK = 'FOK',
+  POST_ONLY = 'POST_ONLY',
+}
+
+export interface HeightResponse {
+  height: number;
+  time: string;
 }
 
 export type SubaccountOrder = {
@@ -354,14 +383,25 @@ export type StablePerpetualMarketSummary = Omit<
 
 export type StablePerpetualMarketSummaries = Record<string, StablePerpetualMarketSummary>;
 
-export type PerpetualMarketFeeDiscount = NonNullable<
-  ToPrimitives<FeeTierModule.QueryAllMarketFeeDiscountParamsResponse['params']>
->;
+export type PerpetualMarketFeeDiscount = Array<{
+  clobPairId: number;
+  startTime?: string;
+  endTime?: string;
+  chargePpm: number;
+}>;
 
-export type RewardsParams = NonNullable<ToPrimitives<RewardsModule.QueryParamsResponse['params']>>;
-export type TokenPriceResponse = NonNullable<
-  ToPrimitives<PricesModule.QueryMarketPriceResponse['marketPrice']>
->;
+export type RewardsParams = {
+  treasuryAccount: string;
+  denom: string;
+  denomExponent: number;
+  marketId: number;
+  feeMultiplierPpm: number;
+};
+export type TokenPriceResponse = {
+  id: number;
+  exponent: number;
+  price: string;
+};
 
 export interface PerpetualMarketFee {
   clobPairId: number;
@@ -396,6 +436,14 @@ export enum ComplianceStatus {
   CLOSE_ONLY = 'CLOSE_ONLY',
   BLOCKED = 'BLOCKED',
   UNKNOWN = 'UNKNOWN',
+}
+export enum ComplianceReason {
+  MANUAL = 'MANUAL',
+  US_GEO = 'US_GEO',
+  CA_GEO = 'CA_GEO',
+  GB_GEO = 'GB_GEO',
+  SANCTIONED_GEO = 'SANCTIONED_GEO',
+  COMPLIANCE_PROVIDER = 'COMPLIANCE_PROVIDER',
 }
 export interface ComplianceResponse {
   status: ComplianceStatus;

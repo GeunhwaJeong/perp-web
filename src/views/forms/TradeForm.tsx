@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 
 import { TradeFormType } from '@/bonsai/forms/trade/types';
-import { OrderSide } from '@dydxprotocol/v4-client-js';
+import { OrderSide } from '@/bonsai/types/summaryTypes';
 import styled, { css } from 'styled-components';
 
 import { ButtonAction } from '@/constants/buttons';

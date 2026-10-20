@@ -1,6 +1,10 @@
 import { BonsaiHelpers } from '@/bonsai/ontology';
-import { OrderStatus, SubaccountFill, SubaccountOrder } from '@/bonsai/types/summaryTypes';
-import { OrderSide } from '@dydxprotocol/v4-client-js';
+import {
+  OrderSide,
+  OrderStatus,
+  SubaccountFill,
+  SubaccountOrder,
+} from '@/bonsai/types/summaryTypes';
 
 import { USD_DECIMALS } from '@/constants/numbers';
 import { IndexerOrderSide } from '@/types/indexer/indexerApiGen';

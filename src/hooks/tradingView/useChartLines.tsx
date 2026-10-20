@@ -3,8 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { accountTransactionManager } from '@/bonsai/AccountTransactionSupervisor';
 import { PlaceOrderPayload } from '@/bonsai/forms/triggers/types';
 import { isOperationFailure } from '@/bonsai/lib/operationResult';
-import { SubaccountOrder } from '@/bonsai/types/summaryTypes';
-import { OrderSide } from '@dydxprotocol/v4-client-js';
+import { OrderSide, SubaccountOrder } from '@/bonsai/types/summaryTypes';
 import { shallowEqual } from 'react-redux';
 import tw from 'twin.macro';
 

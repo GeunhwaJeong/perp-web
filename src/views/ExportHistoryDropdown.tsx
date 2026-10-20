@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 
 import { BonsaiHooks } from '@/bonsai/ontology';
-import { OrderSide } from '@dydxprotocol/v4-client-js';
+import { OrderSide } from '@/bonsai/types/summaryTypes';
 import { useMutation } from '@tanstack/react-query';
 import { isEmpty } from 'lodash';
 

@@ -13,7 +13,6 @@ import {
 // eslint-disable-next-line no-restricted-imports
 import { selectAllMarketsInfo } from '@/bonsai/selectors/markets';
 import { MarketsInfo } from '@/bonsai/types/summaryTypes';
-import { MEGAVAULT_MODULE_ADDRESS, PnlTickInterval } from '@dydxprotocol/v4-client-js';
 import { useQuery } from '@tanstack/react-query';
 import { throttle } from 'lodash';
 
@@ -47,16 +46,11 @@ const vaultQueryOptions = {
 // The vault reads came from perp-api, which has no vault routes, and from the dYdX validator
 // client, which is never created here, so they all answered nothing. They answer nothing without
 // a request until the vault screens read the engine's vault.
-const getMegavaultHistoricalPnl = async (_resolution: PnlTickInterval): Promise<any> => undefined;
+const getMegavaultHistoricalPnl = async (): Promise<any> => undefined;
 const getVaultsHistoricalPnl = async (): Promise<any> => undefined;
 const getMegavaultPositions = async (): Promise<any> => undefined;
 const getVaultAccountInfo = async (): Promise<any> => undefined;
-const getAllAccountTransfersBetween = async (
-  _sourceAddress: string,
-  _sourceSubaccountNumber: string,
-  _recipientAddress: string,
-  _recipientSubaccountNumber: string
-): Promise<any> => undefined;
+const getAllAccountTransfersBetween = async (): Promise<any> => undefined;
 const getVaultWithdrawInfo = async (_shares: number): Promise<any> => undefined;
 
 export function useForceRefreshVaultDetails() {
@@ -76,8 +70,8 @@ export const useLoadedVaultDetails = () => {
     queryKey: ['vaultDetails'],
     queryFn: wrapAndLogBonsaiError(async () => {
       const [dailyResult, hourlyResult] = await Promise.all([
-        getMegavaultHistoricalPnl(PnlTickInterval.day),
-        getMegavaultHistoricalPnl(PnlTickInterval.HOUR),
+        getMegavaultHistoricalPnl(),
+        getMegavaultHistoricalPnl(),
       ]);
       return wrapNullable(
         calculateVaultSummary(
@@ -221,7 +215,7 @@ export const useLoadedVaultAccount = () => {
           // error is an expected result of this call when user has no balance
           () => undefined
         ),
-        getAllAccountTransfersBetween(dydxAddress, '0', MEGAVAULT_MODULE_ADDRESS, '0'),
+        getAllAccountTransfersBetween(),
       ]);
 
       if (transfers == null) {

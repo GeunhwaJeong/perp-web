@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { BonsaiHelpers } from '@/bonsai/ontology';
-import { OrderSide } from '@dydxprotocol/v4-client-js';
+import { OrderSide } from '@/bonsai/types/summaryTypes';
 import { curveStepAfter } from '@visx/curve';
 import { LinearGradient } from '@visx/gradient';
 import { Point } from '@visx/point';

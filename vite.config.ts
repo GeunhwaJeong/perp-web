@@ -67,7 +67,6 @@ export default defineConfig(({ mode }) => ({
             },
           ],
         ],
-        exclude: ['@dydxprotocol/v4-client-js'],
       },
     }),
 
@@ -79,7 +78,7 @@ export default defineConfig(({ mode }) => ({
     // Workaround is to use ViteRestart plugin + a generated file to trigger the restart.
     // See https://github.com/vitejs/vite/issues/8619
     ViteRestart({
-      restart: ['local-abacus-hash', 'local-client-js-hash'],
+      restart: ['local-abacus-hash'],
     }),
   ],
   publicDir: 'public',

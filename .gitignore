@@ -44,7 +44,6 @@ public/datafeed
 
 # Local Library Development
 local-abacus-hash
-local-client-js-hash
 
 # localnet fixture state (keys, published ids)
 .localnet/

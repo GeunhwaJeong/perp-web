@@ -1,17 +1,14 @@
 import {
   MarketInfo,
-  PositionUniqueId,
-  SubaccountOrder,
-  SubaccountPosition,
-} from '@/bonsai/types/summaryTypes';
-import {
-  type ITwapParameters,
   OrderExecution,
   OrderFlags,
   OrderSide,
   OrderTimeInForce,
   OrderType,
-} from '@dydxprotocol/v4-client-js';
+  PositionUniqueId,
+  SubaccountOrder,
+  SubaccountPosition,
+} from '@/bonsai/types/summaryTypes';
 
 export interface TriggerOrdersFormState {
   positionId?: PositionUniqueId;
@@ -108,6 +105,12 @@ export interface PlaceOrderPayload {
   goodTilBlock: number | undefined;
   memo: string | undefined;
   twapParameters: ITwapParameters | undefined;
+}
+
+interface ITwapParameters {
+  duration: number;
+  interval: number;
+  priceTolerance: number;
 }
 
 // have to hard code because it isn't properly exported from v4-clients

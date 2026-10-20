@@ -5,8 +5,7 @@ import {
   simpleValidationError,
   ValidationError,
 } from '@/bonsai/lib/validationErrors';
-import { OrderStatus } from '@/bonsai/types/summaryTypes';
-import { OrderType } from '@dydxprotocol/v4-client-js';
+import { OrderStatus, OrderType } from '@/bonsai/types/summaryTypes';
 import { isEmpty } from 'lodash';
 
 import { STRING_KEYS } from '@/constants/localization';

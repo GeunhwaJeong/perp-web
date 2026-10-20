@@ -1,6 +1,13 @@
 import { getPositionBaseEquity } from '@/bonsai/calculators/subaccount';
-import { MarketInfo, SubaccountOrder, SubaccountPosition } from '@/bonsai/types/summaryTypes';
-import { OrderExecution, OrderFlags, OrderSide, OrderType } from '@dydxprotocol/v4-client-js';
+import {
+  MarketInfo,
+  OrderExecution,
+  OrderFlags,
+  OrderSide,
+  OrderType,
+  SubaccountOrder,
+  SubaccountPosition,
+} from '@/bonsai/types/summaryTypes';
 import BigNumber from 'bignumber.js';
 
 import { TransactionMemo } from '@/constants/analytics';

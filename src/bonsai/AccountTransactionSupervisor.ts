@@ -1,5 +1,12 @@
 import { BonsaiCore } from '@/bonsai/ontology';
-import { OrderStatus, SubaccountOrder } from '@/bonsai/types/summaryTypes';
+import {
+  OrderExecution,
+  OrderSide,
+  OrderStatus,
+  OrderTimeInForce,
+  OrderType,
+  SubaccountOrder,
+} from '@/bonsai/types/summaryTypes';
 import { dAppKit, type HaneulNetwork } from '@/haneul/dAppKit';
 import {
   looksLikeName,
@@ -43,7 +50,6 @@ import {
 } from '@/haneul/perp';
 import { signAndExecute, simulateWithApp } from '@/haneul/perp/executor';
 import { buildCoinSend, isGasCoinType, listCoins } from '@/haneul/transfer';
-import { OrderExecution, OrderSide, OrderTimeInForce, OrderType } from '@dydxprotocol/v4-client-js';
 import type { ClientWithCoreApi } from '@haneullabs/haneul/client';
 
 import { AnalyticsEvents, TradeMetadataSource } from '@/constants/analytics';

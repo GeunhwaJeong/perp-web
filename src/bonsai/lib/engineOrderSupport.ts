@@ -1,4 +1,4 @@
-import { OrderType } from '@dydxprotocol/v4-client-js';
+import { OrderType } from '@/bonsai/types/summaryTypes';
 
 /**
  * The order types the write path can place on the perpetuals engine: limit and market orders,

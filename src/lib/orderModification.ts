@@ -1,7 +1,12 @@
 import { PlaceOrderMarketInfo, PlaceOrderPayload } from '@/bonsai/forms/triggers/types';
 import { BonsaiHelpers } from '@/bonsai/ontology';
-import { SubaccountOrder as SubaccountOrderNew } from '@/bonsai/types/summaryTypes';
-import { OrderExecution, OrderSide, OrderTimeInForce, OrderType } from '@dydxprotocol/v4-client-js';
+import {
+  OrderExecution,
+  OrderSide,
+  OrderTimeInForce,
+  OrderType,
+  SubaccountOrder as SubaccountOrderNew,
+} from '@/bonsai/types/summaryTypes';
 import { ERRORS_STRING_KEYS } from '@dydxprotocol/v4-localization';
 
 import { TransactionMemo } from '@/constants/analytics';
