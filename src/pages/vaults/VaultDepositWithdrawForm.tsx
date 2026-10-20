@@ -1,7 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 
 import { ErrorType } from '@/bonsai/lib/validationErrors';
-import { IndexedTx } from '@cosmjs/stargate';
 import BigNumber from 'bignumber.js';
 import { NumberFormatValues } from 'react-number-format';
 import styled, { css } from 'styled-components';
@@ -81,6 +80,11 @@ type VaultDepositWithdrawFormProps = {
 };
 
 const INDEXER_LAG_ALLOWANCE = timeUnits.second * 2.5;
+
+// The part of a megavault withdrawal's transaction result this form reads.
+type MegavaultWithdrawResult = {
+  events?: Array<{ type: string; attributes: Array<{ key: string; value: string }> }>;
+};
 
 const $SmallIcon = styled(Icon)<{ $hasError?: boolean }>`
   ${({ $hasError }) => ($hasError ? 'color: var(--color-error);' : 'color: var(--color-success);')}
@@ -296,7 +300,7 @@ export const VaultDepositWithdrawForm = ({
         await sleep(INDEXER_LAG_ALLOWANCE);
         const finalTime = new Date().getTime();
 
-        const events = (result as IndexedTx | undefined)?.events;
+        const events = (result as MegavaultWithdrawResult | undefined)?.events;
         const actualAmount = events
           ?.find((e) => e.type === 'withdraw_from_megavault')
           ?.attributes.find((a) => a.key === 'redeemed_quote_quantums')?.value;

@@ -1,10 +1,13 @@
-import { Coin } from '@cosmjs/proto-signing';
+import BigNumber from 'bignumber.js';
 import { keyBy } from 'lodash';
-import { formatUnits } from 'viem';
 
 import { TokenConfigsResult } from '@/hooks/useTokenConfigs';
 
-import { AccountBalances } from '../types/summaryTypes';
+import { AccountBalances, Coin } from '../types/summaryTypes';
+
+// An integer amount of base units as a plain decimal string: 1500000 with 6 decimals is "1.5".
+const fromBaseUnits = (amount: string, decimals: number) =>
+  new BigNumber(amount).shiftedBy(-decimals).toFixed();
 
 export function processCoinAmount(
   tokenConfig: TokenConfigsResult,
@@ -22,14 +25,14 @@ export function processCoinAmount(
     return undefined;
   }
 
-  return formatUnits(BigInt(amount), decimals);
+  return fromBaseUnits(amount, decimals);
 }
 
 export function convertAmount(amount: string | undefined, decimals: number): string | undefined {
   if (amount == null) {
     return undefined;
   }
-  return formatUnits(BigInt(amount), decimals);
+  return fromBaseUnits(amount, decimals);
 }
 
 export function calculateBalances(

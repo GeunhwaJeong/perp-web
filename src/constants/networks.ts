@@ -21,17 +21,7 @@ export interface EndpointsConfig {
     api: string;
     socket: string;
   }[];
-  // Everything below belongs to the dYdX/Cosmos stack and is unset on Haneul; the code that
-  // reads it is slated for removal with that stack.
-  validators?: string[];
-  skip?: string;
-  nobleValidator?: string;
-  osmosisValidator?: string;
-  neutronValidator?: string;
-  faucet?: string;
-  stakingAPR?: string;
-  solanaRpcUrl?: string;
-  affiliates?: string;
+  // Optional services the app calls when they are set; none is set on Haneul.
   geoV2?: string;
   pnlImageApi?: string;
   metadataService?: string;
@@ -39,30 +29,19 @@ export interface EndpointsConfig {
 
 export interface EnvironmentFeatures {
   checkForGeo: boolean;
-  withdrawalSafetyEnabled: boolean;
-  CCTPWithdrawalOnly: boolean;
-  CCTPDepositOnly: boolean;
-  debugCompliance: boolean;
-  isSlTpEnabled: boolean;
   isSlTpLimitOrdersEnabled: boolean;
   // Hidden during the shadow run: both pages still show dYdX data.
   isVaultEnabled: boolean;
-  isChainTokenPageEnabled: boolean;
 }
 
 export interface EnvironmentConfig {
   name: string;
-  ethereumChainId: string;
   dydxChainId: DydxChainId;
   chainName: string;
-  chainLogo: string;
   deployerName: string;
-  megavaultOperatorName: string;
-  rewardsHistoryStartDateMs: string;
   megavaultHistoryStartDateMs: string;
   isMainNet: boolean;
   endpoints: EndpointsConfig;
-  stakingValidators: string[];
   featureFlags: EnvironmentFeatures;
 }
 
@@ -73,7 +52,6 @@ export const ENVIRONMENT_CONFIG_MAP = environments.environments as Record<
 >;
 export const TOKEN_CONFIG_MAP = environments.tokens;
 export const LINKS_CONFIG_MAP = environments.links as Record<DydxChainId, LinksConfigs>;
-export const WALLETS_CONFIG_MAP = environments.wallets;
 export const DEFAULT_APP_ENVIRONMENT = AVAILABLE_ENVIRONMENTS.default as DydxNetwork;
 
 export const STATSIG_ENVIRONMENT_TIER = ({

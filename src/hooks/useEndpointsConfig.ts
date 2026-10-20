@@ -11,16 +11,6 @@ export const useEndpointsConfig = () => {
 
   return {
     indexer: endpointsConfig.indexers[0]!, // assume there's only one option for indexer endpoints
-    validators: endpointsConfig.validators,
-    skip: endpointsConfig.skip,
-    nobleValidator: endpointsConfig.nobleValidator,
-    osmosisValidator: endpointsConfig.osmosisValidator,
-    neutronValidator: endpointsConfig.neutronValidator,
-    faucet: endpointsConfig.faucet,
-    stakingAPR: endpointsConfig.stakingAPR,
-    solanaRpcUrl: endpointsConfig.solanaRpcUrl,
-    affiliatesBaseUrl: endpointsConfig.affiliates,
-    geoV2: endpointsConfig.geoV2,
     pnlImageApi: endpointsConfig.pnlImageApi,
   };
 };

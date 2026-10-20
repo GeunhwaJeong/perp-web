@@ -2,7 +2,6 @@ import { OrderSide, TradeFormType } from '@/bonsai/forms/trade/types';
 import { PlaceOrderPayload } from '@/bonsai/forms/triggers/types';
 import { ApiStatus, SubaccountFill } from '@/bonsai/types/summaryTypes';
 import { type SupportedLocale } from '@dydxprotocol/v4-localization';
-import { Route, RouteResponse, UserAddress } from '@skip-go/client';
 import { RecordOf, TagsOf, UnionOf, ofType, unionize } from 'unionize';
 
 import { type CustomFlags, type StatsigFlags } from '@/constants/statsig';
@@ -386,18 +385,6 @@ export const AnalyticsEvents = unionize(
       validatorAddress?: string;
     }>(),
 
-    // Swapping
-    SwapInitiated: ofType<{ id: string } & Route>(),
-    SwapError: ofType<
-      {
-        id: string;
-        step: 'withdraw-subaccount' | 'execute-swap';
-        error: string;
-      } & Route
-    >(),
-    SwapSubmitted: ofType<{ id: string; txHash: string; chainId: string } & Route>(),
-    SwapFinalized: ofType<{ id: string; txHash: string; chainId: string } & Route>(),
-
     // Sharing
     SharePnlShared: ofType<{
       asset: string;
@@ -484,28 +471,6 @@ export const AnalyticsEvents = unionize(
     TradingApiKeyGenerated: ofType<{}>(),
 
     // Deposit
-    DepositInitiated: ofType<
-      Pick<
-        RouteResponse,
-        | 'sourceAssetDenom'
-        | 'sourceAssetChainId'
-        | 'amountIn'
-        | 'amountOut'
-        | 'usdAmountOut'
-        | 'estimatedAmountOut'
-        | 'swapPriceImpactPercent'
-        | 'estimatedRouteDurationSeconds'
-      > & {
-        isInstantDeposit: boolean;
-      }
-    >(),
-    DepositSubmitted: ofType<
-      Omit<Deposit, 'token'> & {
-        tokenInChainId: string;
-        tokenInDenom: string;
-        userAddresses: UserAddress[];
-      }
-    >(),
     DepositFinalized: ofType<
       Omit<Deposit, 'token'> & { tokenInChainId: string; tokenInDenom: string }
     >(),
@@ -514,20 +479,6 @@ export const AnalyticsEvents = unionize(
     TurnkeyDepositInitiated: ofType<{}>(),
 
     // Withdraw
-    WithdrawInitiated:
-      ofType<
-        Pick<
-          RouteResponse,
-          | 'sourceAssetDenom'
-          | 'sourceAssetChainId'
-          | 'amountIn'
-          | 'amountOut'
-          | 'usdAmountOut'
-          | 'estimatedAmountOut'
-          | 'swapPriceImpactPercent'
-          | 'estimatedRouteDurationSeconds'
-        >
-      >(),
     WithdrawSubmitted: ofType<Withdraw>(),
     WithdrawFinalized: ofType<Withdraw>(),
     WithdrawError: ofType<{ error: string }>(),

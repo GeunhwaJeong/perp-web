@@ -416,6 +416,8 @@ export interface AllPerpetualMarketsFeeDiscounts {
   [clobPairId: string]: PerpetualMarketFee;
 }
 
+export type Coin = { denom: string; amount: string };
+
 export type AccountBalances = {
   usdcAmount?: string;
   chainTokenAmount?: string;

@@ -96,13 +96,6 @@ export default defineConfig(({ mode }) => ({
   build: {
     rollupOptions: {
       input: entryPoints,
-      output: {
-        // vm-browserify, the `vm` that asn1.js takes from the Node crypto polyfills, calls eval
-        // directly, and a direct eval stops the minifier from shortening any top-level name of
-        // the chunk holding it. In a chunk of its own that costs its own 2 KB, not the app's.
-        manualChunks: (id) =>
-          id.includes('/node_modules/vm-browserify/') ? 'vm-browserify' : undefined,
-      },
     },
   },
 }));

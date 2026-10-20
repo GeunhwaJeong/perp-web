@@ -1,5 +1,4 @@
 import BigNumber from 'bignumber.js';
-import Long from 'long';
 
 import { bytesToBigInt } from './numbers';
 
@@ -47,10 +46,6 @@ export const stringifyTransactionError = (error: any): string => {
 const replaceFnThatHandlesBigInt = (key: string, x: any) => {
   if (x == null) {
     return x;
-  }
-
-  if (Long.isLong(x) || x instanceof Long) {
-    return x.toString();
   }
 
   if (x instanceof BigNumber) {

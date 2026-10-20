@@ -8,13 +8,13 @@ import {
   ParentSubaccountData,
 } from '@/bonsai/types/rawTypes';
 import {
+  Coin,
   ComplianceResponse,
   GeoState,
   HeightResponse,
   PerpetualMarketFeeDiscount,
 } from '@/bonsai/types/summaryTypes';
 import type { PerpAccountFees, PerpFeeSchedule } from '@/haneul/perp';
-import { Coin } from '@cosmjs/proto-signing';
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { WritableDraft } from 'immer';
 
