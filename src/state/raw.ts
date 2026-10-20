@@ -68,8 +68,6 @@ export type ComplianceState = {
   geoHeaders: Loadable<GeoHeaders | undefined>;
   geo: Loadable<GeoState | undefined>;
   sourceAddressScreenV2: Loadable<ComplianceResponse & ComplianceErrors>;
-  localAddressScreenV2: Loadable<ComplianceResponse & ComplianceErrors>;
-  solanaAddressScreen: Loadable<ComplianceResponse & ComplianceErrors>;
 };
 
 export interface RawDataState {
@@ -85,7 +83,6 @@ export interface RawDataState {
   };
   account: {
     balances: Loadable<Coin[]>;
-    nobleUsdcBalance: Loadable<Coin>;
     fees: Loadable<PerpAccountFees | undefined>;
     parentSubaccount: Loadable<ParentSubaccountData>;
     fills: Loadable<IndexerCompositeFillResponse>;
@@ -119,7 +116,6 @@ const initialState: RawDataState = {
   account: {
     parentSubaccount: loadableIdle(),
     balances: loadableIdle(),
-    nobleUsdcBalance: loadableIdle(),
     fees: loadableIdle(),
     fills: loadableIdle(),
     orders: loadableIdle(),
@@ -137,9 +133,7 @@ const initialState: RawDataState = {
   compliance: {
     geoHeaders: loadableIdle(),
     geo: loadableIdle(),
-    localAddressScreenV2: loadableIdle(),
     sourceAddressScreenV2: loadableIdle(),
-    solanaAddressScreen: loadableIdle(),
   },
 };
 
@@ -166,9 +160,6 @@ export const rawSlice = createSlice({
       },
       setAccountBalancesRaw: (state, action: PayloadAction<Loadable<Coin[]>>) => {
         state.account.balances = action.payload;
-      },
-      setAccountNobleUsdcBalanceRaw: (state, action: PayloadAction<Loadable<Coin>>) => {
-        state.account.nobleUsdcBalance = action.payload;
       },
       setAccountFeesRaw: (state, action: PayloadAction<Loadable<PerpAccountFees | undefined>>) => {
         state.account.fees = action.payload;
@@ -243,23 +234,11 @@ export const rawSlice = createSlice({
           };
         }
       },
-      setLocalAddressScreenV2Raw: (
-        state,
-        action: PayloadAction<Loadable<ComplianceResponse & ComplianceErrors>>
-      ) => {
-        state.compliance.localAddressScreenV2 = action.payload;
-      },
       setSourceAddressScreenV2Raw: (
         state,
         action: PayloadAction<Loadable<ComplianceResponse & ComplianceErrors>>
       ) => {
         state.compliance.sourceAddressScreenV2 = action.payload;
-      },
-      setSolanaAddressScreenRaw: (
-        state,
-        action: PayloadAction<Loadable<ComplianceResponse & ComplianceErrors>>
-      ) => {
-        state.compliance.solanaAddressScreen = action.payload;
       },
       setSelectedMarketLeverage: (
         state,
@@ -343,7 +322,6 @@ export const {
   setAccountFeesRaw,
   setAccountFillsRaw,
   setAccountTradesRaw,
-  setAccountNobleUsdcBalanceRaw,
   setAccountOrdersRaw,
   setAccountOrderTicketsRaw,
   setAccountTransfersRaw,
@@ -355,9 +333,7 @@ export const {
   setFeeScheduleRaw,
   setComplianceGeoRaw,
   setComplianceGeoHeadersRaw,
-  setLocalAddressScreenV2Raw,
   setSourceAddressScreenV2Raw,
-  setSolanaAddressScreenRaw,
   setSelectedMarketLeverage,
   setSelectedMarketLeverages,
 } = rawSlice.actions;

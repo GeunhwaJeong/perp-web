@@ -102,7 +102,6 @@ export { default as ShieldStrokeIcon } from './shield-stroke.svg';
 export { default as ShieldIcon } from './shield.svg';
 export { default as ShowIcon } from './show.svg';
 export { default as SocialXIcon } from './social-x.svg';
-export { default as SolanaSimpleIcon } from './solana-simple.svg';
 export { default as SparklesIcon } from './sparkles.svg';
 export { default as SpeechBubbleIcon } from './speech-bubble.svg';
 export { default as StarIcon } from './star.svg';

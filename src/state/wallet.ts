@@ -15,7 +15,6 @@ export interface WalletState {
   sourceAccount: SourceAccount;
   localWallet?: {
     address?: string;
-    solanaAddress?: string;
     subaccountNumber?: number;
   };
 }
@@ -69,9 +68,7 @@ export const walletSlice = createSlice({
     },
     setLocalWallet: (
       state,
-      {
-        payload,
-      }: PayloadAction<{ address?: string; solanaAddress?: string; subaccountNumber?: number }>
+      { payload }: PayloadAction<{ address?: string; subaccountNumber?: number }>
     ) => {
       state.localWallet = payload;
     },
@@ -86,24 +83,6 @@ export const walletSlice = createSlice({
   },
 });
 
-export interface WalletEphemeralState {
-  hdKeyNonce?: number;
-}
-
-const initialEphemeralState: WalletEphemeralState = {
-  hdKeyNonce: undefined,
-};
-
-export const walletEphemeralSlice = createSlice({
-  name: 'walletEphemeral',
-  initialState: initialEphemeralState,
-  reducers: {
-    setHdKeyNonce: (state, action: PayloadAction<number | undefined>) => {
-      state.hdKeyNonce = action.payload;
-    },
-  },
-});
-
 export const {
   setSourceAddress,
   setWalletInfo,
@@ -112,5 +91,3 @@ export const {
   clearSourceAccount,
   setLocalWallet,
 } = walletSlice.actions;
-
-export const { setHdKeyNonce } = walletEphemeralSlice.actions;

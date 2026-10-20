@@ -5,9 +5,7 @@ import { Compliance, ComplianceStatus } from '../types/summaryTypes';
 export function calculateCompliance({
   geoHeaders,
   geo: geoBase,
-  localAddressScreenV2,
   sourceAddressScreenV2,
-  solanaAddressScreen,
 }: ComplianceState): Compliance {
   const geo = {
     isPerpetualsGeoBlocked: geoBase.data?.whitelisted
@@ -24,25 +22,9 @@ export function calculateCompliance({
     };
   }
 
-  if (solanaAddressScreen.data?.status === ComplianceStatus.BLOCKED) {
-    return {
-      geo,
-      status: ComplianceStatus.BLOCKED,
-      updatedAt: solanaAddressScreen.data.updatedAt,
-    };
-  }
-
-  if (localAddressScreenV2.data?.errors != null) {
-    return {
-      geo,
-      status: ComplianceStatus.UNKNOWN,
-    };
-  }
-
+  // Only a blocked connected address changes access; UNKNOWN reads as full access.
   return {
     geo,
-    ...(localAddressScreenV2.data ?? {
-      status: ComplianceStatus.UNKNOWN,
-    }),
+    status: ComplianceStatus.UNKNOWN,
   };
 }

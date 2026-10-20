@@ -69,7 +69,7 @@ import {
   selectAssetInfo,
   selectAssetLogo,
 } from './selectors/assets';
-import { selectAccountBalances, selectAccountNobleUsdcBalance } from './selectors/balances';
+import { selectAccountBalances } from './selectors/balances';
 import {
   selectRawAccountFeesData,
   selectRawFeeScheduleData,
@@ -190,9 +190,6 @@ interface BonsaiCoreShape {
     balances: {
       data: BasicSelector<AccountBalances>;
     };
-    nobleUsdcBalance: {
-      data: BasicSelector<string | undefined>;
-    };
   };
   markets: {
     currentMarketId: BasicSelector<string | undefined>;
@@ -284,9 +281,6 @@ export const BonsaiCore: BonsaiCoreShape = {
     },
     balances: {
       data: selectAccountBalances,
-    },
-    nobleUsdcBalance: {
-      data: selectAccountNobleUsdcBalance,
     },
   },
   markets: {

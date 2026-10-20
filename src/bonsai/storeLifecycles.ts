@@ -1,11 +1,7 @@
 import { setUpLocalOrdersOrdersSync } from './lifecycles/localOrders';
 import { setUpAssetsQuery } from './rest/assets';
 import { setUpBlockTradingRewardsQuery } from './rest/blockTradingRewards';
-import {
-  setUpIndexerLocalAddressScreenV2Query,
-  setUpIndexerSolanaAddressScreenQuery,
-  setUpIndexerSourceAddressScreenV2Query,
-} from './rest/compliance';
+import { setUpIndexerSourceAddressScreenV2Query } from './rest/compliance';
 import { setUpAccountFeesQuery, setUpFeeScheduleQuery } from './rest/fees';
 import { setUpFillsQuery } from './rest/fills';
 import { setUpGeoQuery } from './rest/geo';
@@ -44,6 +40,4 @@ export const storeLifecycles = [
   setUpLocalOrdersOrdersSync,
   setUpGeoQuery,
   setUpIndexerSourceAddressScreenV2Query,
-  setUpIndexerLocalAddressScreenV2Query,
-  setUpIndexerSolanaAddressScreenQuery,
 ] as const;

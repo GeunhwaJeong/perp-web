@@ -31,7 +31,7 @@ import { tradingViewSlice } from './tradingView';
 import { transfersSlice } from './transfers';
 import { triggersFormSlice } from './triggersForm';
 import { vaultsSlice } from './vaults';
-import { walletEphemeralSlice, walletSlice } from './wallet';
+import { walletSlice } from './wallet';
 
 const reducers = {
   account: accountSlice.reducer,
@@ -52,7 +52,6 @@ const reducers = {
   transfers: transfersSlice.reducer,
   vaults: vaultsSlice.reducer,
   wallet: walletSlice.reducer,
-  walletEphemeral: walletEphemeralSlice.reducer,
   raw: rawSlice.reducer,
 } as const;
 

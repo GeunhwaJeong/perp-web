@@ -66,15 +66,9 @@ export const selectRawFeeScheduleData = (state: RootState) => state.raw.feeSched
 export const selectRawAccountFeesData = (state: RootState) => state.raw.account.fees.data;
 
 export const selectRawAccountBalancesData = (state: RootState) => state.raw.account.balances.data;
-export const selectRawAccountNobleUsdcBalanceData = (state: RootState) =>
-  state.raw.account.nobleUsdcBalance.data;
 
-export const selectRawLocalAddressScreenV2 = (state: RootState) =>
-  state.raw.compliance.localAddressScreenV2;
 export const selectRawSourceAddressScreenV2 = (state: RootState) =>
   state.raw.compliance.sourceAddressScreenV2;
-export const selectRawSolanaAddressScreen = (state: RootState) =>
-  state.raw.compliance.solanaAddressScreen;
 export const selectRawGeo = (state: RootState) => state.raw.compliance.geo;
 export const selectRawGeoHeaders = (state: RootState) => state.raw.compliance.geoHeaders;
 

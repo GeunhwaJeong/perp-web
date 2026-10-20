@@ -77,7 +77,6 @@ export const AnalyticsUserProperties = unionize(
 
     // Account
     DydxAddress: ofType<DydxAddress | null>(),
-    SolanaAddress: ofType<string | null>(),
     SubaccountNumber: ofType<number | null>(),
 
     // Affiliate
@@ -107,7 +106,6 @@ export const AnalyticsUserPropertyLoggableTypes = {
   WalletAddress: 'walletAddress',
   IsRememberMe: 'isRememberMe',
   DydxAddress: 'dydxAddress',
-  SolanaAddress: 'solanaAddress',
   SubaccountNumber: 'subaccountNumber',
   AffiliateAddress: 'affiliateAddress',
   BonsaiValidatorUrl: 'bonsaiValidator',

@@ -116,7 +116,6 @@ import {
   SocialLoginIcon,
   SocialXIcon,
   SolIcon,
-  SolanaSimpleIcon,
   SparklesIcon,
   SpeechBubbleIcon,
   StarIcon,
@@ -307,7 +306,6 @@ export enum IconName {
   XCircle = 'XCircle',
   SocialX = 'SocialX',
   Sol = 'Sol',
-  SolanaSimple = 'SolanaSimple',
   User2 = 'User2',
   UserShield = 'UserShield',
 }
@@ -461,7 +459,6 @@ const icons = {
   [IconName.XCircle]: XCircleIcon,
   [IconName.SocialX]: SocialXIcon,
   [IconName.Sol]: SolIcon,
-  [IconName.SolanaSimple]: SolanaSimpleIcon,
   [IconName.User2]: User2Icon,
   [IconName.UserShield]: UserShieldIcon,
 } as Record<IconName, ElementType | undefined>;
