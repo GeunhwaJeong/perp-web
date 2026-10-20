@@ -3,7 +3,7 @@ import { useState } from 'react';
 import styled from 'styled-components';
 
 import { AppRoute } from '@/constants/routes';
-import { ConnectorType, type WalletInfo } from '@/constants/wallets';
+import { type WalletInfo } from '@/constants/wallets';
 
 import { ChevronRightIcon, PasskeyIcon, WalletGlyphIcon } from '../icons';
 import {
@@ -24,8 +24,7 @@ import { colors, spacing, type } from '../tokens';
 /** Wallets shown before the "Other wallets" row folds the rest away. */
 const VISIBLE_WALLETS = 3;
 
-const walletKey = (wallet: WalletInfo) =>
-  wallet.connectorType === ConnectorType.WalletStandard ? wallet.walletId : wallet.name;
+const walletKey = (wallet: WalletInfo) => wallet.walletId;
 
 const WalletRow = ({
   wallet,
@@ -36,11 +35,7 @@ const WalletRow = ({
   onSelect: () => void;
   disabled?: boolean;
 }) => {
-  const icon =
-    wallet.connectorType === ConnectorType.WalletStandard ||
-    wallet.connectorType === ConnectorType.Injected
-      ? wallet.icon
-      : undefined;
+  const { icon } = wallet;
   return (
     <OptionRow type="button" onClick={onSelect} disabled={disabled}>
       <OptionIcon $tint={!icon}>

@@ -2,7 +2,6 @@ import { BonsaiCore } from '@/bonsai/ontology';
 import { VaultFormAccountData } from '@/bonsai/public-calculators/vaultFormValidation';
 
 import { OnboardingState, OnboardingSteps } from '@/constants/account';
-import { ConnectorType } from '@/constants/wallets';
 
 import {
   getDisplayChooseWallet,
@@ -16,7 +15,6 @@ import { isNewOrderStatusOpen } from '@/lib/orders';
 
 import { getSubaccountId } from './accountInfoSelectors';
 import { getCurrentMarketId } from './currentMarketSelectors';
-import { getSourceAccount } from './walletSelectors';
 
 export const calculateOnboardingStep = createAppSelector(
   [getOnboardingState, getDisplayChooseWallet],
@@ -44,11 +42,9 @@ export const calculateCanViewAccount = createAppSelector(
  * @description calculate whether the client is in view only mode
  */
 export const calculateIsAccountViewOnly = createAppSelector(
-  [getOnboardingState, calculateCanViewAccount, getSourceAccount],
-  (onboardingState: OnboardingState, canViewAccountInfo: boolean, sourceAccount) =>
-    sourceAccount.walletInfo?.connectorType === ConnectorType.Test
-      ? true
-      : onboardingState !== OnboardingState.AccountConnected && canViewAccountInfo
+  [getOnboardingState, calculateCanViewAccount],
+  (onboardingState: OnboardingState, canViewAccountInfo: boolean) =>
+    onboardingState !== OnboardingState.AccountConnected && canViewAccountInfo
 );
 
 /**

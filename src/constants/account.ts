@@ -1,6 +1,3 @@
-import type { DydxAddress, EvmAddress } from './wallets';
-import { SolAddress } from './wallets';
-
 export enum OnboardingSteps {
   SignIn = 'SignIn',
   ChooseWallet = 'ChooseWallet',
@@ -28,37 +25,6 @@ export enum OnboardingGuard {
   hasAcknowledgedTerms = 'hasAcknowledgedTerms',
   hasPreviousTransactions = 'hasPreviousTransactions',
 }
-
-export enum EvmDerivedAccountStatus {
-  NotDerived,
-  Deriving,
-  EnsuringDeterminism,
-  Derived,
-}
-
-export type EvmDerivedAddresses = {
-  version?: string;
-  [EvmAddress: EvmAddress]: {
-    encryptedSignature?: string;
-    dydxAddress?: DydxAddress;
-  };
-};
-
-export type SolDerivedAddresses = {
-  version?: string;
-} & Record<
-  SolAddress,
-  {
-    encryptedSignature?: string;
-    dydxAddress?: DydxAddress;
-  }
->;
-
-export type Hdkey = {
-  mnemonic: string;
-  privateKey: Uint8Array | null;
-  publicKey: Uint8Array | null;
-};
 
 export const AMOUNT_RESERVED_FOR_GAS_USDC = 1.25;
 export const AMOUNT_USDC_BEFORE_REBALANCE = 1.0;

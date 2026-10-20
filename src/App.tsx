@@ -36,7 +36,6 @@ import { BonsaiCore } from './bonsai/ontology';
 import { ComplianceBanner } from './components/ComplianceBanner';
 import { RestrictionWarning } from './components/RestrictionWarning';
 import { DialogTypes } from './constants/dialogs';
-import { LocalStorageKey } from './constants/localStorage';
 import { CustomFlags, StatsigFlags } from './constants/statsig';
 import { HaneulWalletProvider } from './haneul/HaneulWalletProvider';
 import { useAnalytics } from './hooks/useAnalytics';
@@ -44,7 +43,6 @@ import { useBreakpoints } from './hooks/useBreakpoints';
 import { useCommandMenu } from './hooks/useCommandMenu';
 import { useComplianceState } from './hooks/useComplianceState';
 import { useInitializePage } from './hooks/useInitializePage';
-import { useLocalStorage } from './hooks/useLocalStorage';
 import { useMobileWebEnabled } from './hooks/useMobileWebEnabled';
 import { useShouldShowFooter } from './hooks/useShouldShowFooter';
 import { useSimpleUiEnabled } from './hooks/useSimpleUiEnabled';
@@ -55,8 +53,6 @@ import { setOnboardedThisSession } from './state/account';
 import { setCurrentPath } from './state/app';
 import { appQueryClient } from './state/appQueryClient';
 import { useAppDispatch, useAppSelector } from './state/appTypes';
-import { AppTheme, setAppThemeSetting } from './state/appUiConfigs';
-import { getAppThemeSetting } from './state/appUiConfigsSelectors';
 import { openDialog } from './state/dialogs';
 import { getIsUserMenuOpen } from './state/dialogsSelectors';
 import breakpoints from './styles/breakpoints';
@@ -82,7 +78,6 @@ const Content = () => {
   useInitializePage();
   useAnalytics();
   useCommandMenu();
-  useUiRefreshMigrations();
   useOpenDepositIfRelevant();
 
   const { isTablet, isNotTablet } = useBreakpoints();
@@ -242,23 +237,6 @@ const Content = () => {
     </>
   );
 };
-
-function useUiRefreshMigrations() {
-  const themeSetting = useAppSelector(getAppThemeSetting);
-  const dispatch = useAppDispatch();
-  const [seenUiRefresh, setSeenUiRefresh] = useLocalStorage({
-    key: LocalStorageKey.HasSeenUiRefresh,
-    defaultValue: false,
-  });
-  useEffect(() => {
-    if (!seenUiRefresh) {
-      setSeenUiRefresh(true);
-      if (themeSetting === AppTheme.Classic) {
-        dispatch(setAppThemeSetting(AppTheme.Dark));
-      }
-    }
-  }, [themeSetting, seenUiRefresh, dispatch, setSeenUiRefresh]);
-}
 
 function useOpenDepositIfRelevant() {
   const hasOnboarded = useAppSelector((state) => state.account.onboardedThisSession);

@@ -8,7 +8,7 @@ import {
   lastSuccessfulWebsocketRequestByOrigin,
 } from '@/constants/analytics';
 import { DialogTypesTypes } from '@/constants/dialogs';
-import { ConnectorType, WalletInfo } from '@/constants/wallets';
+import { WalletInfo } from '@/constants/wallets';
 
 import { calculateOnboardingStep } from '@/state/accountCalculators';
 import { getSubaccountId } from '@/state/accountInfoSelectors';
@@ -104,12 +104,8 @@ export const useAnalytics = () => {
   const [analyticsUserId, setAnalyticsUserId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (sourceAccount.walletInfo?.connectorType === ConnectorType.Test) {
-      setAnalyticsUserId(null);
-    }
-
     setAnalyticsUserId(sourceAccount.address ?? null);
-  }, [sourceAccount.address, sourceAccount.walletInfo]);
+  }, [sourceAccount.address]);
 
   useEffect(() => {
     identify(AnalyticsUserProperties.UserId(analyticsUserId));
@@ -136,14 +132,6 @@ export const useAnalytics = () => {
   useEffect(() => {
     identify(AnalyticsUserProperties.DydxAddress(dydxAddress ?? null));
   }, [dydxAddress]);
-
-  useEffect(() => {
-    identify(
-      AnalyticsUserProperties.IsRememberMe(
-        dydxAddress ? Boolean(sourceAccount.encryptedSignature) : null
-      )
-    );
-  }, [dydxAddress, sourceAccount.encryptedSignature]);
 
   // AnalyticsUserProperty.SubaccountNumber
   const subaccountNumber = useAppSelector(getSubaccountId);

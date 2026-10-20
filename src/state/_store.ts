@@ -21,7 +21,6 @@ import { layoutSlice } from './layout';
 import { localOrdersSlice } from './localOrders';
 import { localizationSlice } from './localization';
 import localizationMiddleware from './localizationMiddleware';
-import { customCreateMigrate } from './migrations';
 import { notificationsSlice } from './notifications';
 import { perpetualsSlice } from './perpetuals';
 import { rawSlice } from './raw';
@@ -59,6 +58,7 @@ const rootReducer = combineReducers(reducers);
 
 const persistConfig = {
   key: 'root',
+  // Every stored state is at 6. A change to a persisted slice's shape adds a migration for 7.
   version: 6,
   storage,
   whitelist: [
@@ -70,7 +70,6 @@ const persistConfig = {
     'accountUiMemory',
   ],
   stateReconciler: autoMergeLevel2,
-  migrate: customCreateMigrate({ debug: process.env.NODE_ENV !== 'production' }),
 };
 
 const persistedReducer = persistReducer<ReturnType<typeof rootReducer>>(persistConfig, rootReducer);

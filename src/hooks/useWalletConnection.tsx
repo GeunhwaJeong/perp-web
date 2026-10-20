@@ -26,12 +26,12 @@ export const WalletConnectionProvider = ({ ...props }) => (
 
 export const useWalletConnection = () => useContext(WalletConnectionContext)!;
 
-type WalletStandardInfo = Extract<WalletInfo, { connectorType: ConnectorType.WalletStandard }>;
-
-const isWalletStandardInfo = (info: WalletInfo | undefined): info is WalletStandardInfo =>
+// A browser can still hold a wallet saved by the dYdX connectors (injected, Cosmos, Solana). It
+// fails this check, so it is never reconnected and the next connection replaces it.
+const isWalletStandardInfo = (info: WalletInfo | undefined): info is WalletInfo =>
   info?.connectorType === ConnectorType.WalletStandard;
 
-export const walletInfoFromUiWallet = (wallet: UiWallet): WalletStandardInfo => ({
+export const walletInfoFromUiWallet = (wallet: UiWallet): WalletInfo => ({
   connectorType: ConnectorType.WalletStandard,
   walletId: getWalletUniqueIdentifier(wallet),
   name: wallet.name,

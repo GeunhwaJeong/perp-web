@@ -7,7 +7,7 @@ import { RecordOf, TagsOf, UnionOf, ofType, unionize } from 'unionize';
 
 import { type CustomFlags, type StatsigFlags } from '@/constants/statsig';
 import { type DisplayUnit, type QuickLimitOption } from '@/constants/trade';
-import { type ConnectorType, type DydxAddress, type WalletType } from '@/constants/wallets';
+import { type ConnectorType, type DydxAddress } from '@/constants/wallets';
 
 import type { Deposit, Withdraw } from '@/state/transfers';
 
@@ -70,10 +70,9 @@ export const AnalyticsUserProperties = unionize(
     Network: ofType<DydxNetwork>(),
 
     // Wallet
-    WalletType: ofType<WalletType | string | null>(),
+    WalletType: ofType<string | null>(),
     WalletConnectorType: ofType<ConnectorType | null>(),
     WalletAddress: ofType<string | null>(),
-    IsRememberMe: ofType<boolean | null>(),
 
     // Account
     DydxAddress: ofType<DydxAddress | null>(),
@@ -104,7 +103,6 @@ export const AnalyticsUserPropertyLoggableTypes = {
   WalletType: 'walletType',
   WalletConnectorType: 'walletConnectorType',
   WalletAddress: 'walletAddress',
-  IsRememberMe: 'isRememberMe',
   DydxAddress: 'dydxAddress',
   SubaccountNumber: 'subaccountNumber',
   AffiliateAddress: 'affiliateAddress',
@@ -176,7 +174,7 @@ export const AnalyticsEvents = unionize(
 
     // Wallet
     ConnectWallet: ofType<{
-      walletType: WalletType | string;
+      walletType: string;
       walletConnectorType: ConnectorType;
     }>(),
     DisconnectWallet: ofType<{}>(),
