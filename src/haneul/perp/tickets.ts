@@ -35,7 +35,10 @@ export type StopLossTakeProfitDetails = {
   clearingHouse: string;
   expireTimestampMs?: bigint;
   isLimitOrder: boolean;
-  /** 0: index price, 1: mark price (see `stop_orders::assert_stop_order_trigger_price_type`). */
+  /**
+   * 0: index price, 1: book price (the index when the book is empty), 2: mark price (see
+   * `stop_orders::derive_stop_order_trigger_price`).
+   */
   triggerPriceType: number;
   stopLossPrice?: bigint;
   takeProfitPrice?: bigint;
