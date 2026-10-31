@@ -17,6 +17,8 @@
  *   node scripts/haneul-localnet/fixture.mjs seed    (re)post the maker ladder around that price
  *   node scripts/haneul-localnet/fixture.mjs fund <address> [tusd]
  *                                                    gas and test dollars for another wallet
+ *   node scripts/haneul-localnet/fixture.mjs keeper  the order-ticket keeper's key in .localnet/keeper.key,
+ *                                                    with gas; prints its address
  *   node scripts/haneul-localnet/fixture.mjs oracle-v2-config
  *                                                    write .localnet/oracle-v2.json and print how to run
  *                                                    the real price service (~/oracle-v2) on this
@@ -33,7 +35,7 @@
  *
  * Start the network first:  <perp-dex>/deps/bin/haneul start --with-faucet --force-regenesis
  */
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { createPrivateKey, createPublicKey, randomBytes, sign as nodeSign } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
@@ -53,6 +55,7 @@ const STATE_FILE = join(LOCAL_DIR, 'fixture-state.json');
 const DEV_KEY_FILE = join(LOCAL_DIR, 'dev-wallet.key');
 const SIGNER_SEED_FILE = join(LOCAL_DIR, 'oracle-signer.seed');
 const RELAYER_KEY_FILE = join(LOCAL_DIR, 'oracle-relayer.key');
+const KEEPER_KEY_FILE = join(LOCAL_DIR, 'keeper.key');
 const ORACLE_V2_CONFIG = join(LOCAL_DIR, 'oracle-v2.json');
 const CONFIG_FILE = join(WEB_ROOT, 'public', 'configs', 'haneul', 'perp.localnet.json');
 const MAINNET_CHAIN_ID = 'a0053d9e';
@@ -114,6 +117,38 @@ const ptb = (label, cmds) => {
   if (j.effects?.status?.status !== 'success') throw new Error(`${label} failed on chain: ${JSON.stringify(j.effects?.status)}`);
   return j;
 };
+
+/** `ptb` in a child process the caller does not wait on, so the event loop keeps running. */
+const ptbAsync = (label, cmds) =>
+  new Promise((done, fail) => {
+    const child = spawn(CLI, ['client', 'ptb', ...cmds, '--gas-budget', GAS_BUDGET, '--json'], {
+      cwd: PERP_ROOT,
+    });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', (d) => {
+      stdout += d;
+    });
+    child.stderr.on('data', (d) => {
+      stderr += d;
+    });
+    child.on('error', fail);
+    child.on('close', (code) => {
+      if (code !== 0) {
+        fail(new Error(`${label} failed:\n${(stdout + stderr).slice(-3000)}`));
+        return;
+      }
+      try {
+        const j = JSON.parse(stdout);
+        if (j.effects?.status?.status !== 'success') {
+          throw new Error(`${label} failed on chain: ${JSON.stringify(j.effects?.status)}`);
+        }
+        done(j);
+      } catch (e) {
+        fail(e);
+      }
+    });
+  });
 
 const events = (j, suffix) => (j.events ?? []).filter((e) => e.type.split('<')[0].endsWith(suffix)).map((e) => e.parsedJson);
 const createdOwned = (j, typeSubstr, suffix = '') =>
@@ -511,8 +546,9 @@ const seed = () => {
 /**
  * Signs both feeds every round and serves the latest updates on `/v1/updates` in oracle-v2's
  * format, so the front end reads this service and the real one the same way. With the relay
- * on (the default) every round also lands on chain; with `--no-relay` the chain's prices go
- * stale after the market's tolerance and only transactions that carry the served updates trade.
+ * on (the default) the latest round also lands on chain, one relay at a time; with `--no-relay`
+ * the chain's prices go stale after the market's tolerance and only transactions that carry the
+ * served updates trade.
  */
 const push = async () => {
   const relay = !process.argv.includes('--no-relay');
@@ -544,10 +580,22 @@ const push = async () => {
   server.listen(ORACLE_PORT, ORACLE_HOST);
   log(`price service on http://${ORACLE_HOST}:${ORACLE_PORT}/v1/updates, signing every ${interval} ms, relay ${relay ? 'on' : 'off'} (ctrl-c to stop)`);
 
+  // A relay can take far longer than a round (an epoch change, a busy machine). Waited on, it
+  // would stop the signing and, the event loop being blocked, the serving too: transactions
+  // that carry the served updates, a keeper's included, would get none.
+  const relaying = { now: false };
+  const relayLatest = () => {
+    relaying.now = true;
+    ptbAsync('relay prices', relayCommands(latest.state, latest.body.updates))
+      .catch((e) => log(`round failed: ${String(e).slice(0, 300)}`))
+      .finally(() => {
+        relaying.now = false;
+      });
+  };
   for (;;) {
     try {
       sign();
-      if (relay) ptb('relay prices', relayCommands(latest.state, latest.body.updates));
+      if (relay && !relaying.now) relayLatest();
     } catch (e) {
       log(`round failed: ${String(e).slice(0, 300)}`);
     }
@@ -638,6 +686,20 @@ const fund = () => {
   log(`funded ${address} with gas and ${tusd} TUSD`);
 };
 
+/**
+ * The key of perp-keeper (perp-liquidator's `crates/keeper`), made once and kept with the other
+ * local keys, and gas for it: the keeper needs nothing else. The last line printed is the
+ * address the tickets name as their executor.
+ */
+const keeper = () => {
+  safetyCheck();
+  const kp = loadKeypair(KEEPER_KEY_FILE);
+  const address = kp.getPublicKey().toHaneulAddress();
+  faucet(address);
+  log(`keeper key in ${KEEPER_KEY_FILE}`);
+  process.stdout.write(`${address}\n`);
+};
+
 const mode = process.argv[2] ?? 'setup';
 if (mode === 'setup') setup();
 else if (mode === 'seed') seed();
@@ -645,6 +707,7 @@ else if (mode === 'push') await push();
 else if (mode === 'price') setPrice();
 else if (mode === 'oracle-v2-config') oracleV2Config();
 else if (mode === 'fund') fund();
+else if (mode === 'keeper') keeper();
 else {
   console.error(`unknown mode ${mode}`);
   process.exit(2);
