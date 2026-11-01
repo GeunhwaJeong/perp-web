@@ -173,7 +173,7 @@ const handIn = async (kind: string, details: object) => {
   });
   const body = await response.json();
   if (!response.ok) throw new Error(`the keeper refused the details: ${JSON.stringify(body)}`);
-  return body as { commitment: string; known: boolean };
+  return body as { commitment: string; known: boolean; held: boolean };
 };
 
 // ---------------------------------------------------------------- the indexer's view
@@ -274,6 +274,14 @@ try {
     (await apiTicket(ticketA))?.status === 'OPEN' ? true : undefined
   );
   check('the API lists it open, where the Stop Orders tab reads it', listed);
+  // The front end hands the details in again once the ticket is on chain, which the keeper keeps
+  // whatever else waits.
+  const again = await handIn('stopLossTakeProfit', stopLossTakeProfitJson(sltp.details));
+  check(
+    'handed in again, the keeper finds the ticket on chain holding them',
+    again.held && again.commitment === ours,
+    JSON.stringify(again)
+  );
   await waitFor('the keeper to see it', async () =>
     (await keeperStatus()).tickets.waiting ? true : undefined
   );
