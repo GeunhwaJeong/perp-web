@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Prepares the Sigma VPS once, as root: swap, Postgres, the sigma user and directories, Caddy's
-# site file and the systemd units. Idempotent. Secrets (keys, env files) are placed by hand
-# into /etc/sigma afterwards; see README.md.
+# Prepares the Sigma VPS once, as root: swap, Postgres, the sigma user and directories, the
+# keeper's database and its backup, Caddy's site file and the systemd units. Idempotent. Secrets
+# (keys, env files) are placed by hand into /etc/sigma afterwards; see README.md.
 set -euo pipefail
 
 # 2 GB of swap on a 4 GB box: a safety net for the indexer's backfill and Postgres peaks.
@@ -24,12 +24,18 @@ sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='sigma'" | grep
   sudo -u postgres psql -c "CREATE ROLE sigma LOGIN PASSWORD '${SIGMA_DB_PASSWORD:?set SIGMA_DB_PASSWORD}'"
 sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='perp_indexer'" | grep -q 1 || \
   sudo -u postgres createdb -O sigma perp_indexer
+# The keeper's own database: the order tickets' details exist nowhere else, so it is kept apart
+# from the indexer's and dumped daily (sigma-keeper-backup.timer).
+sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='sigma_keeper'" | grep -q 1 || \
+  sudo -u postgres createdb -O sigma sigma_keeper
+install -d -o postgres -g postgres -m 700 /var/backups/sigma-keeper
+install -m 755 "$(dirname "$0")/sigma-keeper-backup" /usr/local/sbin/sigma-keeper-backup
 
 # Login bots fill sshd's default connection backlog (10) and the box drops our sessions.
 printf 'MaxStartups 50:30:200\nLoginGraceTime 20\n' > /etc/ssh/sshd_config.d/70-sigma.conf
 sshd -t && systemctl reload ssh
 
-install -m 644 "$(dirname "$0")/systemd/"sigma-*.service /etc/systemd/system/
+install -m 644 "$(dirname "$0")/systemd/"sigma-*.service "$(dirname "$0")/systemd/"sigma-*.timer /etc/systemd/system/
 systemctl daemon-reload
 install -m 644 "$(dirname "$0")/Caddyfile" /etc/caddy/Caddyfile
 caddy validate --config /etc/caddy/Caddyfile

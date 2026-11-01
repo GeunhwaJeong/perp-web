@@ -1,0 +1,10 @@
+#!/bin/sh
+# Daily dump of the keeper database (sigma_keeper): the order tickets' details exist nowhere
+# else. Runs as postgres from sigma-keeper-backup.service and keeps 14 days.
+set -eu
+umask 077
+dir=/var/backups/sigma-keeper
+stamp=$(date -u +%Y%m%d-%H%M%S)
+pg_dump -Fc -d sigma_keeper -f "$dir/sigma_keeper-$stamp.dump.part"
+mv "$dir/sigma_keeper-$stamp.dump.part" "$dir/sigma_keeper-$stamp.dump"
+find "$dir" -name "sigma_keeper-*.dump" -mtime +14 -delete

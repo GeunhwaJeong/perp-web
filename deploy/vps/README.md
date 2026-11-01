@@ -12,6 +12,7 @@ committed; the secrets are not and go into `/etc/sigma` by hand.
 | Liquidator | sigma-liquidator | 127.0.0.1:9188 (health) | Postgres, the price service, its key and account |
 | Cranker | sigma-cranker | 127.0.0.1:9189 (health) | the price service, its key |
 | Maker (and the flow simulator) | sigma-maker | 127.0.0.1:9190 (health) | Postgres, the price service, its key and account; `MAKER_EXTRA_ARGS` in `maker.env` carries `--flow …` and quoting parameters |
+| Keeper (order tickets) | sigma-keeper | 127.0.0.1:9191 (health, status, details) | Postgres `sigma_keeper` (its own, dumped daily by sigma-keeper-backup.timer) and `perp_indexer`, the price service, its key |
 | Site | Caddy | sigma.haneul.io | `/var/www/sigma` (the production build) |
 | gRPC proxy | Caddy | rpc.haneul.io | 158.69.54.239:9000 over h2c |
 
@@ -39,6 +40,11 @@ Then the secrets, all root-owned and mode 600 under `/etc/sigma`:
 - `maker.env`: `DATABASE_URL`, `ACCOUNT`, `ACCOUNT_CAP` of the maker's account, and `MAKER_EXTRA_ARGS`
   (empty, or `--flow --flow-key-file /etc/sigma/flow.key --flow-account … --flow-account-cap …`
   and any quoting parameter); `maker.key` (and `flow.key`).
+- `keeper.env` (root:sigma, mode 640): `PERP_KEEPER_DATABASE_URL=postgres://sigma:<password>@127.0.0.1:5432/sigma_keeper?application_name=perp-keeper`
+  and `PERP_DATABASE_URL` for `perp_indexer` with the same application name. The keeper reads
+  them from the environment, so the password stays off the process list. `keeper.key` (sigma,
+  mode 600): the keeper wallet's key, which needs gas and no capability; the tickets name its
+  address as their executor, so keep a copy of the key elsewhere.
 
 The bots take the chain id in the node's base58 form (`BmesG5C6R15WTWTL4feVxmf51fHXDSCMjmrF571aLiKC`
 for mainnet), which the units carry.
@@ -54,7 +60,7 @@ The Rust binaries are built by GitHub Actions (x86_64, glibc 2.39, portable blst
 
 ```sh
 gh run download <run id> -R GeunhwaJeong/perp-indexer -n perp-indexer-linux-x86_64 -D /tmp/bin
-gh run download <run id> -R GeunhwaJeong/perp-liquidator -n perp-bots-linux-x86_64 -D /tmp/bin   # liquidator, cranker, maker
+gh run download <run id> -R GeunhwaJeong/perp-liquidator -n perp-bots-linux-x86_64 -D /tmp/bin   # liquidator, cranker, maker, keeper
 (cd /tmp/bin && sha256sum -c SHA256SUMS)
 sudo install -o sigma -g sigma -m 755 /tmp/bin/perp-* /opt/sigma/bin/
 ```
@@ -69,7 +75,13 @@ sudo systemctl enable --now sigma-oracle      # feeds fresh within a few rounds
 sudo systemctl enable --now sigma-indexer sigma-api
 sudo systemctl enable --now sigma-cranker sigma-liquidator
 sudo systemctl enable --now sigma-maker
+sudo systemctl enable --now sigma-keeper sigma-keeper-backup.timer
 ```
 
+Run the keeper once with `--check-only` before its unit starts: `sudo systemd-run --wait --pipe
+--collect -p User=sigma -p EnvironmentFile=/etc/sigma/keeper.env /opt/sigma/bin/perp-keeper <the
+unit's arguments> --check-only`. Its database is dumped daily to `/var/backups/sigma-keeper`
+(14 days kept); restore with `pg_restore -d sigma_keeper <dump>`.
+
 Health: `curl -s localhost:8787/healthz`, `localhost:3002/health`, `localhost:9188/health`,
-`localhost:9189/health`. Logs: `journalctl -u sigma-<name> -f`.
+`localhost:9189/health`, `localhost:9191/health`. Logs: `journalctl -u sigma-<name> -f`.

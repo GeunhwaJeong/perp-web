@@ -1,0 +1,23 @@
+[Unit]
+Description=Sigma order-ticket keeper
+After=network-online.target postgresql.service sigma-oracle.service sigma-indexer.service
+Wants=network-online.target
+
+[Service]
+User=sigma
+WorkingDirectory=/opt/sigma
+# The database URLs come from the environment (PERP_KEEPER_DATABASE_URL, PERP_DATABASE_URL),
+# not the command line, so that the password does not show in the process list.
+EnvironmentFile=/etc/sigma/keeper.env
+ExecStart=/opt/sigma/bin/perp-keeper --deployment /etc/sigma/perp.mainnet.json --rpc-url http://158.69.54.239:9000 --chain-id BmesG5C6R15WTWTL4feVxmf51fHXDSCMjmrF571aLiKC --key-file /etc/sigma/keeper.key --address 0xbf1fb3b05e6203a37d2aedb93a65b0c9775e0a8f20be406bbc15737698a60c07 --oracle-updates-url http://127.0.0.1:8787/v1/updates --listen-address 127.0.0.1:9191
+Restart=always
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=30
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily backup of the Sigma keeper database
+
+[Timer]
+OnCalendar=daily
+RandomizedDelaySec=15min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
