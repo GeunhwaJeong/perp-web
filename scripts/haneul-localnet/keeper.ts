@@ -8,12 +8,15 @@
  *
  * 1. a stop loss / take profit on the dev wallet's long, on the index price, waits at the price
  *    and closes the long once the price the service signs falls through its stop loss;
- * 2. a standalone stop on the book price places its resting bid, which is then canceled.
+ * 2. a standalone stop on the book price places its resting bid, which is then canceled;
+ * 3. a TWAP buys the long back in two chunks TWAP_GAP_MS apart (5 s) and is finalized; the long
+ *    is then closed.
  *
  * Needs the fixture (`setup`, then `push` with its relay), the indexer and the API, and the
  * keeper on its key (`fixture.mjs keeper`), this deployment file, the indexer's database and the
  * price service. Moves the price the service signs and puts it back. With PAUSE_FILE set, it
- * waits for that file before moving the price, so the waiting ticket can be looked at.
+ * waits for that file before moving the price, so the waiting ticket can be looked at, and for
+ * that file with `.twap` appended once the TWAP's first chunk has run.
  *
  *   pnpm exec tsx scripts/haneul-localnet/keeper.ts
  */
@@ -40,9 +43,11 @@ import {
   sizeToUnits,
   standaloneStopCommitment,
   stopLossTakeProfitCommitment,
+  twapCommitment,
   type PerpDeployment,
   type StandaloneStopDetails,
   type StopLossTakeProfitDetails,
+  type TwapDetails,
 } from '../../src/haneul/perp';
 
 const ROOT = join(import.meta.dirname, '..', '..');
@@ -62,6 +67,7 @@ const MARKET = 'BTC-USD';
 const market = deployment.markets[MARKET]!;
 const D = deployment.collateral.decimals;
 const SIZE = sizeToUnits('0.1');
+const TWAP_GAP_MS = BigInt(process.env.TWAP_GAP_MS ?? '5000');
 
 let passed = 0;
 const check = (name: string, ok: boolean, detail = '') => {
@@ -143,6 +149,22 @@ const standaloneStopJson = (d: StandaloneStopDetails) => ({
   reduceOnly: d.reduceOnly,
   salt: hex(d.salt),
 });
+const twapJson = (d: TwapDetails) => ({
+  firstRunExpireTimestampMs: decimal(d.firstRunExpireTimestampMs),
+  expireTimestampMs: decimal(d.expireTimestampMs),
+  executionGapMs: d.executionGapMs.toString(),
+  executionTimeUncertaintyMs: d.executionTimeUncertaintyMs.toString(),
+  chunksAmount: d.chunksAmount.toString(),
+  smallTailMergeThresholdBps: d.smallTailMergeThresholdBps.toString(),
+  timeForRetryMs: d.timeForRetryMs.toString(),
+  amountUncertaintyBps: d.amountUncertaintyBps.toString(),
+  maxOneExecutionAmountBps: d.maxOneExecutionAmountBps.toString(),
+  side: d.side,
+  size: d.size.toString(),
+  maxSlippageBps: d.maxSlippageBps.toString(),
+  reduceOnly: d.reduceOnly,
+  salt: hex(d.salt),
+});
 const handIn = async (kind: string, details: object) => {
   const response = await fetch(`${KEEPER}/v1/details`, {
     method: 'POST',
@@ -156,7 +178,13 @@ const handIn = async (kind: string, details: object) => {
 
 // ---------------------------------------------------------------- the indexer's view
 
-type ApiTicket = { id: string; type: string; status: string };
+type ApiTicket = {
+  id: string;
+  type: string;
+  status: string;
+  /** In BTC, as decimal strings. */
+  twapProgress?: { processedAmount: string; scheduledAmount: string } | null;
+};
 const apiTickets = async () => {
   const url = new URL(`${API}/v4/orderTickets/parentSubaccountNumber`);
   url.searchParams.set('address', me);
@@ -323,6 +351,71 @@ try {
   );
   await run(b.cancelOrders({ ref, marketId: MARKET, orderIds: [BigInt(bid!.id)] }));
   check('canceled', true);
+
+  // 3. a TWAP buying the long back in two chunks
+  const twap = b.twapTicket({
+    ref,
+    marketId: MARKET,
+    executors: [keeper],
+    details: {
+      executionGapMs: TWAP_GAP_MS,
+      executionTimeUncertaintyMs: 1_000n,
+      chunksAmount: 2n,
+      smallTailMergeThresholdBps: 0n,
+      timeForRetryMs: 30_000n,
+      amountUncertaintyBps: 0n,
+      maxOneExecutionAmountBps: 10_000n,
+      side: SIDE.BID,
+      size: SIZE,
+      maxSlippageBps: 500n,
+      reduceOnly: false,
+    },
+  });
+  const ours3 = hex(twapCommitment(twap.details));
+  const answer3 = await handIn('twap', twapJson(twap.details));
+  check(
+    "the keeper's commitment is the front end's for the TWAP",
+    answer3.commitment === ours3,
+    ours3
+  );
+  r = await run(twap.tx);
+  const ticketC = String(eventsOf(r.events, '::events::CreatedTWAPOrderTicket')[0]!.ticket_id);
+  check('TWAP ticket: buy 0.1 in two chunks', !!ticketC, ticketC);
+  const half = await waitFor(
+    'its first chunk in the API',
+    async () => {
+      const t = await apiTicket(ticketC);
+      return t?.twapProgress && Number(t.twapProgress.processedAmount) > 0 ? t : undefined;
+    },
+    60
+  );
+  check(
+    'the keeper runs its first chunk, which the TWAP tab reads',
+    half.status === 'OPEN' && half.twapProgress!.processedAmount === '0.05',
+    JSON.stringify(half.twapProgress)
+  );
+  if (PAUSE_FILE) {
+    console.log(`  paused: touch ${PAUSE_FILE}.twap to go on`);
+    // eslint-disable-next-line no-await-in-loop -- waits for the file
+    while (!existsSync(`${PAUSE_FILE}.twap`)) await sleep(1_000);
+  }
+  const finalized = await waitFor(
+    'the keeper to finalize the TWAP',
+    async () => ((await apiTicket(ticketC))?.status === 'FINALIZED' ? true : undefined),
+    Number(TWAP_GAP_MS / 1000n) + 60
+  );
+  check('its second chunk after the gap, then finalized', finalized);
+  const boughtBack = await readPosition(client, deployment, MARKET, acct!.accountId);
+  check('long 0.1 again', boughtBack?.base === SIZE * 10n ** 9n, `${boughtBack?.base}`);
+  await run(
+    b.session({
+      ref,
+      marketId: MARKET,
+      orders: [{ kind: 'market', isAsk: SIDE.ASK, size: SIZE, reduceOnly: true }],
+    })
+  );
+  const flat = await readPosition(client, deployment, MARKET, acct!.accountId);
+  check('and closed', flat?.base === 0n, `${flat?.base}`);
 } finally {
   if (signedPrice() !== price0) fixture('price', String(price0));
 }
