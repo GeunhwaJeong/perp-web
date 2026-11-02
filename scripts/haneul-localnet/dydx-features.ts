@@ -5,8 +5,10 @@
  * Trading Keys entry of the More menu (dYdX chain authenticators) and the Equity Tiers page
  * (dYdX order count limits by equity, a validator query that never answers here). Both are to be
  * gone, an old link to the Equity Tiers page is to land on the portfolio overview, and the
- * position's TP/SL dialog, which the missing equity tiers blocked without a word, is to say the
- * orders are coming soon. A market buy and the position it opens show the trade form unchanged.
+ * position's TP/SL dialog, which the missing equity tiers blocked without a word, is to offer the
+ * take profit it is given (the order keeper executes it as a ticket; keeper.ts and the triggers
+ * flow check that end to end). A market buy and the position it opens show the trade form
+ * unchanged.
  * Requires the fixture (`fixture.mjs setup` + `push`), the indexer and API, and `pnpm dev`.
  *
  *   PLAYWRIGHT=/path/to/node_modules/playwright pnpm exec tsx scripts/haneul-localnet/dydx-features.ts
@@ -229,8 +231,8 @@ if (dialogOpen) {
 }
 await page.screenshot({ path: `${screenshots}-4.png` });
 console.log(`  TP/SL button "${label}", disabled ${disabled}`);
-check('the TP/SL button stays disabled', disabled);
-check('the TP/SL button says the orders are coming soon', label === 'Coming soon', label);
+check('the TP/SL button is enabled for the take profit', !disabled);
+check('the TP/SL button adds the trigger', label === 'Add trigger(s)', label);
 check('no page error on the way', errors.length === 0, errors.join(' | ').slice(0, 160));
 
 await browser.close();

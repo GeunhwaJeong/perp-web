@@ -18,7 +18,6 @@ import {
   TriggerOrderDetails,
   TriggerOrderInputData,
   TriggerOrdersFormState,
-  TriggerOrdersPayload,
   TriggerOrderState,
   TriggersSummaryData,
 } from './types';
@@ -105,10 +104,6 @@ export function getErrors(
 
   if (summary.payload == null || summary.payload.payloads.length === 0) {
     validationErrors.push(errors.noPayload());
-  }
-
-  if (summary.payload != null) {
-    validationErrors.push(...validateTriggerOrderPayloadForEngine(summary.payload));
   }
 
   return validationErrors;
@@ -287,15 +282,6 @@ function validateCustomSize(
   return [];
 }
 
-// Nothing executes stop-loss or take-profit orders on the engine until a keeper does, and the
-// account transaction supervisor refuses to place them; the form says so instead of the submit.
-function validateTriggerOrderPayloadForEngine(payload: TriggerOrdersPayload) {
-  if (payload.payloads.some((p) => p.placePayload != null)) {
-    return [errors.conditionalOrdersUnavailable()];
-  }
-  return [];
-}
-
 class TriggerOrderFormValidationErrors {
   // Basic validation errors
   positionNotFound(): ValidationError {
@@ -311,14 +297,6 @@ class TriggerOrderFormValidationErrors {
       code: 'NO_ORDER_MATCHING_ORDER_ID',
       type: ErrorType.error,
       titleKey: STRING_KEYS.UNKNOWN_ERROR,
-    });
-  }
-
-  conditionalOrdersUnavailable(): ValidationError {
-    return simpleValidationError({
-      code: 'CONDITIONAL_ORDERS_UNAVAILABLE',
-      type: ErrorType.error,
-      titleKey: STRING_KEYS.COMING_SOON,
     });
   }
 

@@ -59,8 +59,16 @@ export type PerpDeployment = {
     schedule: string;
     tierRegistry: string;
   };
-  /** Keeper addresses allowed to execute stop and TWAP tickets; empty lets any executor. */
+  /**
+   * Keeper addresses allowed to execute stop and TWAP tickets. The engine takes only the
+   * addresses listed: with none, no ticket can ever execute.
+   */
   ticketExecutors: string[];
+  /**
+   * Where the front end hands ticket details to the keeper (`POST <keeperUrl>/v1/details`),
+   * served under the site's own origin; `/keeper` when absent.
+   */
+  keeperUrl?: string;
   /** HANEUL (in its smallest unit) escrowed on each ticket to pay the executor. */
   ticketGas: string;
   markets: Record<string, PerpMarketConfig>;

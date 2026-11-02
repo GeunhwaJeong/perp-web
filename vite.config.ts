@@ -20,6 +20,16 @@ export default defineConfig(({ mode }) => ({
   define: {
     'process.env': {},
   },
+  server: {
+    // The order-ticket keeper sends no CORS headers: the site serves it under its own origin,
+    // which Caddy does in production and this proxy does for the localnet keeper.
+    proxy: {
+      '/keeper': {
+        target: 'http://127.0.0.1:9191',
+        rewrite: (path: string) => path.replace(/^\/keeper/, ''),
+      },
+    },
+  },
   rollupOptions: {
     // Needed for Abacus sourcemaps since Rollup doesn't load external sourcemaps by default.
     // https://github.com/vitejs/vite/issues/11743

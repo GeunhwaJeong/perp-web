@@ -1,4 +1,5 @@
 import { isParentSubaccount } from '@/bonsai/lib/subaccountUtils';
+import { openStopLossTakeProfits, stopLossTakeProfitOrders } from '@/bonsai/lib/ticketOrders';
 import { BonsaiCore, BonsaiHelpers } from '@/bonsai/ontology';
 import {
   OrderFlags,
@@ -25,7 +26,7 @@ import {
 } from '@/types/indexer/indexerApiGen';
 
 import { calc, mapIfPresent } from '@/lib/do';
-import { BIG_NUMBERS, MaybeBigNumber, MustBigNumber } from '@/lib/numbers';
+import { AttemptNumber, BIG_NUMBERS, MaybeBigNumber, MustBigNumber } from '@/lib/numbers';
 import { objectEntries } from '@/lib/objectHelpers';
 import {
   getAverageFillPrice,
@@ -147,17 +148,40 @@ export const getOrderByClientId = createAppSelector(
 );
 
 /**
+ * The open stop loss / take profit tickets this browser made, as the reduce-only conditional
+ * orders of the positions they close (see `bonsai/lib/ticketOrders`).
+ */
+const getTicketConditionalOrders = createAppSelector(
+  [
+    BonsaiCore.account.orderTickets.data,
+    (s: RootState) => s.ticketDetails.byCommitment,
+    BonsaiCore.account.parentSubaccountPositions.data,
+    BonsaiCore.markets.markets.data,
+  ],
+  (tickets, byCommitment, positions, markets) =>
+    stopLossTakeProfitOrders(
+      openStopLossTakeProfits(tickets, byCommitment),
+      positions ?? [],
+      mapValues(markets ?? {}, (m) => AttemptNumber(m.clobPairId))
+    )
+);
+
+/**
  * @param state
  * @returns list of conditional orders that have not been filled or cancelled for all subaccount positions
  */
 export const getSubaccountConditionalOrders = createAppSelector(
   [
     BonsaiCore.account.openOrders.data,
+    getTicketConditionalOrders,
     BonsaiCore.account.parentSubaccountPositions.data,
     (s, isSlTpLimitOrdersEnabled: boolean) => isSlTpLimitOrdersEnabled,
   ],
-  (orders, positions, isSlTpLimitOrdersEnabled) => {
-    const openOrdersByPositionUniqueId = groupBy(orders, (o) => o.positionUniqueId);
+  (orders, ticketOrders, positions, isSlTpLimitOrdersEnabled) => {
+    const openOrdersByPositionUniqueId = groupBy(
+      [...orders, ...ticketOrders],
+      (o) => o.positionUniqueId
+    );
 
     return mapValues(
       keyBy(positions, (p) => p.uniqueId),

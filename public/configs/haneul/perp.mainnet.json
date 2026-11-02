@@ -26,8 +26,9 @@
     "schedule": "0x5a6a926921a62aa962d3e34bab9775e363bdd930c60fea0ec7d61c88ce0ab364",
     "tierRegistry": "0xde0f0effde6472e8ef3fcde45b0a8c866f3791bff98b90beb9e20b11bada83f8"
   },
-  "ticketExecutors": [],
+  "ticketExecutors": ["0xbf1fb3b05e6203a37d2aedb93a65b0c9775e0a8f20be406bbc15737698a60c07"],
   "ticketGas": "1000000",
+  "keeperUrl": "/keeper",
   "markets": {
     "BTC-USD": {
       "marketId": "BTC-USD",

@@ -447,6 +447,34 @@ export class PerpTransactionBuilder {
     return { tx: this.ticketTx(ref, 1n, commitment, executors), details: full };
   }
 
+  /**
+   * Appends a stop-loss / take-profit ticket to `tx`, after the session that opened the position
+   * or alongside the cancellation of the ticket it replaces.
+   */
+  appendStopLossTakeProfitTicket(
+    tx: Transaction,
+    ref: PerpAccountRef,
+    details: StopLossTakeProfitDetails,
+    executors?: string[]
+  ) {
+    this.addTicket(tx, ref, 0n, stopLossTakeProfitCommitment(details), executors);
+  }
+
+  /** Appends the account's own cancellation of a stop ticket; its gas joins the gas coin. */
+  appendCancelStopTicket(tx: Transaction, ref: PerpAccountRef, ticketId: string) {
+    const gas = tx.moveCall({
+      target: target(this.deployment.packages.perpetualsOrders, 'stop_orders', 'cancel'),
+      typeArguments: [this.coinType, this.types.admin],
+      arguments: [
+        tx.object(ref.account),
+        tx.object(ref.cap),
+        tx.object(this.deployment.registry),
+        tx.pure.id(ticketId),
+      ],
+    });
+    tx.mergeCoins(tx.gas, [gas[0]!]);
+  }
+
   cancelStopTicket({
     ref,
     ticketId,
@@ -513,14 +541,18 @@ export class PerpTransactionBuilder {
     marketId,
     ticketId,
     recipient,
+    priceUpdates = [],
   }: {
     ref: PerpAccountRef;
     marketId: string;
     ticketId: string;
     recipient: string;
+    /** Signed prices for releasing the collateral a partly run TWAP no longer needs. */
+    priceUpdates?: SignedPriceUpdate[];
   }) {
     const market = this.market(marketId);
     const tx = new Transaction();
+    addPriceUpdates(tx, this.deployment, priceUpdates);
     const gas = tx.moveCall({
       target: target(
         this.deployment.packages.perpetualsOrders,
@@ -669,6 +701,17 @@ export class PerpTransactionBuilder {
     executors?: string[]
   ) {
     const tx = new Transaction();
+    this.addTicket(tx, ref, stopOrderType, commitment, executors);
+    return tx;
+  }
+
+  private addTicket(
+    tx: Transaction,
+    ref: PerpAccountRef,
+    stopOrderType: bigint,
+    commitment: Uint8Array,
+    executors?: string[]
+  ) {
     const gas = tx.splitCoins(tx.gas, [tx.pure.u64(BigInt(this.deployment.ticketGas))]);
     tx.moveCall({
       target: target(
@@ -688,7 +731,6 @@ export class PerpTransactionBuilder {
         tx.pure.vector('u8', Array.from(commitment)),
       ],
     });
-    return tx;
   }
 
   private addCreatePosition(tx: Transaction, ref: PerpAccountRef, market: PerpMarketConfig) {

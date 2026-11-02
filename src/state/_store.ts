@@ -24,6 +24,7 @@ import localizationMiddleware from './localizationMiddleware';
 import { notificationsSlice } from './notifications';
 import { perpetualsSlice } from './perpetuals';
 import { rawSlice } from './raw';
+import { ticketDetailsSlice } from './ticketDetails';
 import { tradeFormSlice } from './tradeForm';
 import { getClosePositionFormSummary, getTradeFormSummary } from './tradeFormSelectors';
 import { tradingViewSlice } from './tradingView';
@@ -52,6 +53,7 @@ const reducers = {
   vaults: vaultsSlice.reducer,
   wallet: walletSlice.reducer,
   raw: rawSlice.reducer,
+  ticketDetails: ticketDetailsSlice.reducer,
 } as const;
 
 const rootReducer = combineReducers(reducers);
@@ -68,6 +70,8 @@ const persistConfig = {
     'wallet',
     'appUiConfigs',
     'accountUiMemory',
+    // A slice new to storage: older stored states load it at its initial value.
+    'ticketDetails',
   ],
   stateReconciler: autoMergeLevel2,
 };

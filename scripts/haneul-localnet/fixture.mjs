@@ -481,8 +481,11 @@ const setup = () => {
       updatesUrl: `http://${ORACLE_HOST}:${ORACLE_PORT}/v1/updates`,
     },
     fees: { schedule: feeSchedule, tierRegistry },
-    ticketExecutors: [],
+    // The local keeper's key, made here if `keeper` has not made it yet; `keeper` funds it.
+    ticketExecutors: [loadKeypair(KEEPER_KEY_FILE).getPublicKey().toHaneulAddress()],
     ticketGas: '1000000',
+    // Served by Vite's dev proxy to the keeper on 127.0.0.1:9191, as Caddy serves it in production.
+    keeperUrl: '/keeper',
     markets: {
       'BTC-USD': {
         marketId: 'BTC-USD',

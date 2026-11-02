@@ -43,6 +43,12 @@ const useSubaccountContext = () => {
     );
   }, []);
 
+  const cancelOrderTicket = useCallback(
+    async (params: { ticketId: string; type: 'STOP' | 'TWAP'; marketId?: string }) =>
+      accountTransactionManager.cancelOrderTicket(params),
+    []
+  );
+
   // ------ Vault Methods ------ //
   // Vault deposits and withdrawals went through the dYdX validator client, which is never created
   // here, so they fail as they always have until the vault screens reach the engine's vault.
@@ -107,6 +113,7 @@ const useSubaccountContext = () => {
 
     // Trading Methods
     placeTriggerOrders,
+    cancelOrderTicket,
 
     // vaults
     depositToMegavault,

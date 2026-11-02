@@ -19,6 +19,7 @@ import {
   fetchPriceUpdates,
   findPerpAccount,
   fractionToIfixed,
+  handInTicketDetails,
   hasMarketPosition,
   HaneulTransactionError,
   imrToLeverage,
@@ -32,13 +33,18 @@ import {
   SIDE,
   collateralToUnits,
   limitPriceToUnits,
+  priceToIfixed,
   priceToUnits,
+  randomSalt,
   readAccount,
   readAccountFees,
   readFeeSchedule,
   readPosition,
   selectPriceUpdates,
   sizeToUnits,
+  stopLossTakeProfitCommitment,
+  stopLossTakeProfitJson,
+  toHex,
   unitsToCollateral,
   type CollateralReturn,
   type OrderSpec,
@@ -47,17 +53,25 @@ import {
   type PerpDeployment,
   type PerpPositionState,
   type SignedPriceUpdate,
+  type StopLossTakeProfitDetails,
+  type TicketDetailsJson,
+  type TicketKind,
 } from '@/haneul/perp';
 import { signAndExecute, simulateWithApp } from '@/haneul/perp/executor';
 import { buildCoinSend, isGasCoinType, listCoins } from '@/haneul/transfer';
 import type { ClientWithCoreApi } from '@haneullabs/haneul/client';
+import { Transaction } from '@haneullabs/haneul/transactions';
 
 import { AnalyticsEvents, TradeMetadataSource } from '@/constants/analytics';
 import { STRING_KEYS } from '@/constants/localization';
 import { isDev } from '@/constants/networks';
 import { PlaceOrderStatuses } from '@/constants/trade';
 import { DydxChainAsset } from '@/constants/wallets';
-import { IndexerPerpetualMarketStatus } from '@/types/indexer/indexerApiGen';
+import {
+  IndexerPerpetualMarketStatus,
+  IndexerPerpetualPositionStatus,
+  IndexerPositionSide,
+} from '@/types/indexer/indexerApiGen';
 
 import { selectTokenConfigs } from '@/hooks/useTokenConfigs';
 
@@ -76,13 +90,14 @@ import {
   placeOrderFailed,
   placeOrderSubmitted,
 } from '@/state/localOrders';
+import { ticketDetailsSaved } from '@/state/ticketDetails';
 
 import { track } from '@/lib/analytics/analytics';
 import { operationFailureToErrorParams, wrapSimpleError } from '@/lib/errorHelpers';
 import { isTruthy } from '@/lib/isTruthy';
 
 import { TradeFormPayload } from './forms/trade/types';
-import { PlaceOrderPayload } from './forms/triggers/types';
+import { CancelOrderPayload, PlaceOrderPayload, TriggerOrderActions } from './forms/triggers/types';
 import { unsupportedOrderTypeReason } from './lib/engineOrderSupport';
 import {
   isOperationFailure,
@@ -91,6 +106,12 @@ import {
   wrapOperationFailure,
   wrapOperationSuccess,
 } from './lib/operationResult';
+import {
+  openReducingStopTickets,
+  openStopLossTakeProfits,
+  parseTicketOrderId,
+  planStopLossTakeProfit,
+} from './lib/ticketOrders';
 import { logBonsaiError, logBonsaiInfo } from './logs';
 
 const FN = 'AccountTransactionSupervisor';
@@ -105,6 +126,42 @@ type Context = {
 };
 
 type PlacedOrder = { clientId: string; orderId?: string; filled: boolean };
+
+/** A ticket ready to be created: its details as the chain commits to them and as the keeper takes them. */
+type PreparedTicket = {
+  marketId: string;
+  kind: TicketKind;
+  json: TicketDetailsJson;
+  commitment: Uint8Array;
+  stopLossTakeProfit?: StopLossTakeProfitDetails;
+};
+
+/** Ticket work a session carries in its transaction. */
+type SessionAttachment = { ticket?: PreparedTicket };
+
+// Stop loss and take profit levels trigger on the index price, the oracle price the forms show
+// (`stop_orders` trigger price type 0).
+const TRIGGER_ON_INDEX = 0;
+
+// The indexer recorded a ticket about two seconds after its transaction on localnet; the
+// details are handed in again until the keeper sees the ticket hold them.
+const TICKET_HELD_ATTEMPTS = 5;
+const TICKET_HELD_DELAY_MS = 2_000;
+
+const IFIXED_SIGN_BIT = 2n ** 255n;
+
+/** Whether reduce-only orders of these sizes close all of a position's (ifixed) base. */
+const closesWholePosition = (
+  payloads: PlaceOrderPayload[],
+  lotSize: string,
+  position: PerpPositionState
+) => {
+  const base = position.base >= IFIXED_SIGN_BIT ? 2n ** 256n - position.base : position.base;
+  if (base === 0n) return false;
+  const units = payloads.reduce((sum, p) => sum + sizeToUnits(p.size, lotSize), 0n);
+  // Order sizes have nine decimals, the base eighteen.
+  return units * 1_000_000_000n >= base;
+};
 
 /** A market holding collateral its position no longer needs: no size, no resting orders. */
 type ReturnableMarket = CollateralReturn & { units: bigint };
@@ -455,7 +512,8 @@ export class AccountTransactionSupervisor {
     ctx: Context,
     marketId: string,
     payloads: PlaceOrderPayload[],
-    source: TradeMetadataSource
+    source: TradeMetadataSource,
+    attach: SessionAttachment = {}
   ): Promise<OperationResult<PlacedOrder[]>> {
     const market = ctx.deployment.markets[marketId];
     if (!market) return failure(`Market ${marketId} is not available on ${ctx.deployment.network}`);
@@ -477,8 +535,15 @@ export class AccountTransactionSupervisor {
       closing && !createPosition && position != null
         ? { restoreImr: this.restoreImrFor(marketId, market, position) }
         : undefined;
+    // Closing the whole position also cancels the stop tickets that only reduce it: left in
+    // place, they would act on the next position the account opens on the market.
+    const staleTickets =
+      closing && position != null && closesWholePosition(payloads, market.lotSize, position)
+        ? this.reducingStopTicketsOn(ctx, marketId)
+        : [];
+    const ref = { account: ctx.account.account, cap: ctx.account.cap };
     const tx = ctx.builder.session({
-      ref: { account: ctx.account.account, cap: ctx.account.cap },
+      ref,
       marketId,
       orders: payloads.map((p) => toOrderSpec(p, market)),
       options: {
@@ -494,9 +559,23 @@ export class AccountTransactionSupervisor {
       },
       priceUpdates,
     });
+    staleTickets.forEach((ticketId) => ctx.builder.appendCancelStopTicket(tx, ref, ticketId));
+    if (attach.ticket?.stopLossTakeProfit) {
+      ctx.builder.appendStopLossTakeProfitTicket(tx, ref, attach.ticket.stopLossTakeProfit);
+    }
     try {
+      if (attach.ticket) await this.handInBeforeSigning(ctx, attach.ticket);
       const result = await signAndExecute(tx);
       this.markPosition(ctx, marketId);
+      if (attach.ticket) this.ticketLanded(ctx, attach.ticket);
+      if (staleTickets.length > 0) {
+        logBonsaiInfo(FN, 'stop tickets canceled with the position', {
+          digest: result.digest,
+          marketId,
+          tickets: staleTickets,
+        });
+        this.refreshTickets();
+      }
       // Ending the session cached the account's fee tier on the market for its next sessions.
       appQueryClient
         .invalidateQueries({ queryKey: ['haneul', 'accountFees'] })
@@ -544,7 +623,9 @@ export class AccountTransactionSupervisor {
 
   public async placeOrder(
     payload: PlaceOrderPayload,
-    source: TradeMetadataSource
+    source: TradeMetadataSource,
+    /** A take profit / stop loss to create with the order, which opens the position. */
+    triggers?: TriggerOrderActions[]
   ): Promise<OperationResult<any>> {
     const unsupported = unsupportedOrderTypeReason(payload.type);
     if (unsupported) {
@@ -563,9 +644,21 @@ export class AccountTransactionSupervisor {
     );
 
     const ctx = await this.context();
+    let attach: SessionAttachment = {};
+    if (!isOperationFailure(ctx) && triggers != null && triggers.length > 0) {
+      const levels = planStopLossTakeProfit(triggers, []).create;
+      if (levels != null) {
+        attach = {
+          ticket: this.prepareStopLossTakeProfit(ctx.payload, payload.marketId, {
+            ...levels,
+            positionIsAsk: payload.side === OrderSide.SELL,
+          }),
+        };
+      }
+    }
     const result = isOperationFailure(ctx)
       ? ctx
-      : await this.executeSession(ctx.payload, payload.marketId, [payload], source);
+      : await this.executeSession(ctx.payload, payload.marketId, [payload], source, attach);
     this.settlePlacements(result, [payload]);
     return result;
   }
@@ -573,9 +666,15 @@ export class AccountTransactionSupervisor {
   public async placeCompoundOrder(order: TradeFormPayload, source: TradeMetadataSource) {
     const main = order.orderPayload;
     const scale = order.scaleOrderPayloads ?? [];
-    const triggers = (order.triggersPayloads ?? []).filter((t) => t.placePayload != null);
+    const triggers = (order.triggersPayloads ?? []).filter(
+      (t) => t.placePayload != null || t.cancelPayload != null
+    );
     if (triggers.length > 0) {
-      return failure('Conditional orders are not available yet');
+      if (main == null && scale.length === 0) return this.placeTriggerTickets(triggers);
+      if (main == null || scale.length > 0 || !isMarketOrder(main)) {
+        return failure('Take profit and stop loss go with a market order only');
+      }
+      return this.placeOrder(main, source, triggers);
     }
     const payloads = [main, ...scale].filter((p): p is PlaceOrderPayload => p != null);
     const unsupported = payloads.map((p) => unsupportedOrderTypeReason(p.type)).find(isTruthy);
@@ -648,6 +747,9 @@ export class AccountTransactionSupervisor {
     orderId: string;
     withNotification?: boolean;
   }): Promise<OperationResult<any>> {
+    if (parseTicketOrderId(orderId) != null) {
+      return this.placeTriggerTickets([{ cancelPayload: { orderId } as CancelOrderPayload }]);
+    }
     const uuid = crypto.randomUUID();
     const resolved = this.resolveOrderMarket(orderId);
     if (!resolved) {
@@ -744,6 +846,235 @@ export class AccountTransactionSupervisor {
       );
     }
     return result;
+  }
+
+  // ---------------------------------------------------------------- order tickets
+
+  /** The open stop loss / take profit tickets of the account on `marketId` this browser made. */
+  private stopLossTakeProfitsOn(ctx: Context, marketId: string) {
+    const state = this.store.getState();
+    return openStopLossTakeProfits(
+      BonsaiCore.account.orderTickets.data(state),
+      state.ticketDetails.byCommitment,
+      ctx.account.account
+    ).filter((t) => t.marketId === marketId);
+  }
+
+  /** The open stop tickets of the account that only reduce its position on `marketId`. */
+  private reducingStopTicketsOn(ctx: Context, marketId: string) {
+    const state = this.store.getState();
+    return openReducingStopTickets(
+      BonsaiCore.account.orderTickets.data(state),
+      state.ticketDetails.byCommitment,
+      ctx.account.account
+    )
+      .filter((t) => t.marketId === marketId)
+      .map((t) => t.ticketId);
+  }
+
+  private prepareStopLossTakeProfit(
+    ctx: Context,
+    marketId: string,
+    levels: { stopLoss?: number; takeProfit?: number; size: number; positionIsAsk: boolean }
+  ): PreparedTicket {
+    const market = ctx.deployment.markets[marketId]!;
+    // One ticket holds both levels: the engine consumes it at whichever triggers first, which
+    // cancels the other. It closes at market; the keeper holds back a fill far from the index.
+    const details: StopLossTakeProfitDetails = {
+      clearingHouse: market.clearingHouse,
+      isLimitOrder: false,
+      triggerPriceType: TRIGGER_ON_INDEX,
+      stopLossPrice: levels.stopLoss != null ? priceToIfixed(levels.stopLoss) : undefined,
+      takeProfitPrice: levels.takeProfit != null ? priceToIfixed(levels.takeProfit) : undefined,
+      positionIsAsk: levels.positionIsAsk,
+      size: sizeToUnits(levels.size, market.lotSize),
+      price: 0n,
+      orderType: ORDER_TYPE.GTC,
+      salt: randomSalt(),
+    };
+    return {
+      marketId,
+      kind: 'stopLossTakeProfit',
+      json: stopLossTakeProfitJson(details),
+      commitment: stopLossTakeProfitCommitment(details),
+      stopLossTakeProfit: details,
+    };
+  }
+
+  /**
+   * Hands a ticket's details to the keeper before its transaction is signed. Throws unless the
+   * keeper answers with the commitment computed here: a ticket whose details it does not hold
+   * would never execute.
+   */
+  private async handInBeforeSigning(ctx: Context, ticket: PreparedTicket) {
+    if (ctx.deployment.ticketExecutors.length === 0) {
+      throw new Error(`No order keeper executes tickets on ${ctx.deployment.network}`);
+    }
+    const answer = await handInTicketDetails(ctx.deployment, ticket.kind, ticket.json);
+    if (answer.commitment !== toHex(ticket.commitment)) {
+      throw new Error(
+        'The order keeper computed another commitment for these details; nothing was signed'
+      );
+    }
+  }
+
+  /**
+   * Keeps a landed ticket's details for the tables, and hands them in again until the keeper
+   * finds the ticket on chain holding them, which it keeps whatever else waits.
+   */
+  private ticketLanded(ctx: Context, ticket: PreparedTicket) {
+    const commitment = toHex(ticket.commitment);
+    this.store.dispatch(
+      ticketDetailsSaved({
+        commitment,
+        entry: {
+          network: ctx.deployment.network,
+          account: ctx.account.account,
+          marketId: ticket.marketId,
+          kind: ticket.kind,
+          details: ticket.json,
+          savedAtMs: Date.now(),
+        },
+      })
+    );
+    this.refreshTickets();
+    const again = async (attempt: number): Promise<void> => {
+      const answer = await handInTicketDetails(ctx.deployment, ticket.kind, ticket.json).catch(
+        () => undefined
+      );
+      if (answer?.held === true) return;
+      if (attempt + 1 >= TICKET_HELD_ATTEMPTS) {
+        logBonsaiInfo(FN, 'the keeper has not seen the ticket on chain yet', { commitment });
+        return;
+      }
+      await new Promise((resolve) => {
+        setTimeout(resolve, TICKET_HELD_DELAY_MS);
+      });
+      await again(attempt + 1);
+    };
+    again(0).catch(() => undefined);
+  }
+
+  /** The ticket tables read perp-api: now, and again once the indexer has had time. */
+  private refreshTickets() {
+    const refresh = () =>
+      appQueryClient
+        .invalidateQueries({ queryKey: ['indexer', 'account', 'orderTickets'] })
+        .catch(() => undefined);
+    refresh();
+    setTimeout(refresh, TRANSFERS_REFRESH_DELAY_MS);
+  }
+
+  /**
+   * The triggers form's take profit and stop loss edits on one position, as tickets: the open
+   * ticket of the market is canceled and, unless no level is left, one ticket with the levels
+   * after the edit is created, in one transaction.
+   */
+  private async placeTriggerTickets(
+    triggers: TriggerOrderActions[]
+  ): Promise<OperationResult<{ digest: string }>> {
+    const ctx = await this.context();
+    if (isOperationFailure(ctx)) return ctx;
+    const { deployment, builder, account } = ctx.payload;
+    const state = this.store.getState();
+    const marketId =
+      triggers.map((t) => t.placePayload?.marketId).find(isTruthy) ??
+      triggers
+        .map((t) => parseTicketOrderId(t.cancelPayload?.orderId)?.ticketId)
+        .filter(isTruthy)
+        .map(
+          (ticketId) =>
+            openStopLossTakeProfits(
+              BonsaiCore.account.orderTickets.data(state),
+              state.ticketDetails.byCommitment,
+              account.account
+            ).find((t) => t.ticketId === ticketId)?.marketId
+        )
+        .find(isTruthy);
+    if (marketId == null || deployment.markets[marketId] == null) {
+      return failure('No market for the take profit / stop loss');
+    }
+    const plan = planStopLossTakeProfit(
+      triggers,
+      this.stopLossTakeProfitsOn(ctx.payload, marketId)
+    );
+    if (plan.create == null && plan.cancelTicketIds.length === 0)
+      return wrapOperationSuccess({ digest: '' });
+    const position = (BonsaiCore.account.parentSubaccountPositions.data(state) ?? []).find(
+      (p) => p.market === marketId && p.status === IndexerPerpetualPositionStatus.OPEN
+    );
+    if (plan.create != null && position == null) {
+      return failure('Take profit and stop loss need an open position');
+    }
+    const ref = { account: account.account, cap: account.cap };
+    const tx = new Transaction();
+    plan.cancelTicketIds.forEach((ticketId) => builder.appendCancelStopTicket(tx, ref, ticketId));
+    const ticket =
+      plan.create != null && position != null
+        ? this.prepareStopLossTakeProfit(ctx.payload, marketId, {
+            ...plan.create,
+            positionIsAsk: position.side === IndexerPositionSide.SHORT,
+          })
+        : undefined;
+    if (ticket?.stopLossTakeProfit) {
+      builder.appendStopLossTakeProfitTicket(tx, ref, ticket.stopLossTakeProfit);
+    }
+    try {
+      if (ticket) await this.handInBeforeSigning(ctx.payload, ticket);
+      const result = await signAndExecute(tx);
+      if (ticket) this.ticketLanded(ctx.payload, ticket);
+      else this.refreshTickets();
+      logBonsaiInfo(FN, 'take profit / stop loss tickets', {
+        digest: result.digest,
+        marketId,
+        canceled: plan.cancelTicketIds,
+        created: plan.create,
+      });
+      return wrapOperationSuccess({ digest: result.digest });
+    } catch (error) {
+      return this.toFailure(error);
+    }
+  }
+
+  /** Cancels a stop or TWAP ticket of the account; the gas it held comes back to the wallet. */
+  public async cancelOrderTicket({
+    ticketId,
+    type,
+    marketId,
+  }: {
+    ticketId: string;
+    type: 'STOP' | 'TWAP';
+    /** The TWAP's market, whose collateral its cancellation releases. */
+    marketId?: string;
+  }): Promise<OperationResult<{ digest: string }>> {
+    const ctx = await this.context();
+    if (isOperationFailure(ctx)) return ctx;
+    const { builder, account, address } = ctx.payload;
+    const ref = { account: account.account, cap: account.cap };
+    try {
+      let tx: Transaction;
+      if (type === 'STOP') {
+        tx = builder.cancelStopTicket({ ref, ticketId, recipient: address });
+      } else {
+        if (marketId == null || ctx.payload.deployment.markets[marketId] == null) {
+          return failure('The TWAP order names no market');
+        }
+        const priceUpdates = await this.priceUpdatesFor(ctx.payload, marketId);
+        tx = builder.cancelTwapTicket({
+          ref,
+          marketId,
+          ticketId,
+          recipient: address,
+          priceUpdates,
+        });
+      }
+      const result = await signAndExecute(tx);
+      this.refreshTickets();
+      logBonsaiInfo(FN, 'order ticket canceled', { digest: result.digest, ticketId, type });
+      return wrapOperationSuccess({ digest: result.digest });
+    } catch (error) {
+      return this.toFailure(error);
+    }
   }
 
   /** Closes every open position with reduce-only market orders, one session per market. */
