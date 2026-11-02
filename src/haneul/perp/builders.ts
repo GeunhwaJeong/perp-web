@@ -511,9 +511,21 @@ export class PerpTransactionBuilder {
     executors?: string[];
   }) {
     const full: TwapDetails = { ...details, salt: details.salt ?? randomSalt() };
-    const commitment = twapCommitment(full);
-    const market = this.market(marketId);
     const tx = new Transaction();
+    this.appendTwapTicket(tx, ref, marketId, full, executors);
+    return { tx, details: full };
+  }
+
+  /** Appends a TWAP ticket on `marketId` to `tx`; the ticket names its clearing house. */
+  appendTwapTicket(
+    tx: Transaction,
+    ref: PerpAccountRef,
+    marketId: string,
+    details: TwapDetails,
+    executors?: string[]
+  ) {
+    const commitment = twapCommitment(details);
+    const market = this.market(marketId);
     const gas = tx.splitCoins(tx.gas, [tx.pure.u64(BigInt(this.deployment.ticketGas))]);
     tx.moveCall({
       target: target(
@@ -533,7 +545,31 @@ export class PerpTransactionBuilder {
         tx.pure.vector('u8', Array.from(commitment)),
       ],
     });
-    return { tx, details: full };
+  }
+
+  /** Appends a standalone stop ticket to `tx`. */
+  appendStandaloneStopTicket(
+    tx: Transaction,
+    ref: PerpAccountRef,
+    details: StandaloneStopDetails,
+    executors?: string[]
+  ) {
+    this.addTicket(tx, ref, 1n, standaloneStopCommitment(details), executors);
+  }
+
+  /**
+   * Appends the account's position on `marketId` at `initialMarginRatio`: a ticket's order runs
+   * in a session on the position, which the engine does not create for it.
+   */
+  appendCreatePosition(
+    tx: Transaction,
+    ref: PerpAccountRef,
+    marketId: string,
+    initialMarginRatio: bigint
+  ) {
+    const market = this.market(marketId);
+    this.addCreatePosition(tx, ref, market);
+    this.addSetImr(tx, ref, market, initialMarginRatio);
   }
 
   cancelTwapTicket({

@@ -9,21 +9,21 @@ describe('unsupportedOrderTypeReason', () => {
     expect(unsupportedOrderTypeReason(OrderType.MARKET)).toBeUndefined();
   });
 
-  it('refuses TWAP orders', () => {
-    expect(unsupportedOrderTypeReason(OrderType.TWAP)).toBe('TWAP orders are not available yet');
-    expect(unsupportedOrderTypeReason(OrderType.TWAP_SUBORDER)).toBe(
-      'TWAP orders are not available yet'
-    );
-  });
-
-  it('refuses every conditional order type', () => {
+  it('lets stop, take profit and TWAP orders through, which become order tickets', () => {
     [
       OrderType.STOP_LIMIT,
       OrderType.STOP_MARKET,
       OrderType.TAKE_PROFIT_LIMIT,
       OrderType.TAKE_PROFIT_MARKET,
+      OrderType.TWAP,
     ].forEach((type) => {
-      expect(unsupportedOrderTypeReason(type)).toBe('Conditional orders are not available yet');
+      expect(unsupportedOrderTypeReason(type)).toBeUndefined();
     });
+  });
+
+  it('refuses a TWAP suborder, which only the keeper places', () => {
+    expect(unsupportedOrderTypeReason(OrderType.TWAP_SUBORDER)).toBe(
+      'TWAP suborders are placed by the keeper'
+    );
   });
 });

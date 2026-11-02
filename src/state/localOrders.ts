@@ -157,9 +157,15 @@ export const localOrdersSlice = createSlice({
     // to move a submission out of the pending state.
     placeOrderConfirmed: (
       state,
-      action: PayloadAction<{ clientId: string; orderId?: string; status: PlaceOrderStatuses }>
+      action: PayloadAction<{
+        clientId: string;
+        orderId?: string;
+        status: PlaceOrderStatuses;
+        /** The order's status when no indexed order will report it, as for an order ticket. */
+        cachedStatus?: OrderStatus;
+      }>
     ) => {
-      const { clientId, orderId, status } = action.payload;
+      const { clientId, orderId, status, cachedStatus } = action.payload;
       const existing = state.localPlaceOrders[clientId];
       if (existing == null) {
         return;
@@ -168,6 +174,10 @@ export const localOrdersSlice = createSlice({
         ...existing,
         orderId: orderId ?? existing.orderId,
         submissionStatus: status,
+        cachedData:
+          cachedStatus != null
+            ? { ...existing.cachedData, status: cachedStatus }
+            : existing.cachedData,
       };
     },
     cancelOrderConfirmed: (state, action: PayloadAction<{ uuid: string }>) => {

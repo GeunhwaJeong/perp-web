@@ -179,19 +179,20 @@ const acct = await findPerpAccount(client, deployment, me);
 if (!acct) throw new Error('no account');
 accountId = acct.accountId;
 accountObject = acct.account;
-let s = await chain();
+const s = await chain();
 check('account balance 19,000 on chain', s.balance === 19_000n * UNIT, describe(s));
 
-// The write path refuses TWAP before signing.
+// The write path refuses, before signing, a TWAP the keeper would not run: two hours at thirty
+// seconds is 240 chunks, over the 120 a TWAP ticket may take.
 r = await place({
   type: 'TWAP',
-  twapParameters: { duration: 300, interval: 30, priceTolerance: 1 },
+  twapParameters: { duration: 7200, interval: 30, priceTolerance: 10_000 },
 });
 const afterTwap = await chain();
 check(
-  'a TWAP order is refused and nothing changes',
+  'a TWAP of more chunks than the keeper runs is refused and nothing changes',
   r.type === 'failure' &&
-    /TWAP orders are not available yet/.test(r.errorString) &&
+    /at most 120 chunks/.test(r.errorString) &&
     afterTwap.balance === s.balance &&
     afterTwap.base === 0n,
   r.errorString

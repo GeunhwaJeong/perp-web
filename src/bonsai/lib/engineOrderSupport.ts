@@ -1,12 +1,11 @@
 import { OrderType } from '@/bonsai/types/summaryTypes';
 
 /**
- * The order types the write path can place on the perpetuals engine as orders: limit and market
- * orders, which become `place_limit_order` calls in one session. A position's take profit and
- * stop loss go through the triggers form as an order ticket the keeper executes (see
- * `placeCompoundOrder`); standalone stop and TWAP orders are not wired to tickets yet. This is
- * an allowlist on purpose: a type it does not name would otherwise fall through to a plain
- * resting limit order.
+ * The order types the write path can place on the perpetuals engine: limit and market orders,
+ * which become `place_limit_order` calls in one session, and stop, take profit and TWAP orders,
+ * which become order tickets the keeper executes (see `placeTicketOrder`). A TWAP's suborders
+ * are the keeper's chunks, never placed from here. This is an allowlist on purpose: a type it
+ * does not name would otherwise fall through to a plain resting limit order.
  *
  * Returns why `type` cannot be placed, or `undefined` when it can.
  */
@@ -14,11 +13,15 @@ export const unsupportedOrderTypeReason = (type: OrderType): string | undefined 
   switch (type) {
     case OrderType.LIMIT:
     case OrderType.MARKET:
-      return undefined;
+    case OrderType.STOP_LIMIT:
+    case OrderType.STOP_MARKET:
+    case OrderType.TAKE_PROFIT_LIMIT:
+    case OrderType.TAKE_PROFIT_MARKET:
     case OrderType.TWAP:
+      return undefined;
     case OrderType.TWAP_SUBORDER:
-      return 'TWAP orders are not available yet';
+      return 'TWAP suborders are placed by the keeper';
     default:
-      return 'Conditional orders are not available yet';
+      return 'This order type is not available';
   }
 };

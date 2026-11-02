@@ -42,9 +42,13 @@ import {
   readPosition,
   selectPriceUpdates,
   sizeToUnits,
+  standaloneStopCommitment,
+  standaloneStopJson,
   stopLossTakeProfitCommitment,
   stopLossTakeProfitJson,
   toHex,
+  twapCommitment,
+  twapJson,
   unitsToCollateral,
   type CollateralReturn,
   type OrderSpec,
@@ -53,9 +57,11 @@ import {
   type PerpDeployment,
   type PerpPositionState,
   type SignedPriceUpdate,
+  type StandaloneStopDetails,
   type StopLossTakeProfitDetails,
   type TicketDetailsJson,
   type TicketKind,
+  type TwapDetails,
 } from '@/haneul/perp';
 import { signAndExecute, simulateWithApp } from '@/haneul/perp/executor';
 import { buildCoinSend, isGasCoinType, listCoins } from '@/haneul/transfer';
@@ -107,10 +113,13 @@ import {
   wrapOperationSuccess,
 } from './lib/operationResult';
 import {
+  isStopOrderType,
   openReducingStopTickets,
   openStopLossTakeProfits,
   parseTicketOrderId,
   planStopLossTakeProfit,
+  standaloneStopFromPayload,
+  twapFromPayload,
 } from './lib/ticketOrders';
 import { logBonsaiError, logBonsaiInfo } from './logs';
 
@@ -134,6 +143,8 @@ type PreparedTicket = {
   json: TicketDetailsJson;
   commitment: Uint8Array;
   stopLossTakeProfit?: StopLossTakeProfitDetails;
+  standaloneStop?: StandaloneStopDetails;
+  twap?: TwapDetails;
 };
 
 /** Ticket work a session carries in its transaction. */
@@ -631,6 +642,9 @@ export class AccountTransactionSupervisor {
     if (unsupported) {
       return failure(unsupported);
     }
+    if (isStopOrderType(payload.type) || payload.type === OrderType.TWAP) {
+      return this.placeTicketOrder(payload);
+    }
     this.store.dispatch(
       placeOrderSubmitted({
         marketId: payload.marketId,
@@ -1033,6 +1047,115 @@ export class AccountTransactionSupervisor {
       return wrapOperationSuccess({ digest: result.digest });
     } catch (error) {
       return this.toFailure(error);
+    }
+  }
+
+  /**
+   * A stop, take profit or TWAP order of the trade form, as an order ticket the keeper executes.
+   * The order runs in a session on the account's position, which the ticket's transaction
+   * creates when the market has none yet. A reduce-only order needs a position it reduces: the
+   * keeper would cancel it otherwise.
+   */
+  private async placeTicketOrder(payload: PlaceOrderPayload): Promise<OperationResult<any>> {
+    this.store.dispatch(
+      placeOrderSubmitted({
+        marketId: payload.marketId,
+        clientId: `${payload.clientId}`,
+        orderType: payload.type,
+        subaccountNumber: payload.subaccountNumber,
+      })
+    );
+    const settle = (result: OperationResult<any>, cachedStatus?: OrderStatus) => {
+      if (isOperationFailure(result)) {
+        this.store.dispatch(
+          placeOrderFailed({
+            clientId: `${payload.clientId}`,
+            errorParams: operationFailureToErrorParams(result),
+          })
+        );
+      } else {
+        this.store.dispatch(
+          placeOrderConfirmed({
+            clientId: `${payload.clientId}`,
+            status: PlaceOrderStatuses.Placed,
+            cachedStatus,
+          })
+        );
+      }
+      return result;
+    };
+    const ctx = await this.context();
+    if (isOperationFailure(ctx)) return settle(ctx);
+    const { deployment, builder, account } = ctx.payload;
+    const marketId = payload.marketId;
+    const market = deployment.markets[marketId];
+    if (market == null) return settle(failure(`Market ${marketId} is not available`));
+    if (payload.reduceOnly === true) {
+      const position = (
+        BonsaiCore.account.parentSubaccountPositions.data(this.store.getState()) ?? []
+      ).find((p) => p.market === marketId && p.status === IndexerPerpetualPositionStatus.OPEN);
+      const reduces =
+        position != null &&
+        (payload.side === OrderSide.SELL
+          ? position.side === IndexerPositionSide.LONG
+          : position.side === IndexerPositionSide.SHORT);
+      if (!reduces) {
+        return settle(failure('A reduce-only order needs a position on the other side to reduce'));
+      }
+    }
+    const isTwap = payload.type === OrderType.TWAP;
+    const planned = isTwap
+      ? twapFromPayload(payload, market, Date.now())
+      : standaloneStopFromPayload(payload, market, Date.now());
+    if ('error' in planned) return settle(failure(planned.error));
+    let ticket: PreparedTicket;
+    if (isTwap) {
+      const details = { ...(planned.details as Omit<TwapDetails, 'salt'>), salt: randomSalt() };
+      ticket = {
+        marketId,
+        kind: 'twap',
+        json: twapJson(details),
+        commitment: twapCommitment(details),
+        twap: details,
+      };
+    } else {
+      const details = {
+        ...(planned.details as Omit<StandaloneStopDetails, 'salt'>),
+        salt: randomSalt(),
+      };
+      ticket = {
+        marketId,
+        kind: 'standaloneStop',
+        json: standaloneStopJson(details),
+        commitment: standaloneStopCommitment(details),
+        standaloneStop: details,
+      };
+    }
+    const ref = { account: account.account, cap: account.cap };
+    try {
+      const createPosition = await this.ensurePosition(ctx.payload, marketId);
+      const tx = new Transaction();
+      if (createPosition) {
+        builder.appendCreatePosition(tx, ref, marketId, BigInt(market.initialMarginRatio));
+      }
+      if (ticket.twap) builder.appendTwapTicket(tx, ref, marketId, ticket.twap);
+      if (ticket.standaloneStop) builder.appendStandaloneStopTicket(tx, ref, ticket.standaloneStop);
+      await this.handInBeforeSigning(ctx.payload, ticket);
+      const result = await signAndExecute(tx);
+      if (createPosition) this.markPosition(ctx.payload, marketId);
+      this.ticketLanded(ctx.payload, ticket);
+      logBonsaiInfo(FN, 'order ticket placed', {
+        digest: result.digest,
+        marketId,
+        kind: ticket.kind,
+        createdPosition: createPosition,
+      });
+      return settle(
+        wrapOperationSuccess({ digest: result.digest }),
+        isTwap ? OrderStatus.Open : OrderStatus.Untriggered
+      );
+    } catch (error) {
+      return settle(this.toFailure(error));
     }
   }
 
