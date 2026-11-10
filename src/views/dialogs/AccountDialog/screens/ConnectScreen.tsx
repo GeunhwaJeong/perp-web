@@ -150,7 +150,7 @@ export const ConnectScreen = ({
         <Fine>
           By connecting a wallet you agree to Sigma&apos;s{' '}
           <a href={AppRoute.Terms} target="_blank" rel="noreferrer">
-            Terms of Service
+            Terms of Use
           </a>{' '}
           and{' '}
           <a href={AppRoute.Privacy} target="_blank" rel="noreferrer">

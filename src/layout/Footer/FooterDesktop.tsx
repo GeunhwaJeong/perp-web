@@ -112,17 +112,10 @@ export const FooterDesktop = () => {
           {walletConnected ? 'Wallet connected' : 'Wallet disconnected'}
         </$FooterItem>
         <$FooterItem>
-          {stringGetter({
-            key: STRING_KEYS.SITE_OPERATED_BY_SHORT,
-            params: {
-              NAME_OF_DEPLOYER: deployerName,
-              LEARN_MORE_LINK: (
-                <Link onClick={() => dispatch(openDialog(DialogTypes.Help()))}>
-                  {stringGetter({ key: STRING_KEYS.LEARN_MORE })}
-                </Link>
-              ),
-            },
-          })}
+          This site is operated by {deployerName}.{' '}
+          <Link onClick={() => dispatch(openDialog(DialogTypes.Help()))}>
+            {stringGetter({ key: STRING_KEYS.LEARN_MORE })}
+          </Link>
         </$FooterItem>
       </$Row>
 

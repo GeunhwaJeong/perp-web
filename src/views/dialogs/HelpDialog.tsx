@@ -21,18 +21,13 @@ import { TermsOfUseLink } from '@/components/TermsOfUseLink';
 import { isTruthy } from '@/lib/isTruthy';
 
 const latestCommit = import.meta.env.VITE_LAST_ORIGINAL_COMMIT;
+const SOURCE_URL = 'https://github.com/GeunhwaJeong/perp-web';
 const latestVersion = import.meta.env.VITE_LAST_TAG;
 
 export const HelpDialog = ({ setIsOpen }: DialogProps<HelpDialogProps>) => {
   const stringGetter = useStringGetter();
   const deployerName = useEnvConfig('deployerName');
-  const {
-    help: helpCenter,
-    community,
-    deployerTermsAndConditions,
-    dydxLearnMore,
-    tos,
-  } = useURLConfigs();
+  const { help: helpCenter, community } = useURLConfigs();
 
   const HELP_ITEMS = useMemo(
     (): MenuConfig<string | number, string | number> => [
@@ -71,30 +66,15 @@ export const HelpDialog = ({ setIsOpen }: DialogProps<HelpDialogProps>) => {
 
   const legalDisclaimer = (
     <div tw="text-color-text-0 font-mini-book">
-      {stringGetter({
-        key: STRING_KEYS.SITE_OPERATED_BY_LONG,
-        params: {
-          NAME_OF_DEPLOYER: deployerName,
-          DEPLOYER_TERMS_AND_CONDITIONS: (
-            <Link
-              isInline
-              href={
-                deployerTermsAndConditions && deployerTermsAndConditions !== ''
-                  ? deployerTermsAndConditions
-                  : `${BASE_ROUTE}${AppRoute.Terms}`
-              }
-            >
-              {stringGetter({ key: STRING_KEYS.OUR_TERMS_AND_CONDITIONS })}
-            </Link>
-          ),
-          TERMS_OF_USE: <TermsOfUseLink isInline hrefOverride={tos} />,
-          LEARN_MORE_LINK: (
-            <Link isInline href={dydxLearnMore}>
-              {stringGetter({ key: STRING_KEYS.LEARN_MORE_ARROW })}
-            </Link>
-          ),
-        },
-      })}
+      This site is operated by {deployerName} subject to its <TermsOfUseLink isInline /> and{' '}
+      <Link isInline href={`${BASE_ROUTE}${AppRoute.Privacy}`}>
+        {stringGetter({ key: STRING_KEYS.PRIVACY_POLICY })}
+      </Link>
+      . The interface is derived from the dYdX v4 web software and is open source under the AGPL-3.0
+      license.{' '}
+      <Link isInline href={SOURCE_URL}>
+        Source code
+      </Link>
     </div>
   );
 

@@ -7,35 +7,39 @@ const TermsOfUsePage = () => (
   <$Article>
     <header>
       <h1>Terms of Use</h1>
-      <span>Last updated: October 14, 2026</span>
+      <span>Last updated: November 10, 2026</span>
     </header>
     <div>
       <p>
         <strong>
-          THE INTERFACE (AS DEFINED BELOW) IS NOT AVAILABLE TO PERSONS OR ENTITIES WHO RESIDE IN,
-          ARE LOCATED IN, ARE INCORPORATED IN, OR HAVE A REGISTERED OFFICE IN THE UNITED STATES OF
-          AMERICA OR CANADA (COLLECTIVELY, “BLOCKED PERSONS”). MOREOVER, NO SERVICES (AS DEFINED
-          BELOW) ARE OFFERED TO PERSONS OR ENTITIES WHO RESIDE IN, ARE CITIZENS OF, ARE LOCATED IN,
-          ARE INCORPORATED IN, OR HAVE A REGISTERED OFFICE IN ANY RESTRICTED TERRITORY (AS DEFINED
-          BELOW, AND ANY SUCH PERSON OR ENTITY FROM A RESTRICTED TERRITORY, A “RESTRICTED PERSON”).
-          WE DO NOT MAKE EXCEPTIONS; THEREFORE, IF YOU ARE A BLOCKED PERSON, THEN DO NOT ATTEMPT TO
-          USE THE INTERFACE AND IF YOU ARE A RESTRICTED PERSON, THEN DO NOT ATTEMPT TO USE ANY OF
-          THE SERVICES. USE OF A VIRTUAL PRIVATE NETWORK (“VPN”) TO CIRCUMVENT THE RESTRICTIONS SET
-          FORTH HEREIN IS PROHIBITED.
+          THE SERVICES (AS DEFINED BELOW) ARE NOT OFFERED TO PERSONS OR ENTITIES WHO RESIDE IN, ARE
+          CITIZENS OF, ARE LOCATED IN, ARE INCORPORATED IN, OR HAVE A REGISTERED OFFICE IN ANY
+          RESTRICTED TERRITORY (AS DEFINED BELOW, AND ANY SUCH PERSON OR ENTITY, A “RESTRICTED
+          PERSON”), OR TO ANY PERSON OR ENTITY WHOSE USE OF THE SERVICES IS PROHIBITED BY THE LAWS
+          THAT APPLY TO THEM. IF YOU ARE A RESTRICTED PERSON, OR IF THE LAWS THAT APPLY TO YOU
+          PROHIBIT YOUR USE OF THE SERVICES, THEN DO NOT USE THE SERVICES.
         </strong>
       </p>
       <p>
-        These terms of use, together with any documents and additional terms they expressly
-        incorporate by reference, which includes any other terms and conditions or other agreement
-        that our posts publicly or makes available to you or the company or other legal entity you
-        represent (“you” or “your”) (collectively, these “Terms”), are entered into between us and
-        you concerning your use of, and access to:
+        <strong>
+          SIGMA IS AT AN EARLY STAGE AND IS OPERATED ON AN EXPERIMENTAL BASIS. THE SERVICES MAY
+          CHANGE, BE INTERRUPTED, OR BE DISCONTINUED AT ANY TIME AND WITHOUT NOTICE.
+        </strong>
+      </p>
+      <p>
+        Sigma is a perpetual futures trading interface on the Haneul blockchain. In these terms,
+        “Sigma”, “we”, “us” and “our” refer to the operator of Sigma. These terms of use, together
+        with any documents and additional terms they expressly incorporate by reference, which
+        includes any other terms and conditions or other agreement that we post publicly or make
+        available to you or the company or other legal entity you represent (“you” or “your”)
+        (collectively, these “Terms”), are entered into between us and you concerning your use of,
+        and access to:
       </p>
       <ul>
         <li>
-          this website (and any subdomains); web applications; mobile applications; and all
-          associated sites linked thereto by us (collectively with any materials and services
-          available therein, and successor website(s) or application(s) thereto, the “Site”); and
+          this website (and any subdomains); web applications; and all associated sites linked
+          thereto by us (collectively with any materials and services available therein, and
+          successor website(s) or application(s) thereto, the “Site”); and
         </li>
       </ul>
       <ul>
@@ -43,9 +47,8 @@ const TermsOfUsePage = () => (
           all products and features available via the Site, including the smart contracts,
           decentralized applications, APIs and all other software that we or a third party has
           developed for trading blockchain-based assets (collectively, “Digital Assets”), including
-          entering into perpetual contracts (“Perpetual Contracts”) related to Digital Assets, or
-          exchanging one Digital Asset for another Digital Asset (collectively the “Interface”, and
-          together with the Site, the “Services”).
+          entering into perpetual contracts (“Perpetual Contracts”) related to Digital Assets
+          (collectively the “Interface”, and together with the Site, the “Services”).
         </li>
       </ul>
       <p>
@@ -54,7 +57,7 @@ const TermsOfUsePage = () => (
         legal liability, relating to your use of, and access to, the Services. By clicking “I agree”
         (or a similar language) to these Terms, acknowledging these Terms by other means, or
         otherwise accessing or using the Services, you accept and agree to be bound by and to comply
-        with these Terms, including the mandatory arbitration provision in Section 15. If you do not
+        with these Terms, including the dispute resolution provisions in Section 15. If you do not
         agree to these Terms, then you must not access or use the Services.
       </p>
       <p>
@@ -64,9 +67,9 @@ const TermsOfUsePage = () => (
         </strong>{' '}
         The information in Section 12 provides important details about the legal obligations
         associated with your use of the Services. By accessing or using the Services, you agree that
-        we do not provide execution, settlement, or clearing services of any kind and are not
-        responsible for the execution, settlement, or clearing of transactions automated through the
-        Services.
+        transactions are executed and settled by smart contracts on the Haneul blockchain and that
+        we are not responsible for the execution, settlement, or clearing of transactions made
+        through the Services.
       </p>
       <p>
         <strong>1. MODIFICATIONS TO THESE TERMS</strong>
@@ -103,27 +106,20 @@ const TermsOfUsePage = () => (
           </ul>
           <ul>
             <li>
-              if you are entering into these Terms to access the Interface or will in the future
-              access the Interface, then you are not a Blocked Person, and are not accessing the
-              Interface from within the United States or Canada (collectively, &quot;Blocked
-              Countries&quot;);
-            </li>
-          </ul>
-          <ul>
-            <li>
               you must not be a resident, citizen or agent of, or incorporated in, and do not have a
               registered office in Iran, Cuba, North Korea, Syria, Myanmar (Burma), the regions of
               Crimea, Donetsk or Luhansk, or any other country or region that is the subject of
-              comprehensive country-wide or region-wide economic sanctions by the United States
-              (collectively, “Restricted Territories”);
+              comprehensive country-wide or region-wide economic sanctions by Canada or the United
+              States (collectively, “Restricted Territories”);
             </li>
           </ul>
           <ul>
             <li>
               you are not the subject of economic or trade sanctions administered or enforced by any
               governmental authority or otherwise designated on any list of prohibited or restricted
-              parties (including the list maintained by the Office of Foreign Assets Control of the
-              U.S. Department of the Treasury) (collectively, “Sanctioned Person”);
+              parties (including the lists maintained by Global Affairs Canada and by the Office of
+              Foreign Assets Control of the U.S. Department of the Treasury) (collectively,
+              “Sanctioned Person”);
             </li>
           </ul>
           <ul>
@@ -321,14 +317,13 @@ const TermsOfUsePage = () => (
         (“Prohibited Uses”). The specific activities set forth below are representative, but not
         exhaustive, of Prohibited Uses. If you are uncertain as to whether your use of the Services
         involves a Prohibited Use or have other questions about how these requirements apply to you,
-        then please contact us using the information set forth in Section 19. By using the Services,
+        then please contact us using the information set forth in Section 18. By using the Services,
         you confirm that you will not engage in any of the following Prohibited Uses:
       </p>
       <ul>
         <li>
           violate any Applicable Laws including any relevant and applicable anti-money laundering
-          and anti-terrorist financing laws and sanctions programs, such as the Bank Secrecy Act and
-          the U.S. Department of Treasury’s Office of Foreign Asset Controls;
+          and anti-terrorist financing laws and sanctions programs;
         </li>
       </ul>
       <ul>
@@ -410,7 +405,7 @@ const TermsOfUsePage = () => (
         <li>
           use the Services from a jurisdiction (including an IP address in a jurisdiction) that we
           have, in our sole discretion, determined is a jurisdiction where the use of the Services
-          is prohibited, including any Blocked Countries or any Restricted Territory;
+          is prohibited, including any Restricted Territory;
         </li>
       </ul>
       <ul>
@@ -488,6 +483,15 @@ const TermsOfUsePage = () => (
           the blockchain address from which you transfer Digital Assets is the only private key that
           can control the Digital Assets you transfer into the smart contracts available on the
           Interface.
+        </li>
+      </ul>
+      <ul>
+        <li>
+          7.5. The charts on the Site are provided by TradingView through its Advanced Charts
+          library, which we use under license. The charts are made available to you for your
+          personal, non-commercial use only. You may not copy, modify, redistribute, or commercially
+          exploit the charting library or any part of it, and you may not remove or obscure the
+          TradingView attribution displayed with the charts.
         </li>
       </ul>
       <p>
@@ -682,15 +686,10 @@ const TermsOfUsePage = () => (
       </p>
       <ul>
         <li>
-          12.1 We are a developer of software. We do not operate a Digital Asset or derivatives
-          exchange platform or offer trade execution or clearing services and have no oversight,
-          involvement, or control concerning your transactions using the Services. All transactions
-          between users of the Interface are executed peer-to-peer directly between the users’
-          blockchain addresses through a smart contract. You are responsible for complying with all
-          Applicable Laws that govern your Digital Assets. As a result of restrictions under the
-          Commodity Exchange Act and the regulations promulgated thereunder by the U.S. Commodity
-          Futures Trading Commission (“CFTC”), no Blocked Person may enter into Perpetual Contracts
-          using the Services.
+          12.1 Transactions made through the Interface are executed and settled by smart contracts
+          on the Haneul blockchain. We operate the Site and software that supports those smart
+          contracts. You are responsible for complying with all Applicable Laws that govern your
+          Digital Assets.
         </li>
       </ul>
       <ul>
@@ -783,112 +782,49 @@ const TermsOfUsePage = () => (
         liability, will be one hundred U.S. dollars ($100).
       </p>
       <p>
-        <strong>15. DISPUTE RESOLUTION AND ARBITRATION</strong>
+        <strong>15. DISPUTE RESOLUTION</strong>
       </p>
       <p>
-        PLEASE READ THE FOLLOWING SECTION CAREFULLY BECAUSE IT MAY SIGNIFICANTLY IMPACT YOUR LEGAL
-        RIGHTS, INCLUDING YOUR RIGHT TO BRING A LAWSUIT AGAINST US IN ANY COURT OR GOVERNING
-        AUTHORITY. EXCEPT AS EXPRESSLY PROVIDED BELOW, THIS SECTION REQUIRES YOU TO SUBMIT ANY
-        DISPUTE, CLAIM, OR DISAGREEMENT (EACH A “DISPUTE”) ARISING OUT OF THESE TERMS OR THE
-        SERVICES, INCLUDING ANY DISPUTE THAT AROSE BEFORE THE EFFECTIVE DATES OF THESE TERMS, TO
-        BINDING INDIVIDUAL ARBITRATION. THIS SECTION EXTENDS TO DISPUTES THAT AROSE OR INVOLVE FACTS
-        OCCURING BEFORE THE EXISTENCE OF THIS OR ANY PRIOR VERSIONS OF THE TERMS AS WELL AS DISPUTES
-        THAT MAY ARISE AFTER THE TERMINATION OF THE TERMS.
+        For any dispute, claim, or disagreement arising out of or related to these Terms or the
+        Services (each a “Dispute”), you agree to first contact us and attempt to resolve the
+        Dispute informally by sending a written notice (“Notice”) to us by email using the
+        information set forth in Section 18. The Notice must (a) include your name and email
+        address; (b) describe the nature and basis of the Dispute; and (c) set forth the specific
+        relief sought. Our notice to you will be similar in form to that described above.
       </p>
       <p>
-        You and we agree that any Dispute arising out of or related to these Terms or the Services
-        is personal to you and us and that any Dispute will be resolved solely through individual
-        arbitration, and will not be brought as a class arbitration, class action, or any other type
-        of representative proceeding.
+        If you and we cannot reach an agreement to resolve the Dispute within thirty (30) days after
+        the Notice is received, then either party may bring the Dispute before the courts set forth
+        in Section 16.
       </p>
       <p>
-        Nothing in this Section precludes you or we from bringing an individual action for damages
-        in a small claims court if such claims qualify and remain in small claims court, or from
-        seeking injunctive or other equitable relief in court for infringement or other alleged
-        misuse of intellectual property rights (such as trademarks, trade dress, domain names, trade
-        secrets, copyrights, and patents).
+        To the fullest extent permitted by Applicable Law, you and we agree that any Dispute is
+        personal to you and us, and that any Dispute will be brought only on an individual basis and
+        not as a class action or any other type of representative proceeding.
       </p>
       <p>
-        Except as specified above, you and we waive the rights to a judge or jury trial or to have
-        any Dispute arising out of or related to these Terms or the Services resolved in court.
-        Instead, for any Dispute that you have against us or relating in any way to the Services,
-        you agree to first contact us and attempt to resolve the claim informally by sending a
-        written notice of your claim (“Notice”) to us by email using the information set forth in
-        Section 19. The Notice must (a) include your name, residence address, email address, and
-        telephone number; (b) describe the nature and basis of the claim; and (c) set forth the
-        specific relief sought. Our notice to you will be similar in form to that described above.
-        If you and we cannot reach an agreement to resolve the claim within thirty (30) days after
-        such Notice is received, then either party may submit the Dispute to binding arbitration
-        administered by JAMS or, under the limited circumstances set forth above, in court. All
-        Disputes submitted to JAMS will be resolved through confidential, binding arbitration before
-        one arbitrator. Arbitration proceedings will be held in San Francisco, California, under the
-        JAMS Streamlined Arbitration Rules and Procedures (“JAMS Rules”). The most recent version of
-        the JAMS Rules is available on the JAMS website and are hereby incorporated by reference.
-        You either acknowledge and agree that you have read and understand the JAMS Rules or waive
-        your opportunity to read the JAMS Rules and waive any claim that the JAMS Rules are unfair
-        or should not apply for any reason.
-      </p>
-      <p>
-        You and we agree that these Terms affect interstate commerce and that the enforceability of
-        this Section 15 will be substantively and procedurally governed by the Federal Arbitration
-        Act, 9 U.S.C. § 1, et seq. (the “FAA”), to the maximum extent permitted by applicable law.
-        As limited by the FAA, these Terms and the JAMS Rules, the arbitrator will have exclusive
-        authority to make all procedural and substantive decisions regarding any dispute and to
-        grant any remedy that would otherwise be available in court, including the power to
-        determine the question of arbitrability. The arbitrator may conduct only an individual
-        arbitration and may not consolidate more than one individual’s claims, preside over any type
-        of class or representative proceeding or preside over any proceeding involving more than one
-        individual.
-      </p>
-      <p>
-        The arbitrator, we, and you will maintain the confidentiality of any arbitration
-        proceedings, judgments and awards, including all information gathered, prepared, and
-        presented for purposes of the arbitration or related to the dispute(s) therein. The
-        arbitrator will have the authority to make appropriate rulings to safeguard confidentiality
-        unless the law provides to the contrary. The duty of confidentiality does not apply to the
-        extent that disclosure is necessary to prepare for or conduct the arbitration hearing on the
-        merits, in connection with a court application for a preliminary remedy or in connection
-        with a judicial challenge to an arbitration award or its enforcement, or to the extent that
-        disclosure is otherwise required by law or judicial decision.
-      </p>
-      <p>
-        You and we agree that for any arbitration you initiate, you will pay the filing fee and all
-        other JAMS fees and costs. For any arbitration initiated by us, we will pay all JAMS fees
-        and costs. You and we agree that the state or federal courts of the State of Delaware have
-        exclusive jurisdiction over the enforcement of an arbitration award.
-      </p>
-      <p>
-        Any claim arising out of or related to these Terms or the Services must be filed within one
-        (1) year after such claim arose; otherwise, the claim is permanently barred, which means
-        that you and we will not have the right to assert the claim.
+        To the fullest extent permitted by Applicable Law, any claim arising out of or related to
+        these Terms or the Services must be filed within one (1) year after such claim arose;
+        otherwise, the claim is permanently barred, which means that you and we will not have the
+        right to assert the claim.
       </p>
       <p>
         If any portion of this Section 15 is found to be unenforceable or unlawful for any reason,
-        (a) the unenforceable or unlawful provision will be severed from these Terms; (b) severance
-        of the unenforceable or unlawful provision will have no impact whatsoever on the remainder
-        of this Section 15 or the parties’ ability to compel arbitration of any remaining claims on
-        an individual basis under this Section 15; and (c) to the extent that any claims must
-        therefore proceed on a class, collective, consolidated, or representative basis, such claims
-        must be litigated in a civil court of competent jurisdiction and not in arbitration, and the
-        parties agree that litigation of those claims will be stayed pending the outcome of any
-        individual claims in arbitration. Further, if any part of this Section 15 is found to
-        prohibit an individual claim seeking public injunctive relief, then that provision will have
-        no effect to the extent such relief is allowed to be sought out of arbitration, and the
-        remainder of this Section 15 will be enforceable.
+        the unenforceable or unlawful provision will be severed from these Terms, and the severance
+        will have no impact on the remainder of this Section 15.
       </p>
       <p>
         <strong>16. GOVERNING LAW</strong>
       </p>
       <p>
         The interpretation and enforcement of these Terms, and any Dispute related to these Terms or
-        the Services, will be governed by and construed and enforced under the laws of the State of
-        Delaware, as applicable, without regard to conflict of law rules or principles (whether of
-        the State of Delaware or any other jurisdiction) that would cause the application of the
-        laws of any other jurisdiction. You agree that we may initiate a proceeding related to the
-        enforcement or validity of our intellectual property rights in any court having
-        jurisdiction. For any other proceeding that is not subject to arbitration under these Terms,
-        the state and federal courts located in Delaware will have exclusive jurisdiction. You waive
-        any objection to venue in any such courts.
+        the Services, will be governed by and construed and enforced under the laws of the Province
+        of Ontario and the federal laws of Canada applicable therein, without regard to conflict of
+        law rules or principles that would cause the application of the laws of any other
+        jurisdiction. You agree that we may initiate a proceeding related to the enforcement or
+        validity of our intellectual property rights in any court having jurisdiction. For any other
+        proceeding, the courts of the Province of Ontario will have exclusive jurisdiction. You
+        waive any objection to venue in any such courts.
       </p>
       <p>
         <strong>17. GENERAL INFORMATION</strong>
@@ -905,12 +841,10 @@ const TermsOfUsePage = () => (
           17.2. You consent to receive all communications, agreements, documents, receipts, notices,
           and disclosures electronically (collectively, our “Communications”) that we provide in
           connection with these Terms or any Services. You agree that we may provide our
-          Communications to you by posting them on the Site, by emailing them to you at the email
-          address you provide in connection with using the Services, if any, or by Telegram at the
-          username you provided to us during the course of your use of the Services. You should
-          maintain copies of our Communications by printing a paper copy or saving an electronic
-          copy. You may also contact us with questions, complaints, or claims concerning the
-          Services using the information set forth in Section 19.
+          Communications to you by posting them on the Site. You should maintain copies of our
+          Communications by printing a paper copy or saving an electronic copy. You may also contact
+          us with questions, complaints, or claims concerning the Services using the information set
+          forth in Section 18.
         </li>
       </ul>
       <ul>
@@ -975,104 +909,11 @@ const TermsOfUsePage = () => (
         </li>
       </ul>
       <p>
-        <strong>18. APPLE-ENABLED SOFTWARE</strong>
+        <strong>18. CONTACT INFORMATION</strong>
       </p>
       <p>
-        With respect to any mobile application that is made available by us for your use in
-        connection with an Apple-branded product (the “Apple-Enabled Software”), in addition to the
-        other terms and conditions set forth in these Terms, the following terms and conditions
-        apply:
-      </p>
-      <ul>
-        <li>
-          we and you acknowledge that these Terms are concluded only between us and you, and not
-          with Apple Inc. or its affiliates (collectively, “Apple”), and that as between us and
-          Apple, we, not Apple, is solely responsible for the Apple-Enabled Software and the content
-          thereof.
-        </li>
-      </ul>
-      <ul>
-        <li>
-          You may not use the Apple-Enabled Software in any manner that is in violation of or
-          inconsistent with the Usage Rules set forth for Apple-Enabled Software in, or otherwise be
-          in conflict with, the Apple Media Services Terms and Conditions (the “Usage Rules”).
-        </li>
-      </ul>
-      <ul>
-        <li>
-          Your license to use the Apple-Enabled Software is limited to a non-transferable license to
-          use the Apple-Enabled Software on an iOS product that you own or control, as permitted by
-          the Usage Rules.
-        </li>
-      </ul>
-      <ul>
-        <li>
-          Apple has no obligation whatsoever to provide any maintenance or support services with
-          respect to the Apple-Enabled Software.
-        </li>
-      </ul>
-      <ul>
-        <li>
-          Apple is not responsible for any product warranties, whether express or implied by law. In
-          the event of any failure of the Apple-Enabled Software to conform to any applicable
-          warranty, you may notify Apple, and Apple will refund the purchase price for the
-          Apple-Enabled Software, if any, to you; and, to the maximum extent permitted by applicable
-          law, Apple will have no other warranty obligation whatsoever with respect to the
-          Apple-Enabled Software, or any other claims, losses, liabilities, damages, costs, or
-          expenses attributable to any failure to conform to any warranty, which will be our sole
-          responsibility, to the extent it cannot be disclaimed under applicable law.
-        </li>
-      </ul>
-      <ul>
-        <li>
-          we and you acknowledge that we, not Apple, is responsible for addressing any claims of you
-          or any third party relating to the Apple-Enabled Software or your possession or use of
-          that Apple-Enabled Software, including: (a) product liability claims; (b) any claim that
-          the Apple-Enabled Software fails to conform to any applicable legal or regulatory
-          requirement; and (c) claims arising under consumer protection, privacy, or similar
-          legislation.
-        </li>
-      </ul>
-      <ul>
-        <li>
-          In the event of any third-party claim that the Apple-Enabled Software or your possession
-          and use of that Apple-Enabled Software infringes that third party’s intellectual property
-          rights, as between us and Apple, we, not Apple, will be solely responsible for the
-          investigation, defense, settlement, and discharge of any such intellectual property
-          infringement claim.
-        </li>
-      </ul>
-      <ul>
-        <li>
-          You represent and warrant that (i) you are not located in a country that is subject to a
-          United States government embargo, or that has been designated by the United States
-          government as a “terrorist supporting” country; and (ii) you are not listed on any United
-          States government list of prohibited or restricted parties.
-        </li>
-      </ul>
-      <ul>
-        <li>
-          You must comply with applicable third-party terms of agreement when using the
-          Apple-Enabled Software, including your wireless data service agreement.
-        </li>
-      </ul>
-      <ul>
-        <li>
-          we and you acknowledge and agree that Apple, and Apple’s subsidiaries, are third-party
-          beneficiaries of these Terms with respect to the Apple-Enabled Software, and that, upon
-          your acceptance of the terms and conditions of these Terms, Apple will have the right (and
-          will be deemed to have accepted the right) to enforce these Terms against you with respect
-          to the Apple-Enabled Software as a third-party beneficiary thereof.
-        </li>
-      </ul>
-      <ul>
-        <li>
-          If you have any questions, complaints, or claims with respect to the Apple-Enabled
-          Software, the foregoing should be directed to us in accordance with Section 17.2.
-        </li>
-      </ul>
-      <p>
-        <strong>19. CONTACT INFORMATION</strong>
+        If you have questions, complaints, or claims concerning these Terms or the Services, then
+        contact us at <a href="mailto:geunhwa@haneul.io">geunhwa@haneul.io</a>.
       </p>
     </div>
   </$Article>
