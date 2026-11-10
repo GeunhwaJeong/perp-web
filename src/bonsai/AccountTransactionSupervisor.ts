@@ -112,6 +112,7 @@ import {
   wrapOperationFailure,
   wrapOperationSuccess,
 } from './lib/operationResult';
+import { placementConfirmation, type PlacedOrder } from './lib/placements';
 import {
   isStopOrderType,
   openReducingStopTickets,
@@ -133,8 +134,6 @@ type Context = {
   address: string;
   account: PerpAccount;
 };
-
-type PlacedOrder = { clientId: string; orderId?: string; filled: boolean };
 
 /** A ticket ready to be created: its details as the chain commits to them and as the keeper takes them. */
 type PreparedTicket = {
@@ -733,13 +732,7 @@ export class AccountTransactionSupervisor {
       return;
     }
     result.payload.forEach((placed) =>
-      this.store.dispatch(
-        placeOrderConfirmed({
-          clientId: placed.clientId,
-          orderId: placed.orderId,
-          status: placed.filled ? PlaceOrderStatuses.Filled : PlaceOrderStatuses.Placed,
-        })
-      )
+      this.store.dispatch(placeOrderConfirmed(placementConfirmation(placed)))
     );
   }
 
