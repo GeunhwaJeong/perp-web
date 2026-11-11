@@ -105,7 +105,7 @@ export const LAUNCHABLE_MARKET_RESOLUTION_CONFIGS = {
   '1D': { defaultRange: 30 * timeUnits.day },
 } as Record<ResolutionString, { defaultRange: number }>;
 
-export const DEFAULT_RESOLUTION = '1D';
+export const DEFAULT_RESOLUTION = '60';
 
 /**
  * @description Chart Configs mapped to ResolutionStrings

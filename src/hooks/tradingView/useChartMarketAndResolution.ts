@@ -77,12 +77,17 @@ const setVisibleRangeForResolution = (
     const to = Date.now() / 1000;
     const from = (Date.now() - defaultRange) / 1000;
 
-    tvWidget.activeChart().setVisibleRange(
-      {
-        from,
-        to,
-      },
-      { percentRightMargin: 10 }
-    );
+    // The library rejects this promise after ten seconds when the range holds no bar to
+    // scroll to, as on a market younger than the range. The chart keeps the range it has.
+    tvWidget
+      .activeChart()
+      .setVisibleRange(
+        {
+          from,
+          to,
+        },
+        { percentRightMargin: 10 }
+      )
+      .catch(() => {});
   }
 };

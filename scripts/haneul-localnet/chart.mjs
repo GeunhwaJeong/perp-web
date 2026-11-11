@@ -132,7 +132,7 @@ const appPosition = () =>
     return p ? p.signedSize.toNumber() : 0;
   });
 
-// 1. the default resolution loads every daily candle the indexer has
+// 1. the default resolution is one hour and loads the hourly candles the indexer has
 await page.waitForFunction(() => window.haneulPerp?.tvWidget != null, null, { timeout: 60_000 });
 await page.evaluate(
   () =>
@@ -140,11 +140,29 @@ await page.evaluate(
       window.haneulPerp.tvWidget.onChartReady(r);
     })
 );
-await waitForChart((c) => c.bars.length > 0, 'daily candles');
+await waitForChart((c) => c.bars.length > 0, 'hourly candles');
 let state = await chart();
 check('chart drawn in the library iframe', state.iframes === 1, `${state.iframes} iframe`);
 check('symbol is the market', state.symbol === 'BTC-USD', state.symbol);
-check('default resolution is 1D', state.resolution === '1D', state.resolution);
+check('default resolution is 1h', state.resolution === '60', state.resolution);
+const hourly = await candles('1HOUR');
+check('hourly bars match the indexer', state.bars.length === hourly.length, `${state.bars.length}`);
+const lastHourly = hourly[0];
+const lastHourBar = state.bars.at(-1);
+check(
+  'latest hourly bar carries the indexer OHLC',
+  lastHourBar.time === Date.parse(lastHourly.startedAt) / 1000 &&
+    lastHourBar.open === Number(lastHourly.open) &&
+    lastHourBar.high === Number(lastHourly.high) &&
+    lastHourBar.low === Number(lastHourly.low) &&
+    lastHourBar.close === Number(lastHourly.close),
+  `${lastHourBar.open}/${lastHourBar.high}/${lastHourBar.low}/${lastHourBar.close}`
+);
+
+// 1b. daily bars load every daily candle the indexer has
+await page.evaluate(() => window.haneulPerp.tvWidget.activeChart().setResolution('1D'));
+await waitForChart((c) => c.resolution === '1D' && c.bars.length > 0, 'daily candles');
+state = await chart();
 const daily = await candles('1DAY');
 check('daily bars match the indexer', state.bars.length === daily.length, `${state.bars.length}`);
 const lastDaily = daily[0];
@@ -264,7 +282,16 @@ check('order line labelled with the size', orderLine.text.includes('0.1'), order
 
 const buy = await place({ type: 'MARKET', price: 100_100, size: 0.2 });
 check('market buy filled', buy.type === 'success', JSON.stringify(buy).slice(0, 80));
-await waitForChart((c) => c.lines.some((l) => l.price !== 99_900), 'the position lines');
+// A buy that fills at more than one price level moves the entry line while it fills, so wait
+// for the line that carries the whole size and read it again a moment later.
+await waitForChart(
+  (c) =>
+    c.lines.some(
+      (l) => l.price > 99_000 && l.price < 101_000 && l.price !== 99_900 && l.text.includes('0.2')
+    ),
+  'the position lines'
+);
+await page.waitForTimeout(1000);
 state = await chart();
 const positionLines = state.lines.filter((l) => l.price !== 99_900);
 const entry = positionLines.find((l) => l.price > 99_000 && l.price < 101_000);
