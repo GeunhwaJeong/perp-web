@@ -35,6 +35,12 @@ sigma.haneul.io {
     # (dYdX's hosting rewrote to it).
     handle {
         root * /var/www/sigma
+        # Scripts run from this site only, and requests go to this site, the indexer API, the full
+        # node and the price service only. The three hashes are the inline scripts the TradingView
+        # library writes into the chart's frame (Advanced Charts 33.1.0); `scripts/haneul-mainnet/
+        # csp.ts` checks a build against this line. Report-only: the browser logs what the policy
+        # would refuse and refuses nothing.
+        header Content-Security-Policy-Report-Only "default-src 'self'; script-src 'self' 'sha256-Imv8rgvxn2GP4QJH/s+T5I8tEtsRwclyX3+LH36ke+U=' 'sha256-UkirSrOhyl2owLIRZtm0VusIDuET0YXn7cKQYvZVRa4=' 'sha256-yxzsY6Bi2C4+OSAgq5pgxd4AP6ElWbwhdkLXUWWLLvk='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://api.sigma.haneul.io wss://api.sigma.haneul.io https://rpc.haneul.io https://oracle.haneul.io; frame-src 'self' blob:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
         try_files {path} /entry-points/index.html
         header /entry-points/index.html Cache-Control "public, max-age=0, must-revalidate"
         header /assets/* Cache-Control "public, max-age=31536000, immutable"
