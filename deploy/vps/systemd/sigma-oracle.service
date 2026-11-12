@@ -11,6 +11,11 @@ EnvironmentFile=/etc/sigma/oracle.env
 ExecStart=/usr/bin/node src/main.ts
 Restart=always
 RestartSec=2
+# The process grows over weeks (from about 600 MB to 2.3 GB in 37 days), and once it is in swap it falls
+# behind the venues' streams and stops signing. A fresh process holds about 600 MB. Past the
+# limit it is killed and started again instead of slowing down; it is never swapped.
+MemoryMax=1200M
+MemorySwapMax=0
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true

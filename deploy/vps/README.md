@@ -69,6 +69,11 @@ gh run download <run id> -R GeunhwaJeong/perp-liquidator -n perp-bots-linux-x86_
 sudo install -o sigma -g sigma -m 755 /tmp/bin/perp-* /opt/sigma/bin/
 ```
 
+The price service is limited to 1,200 MB and restarted every Sunday at 20:00 UTC
+(`sigma-oracle-restart.timer`): it grows over weeks, and in swap it falls behind the venues and
+stops signing. `streamExchanges` in `oracle-v2.json` leaves out okx and bitstamp, whose streams
+fail with ccxt 4.5.84 and were reconnected without end; both are asked over REST.
+
 oracle-v2 is a checkout of its repository at `/opt/sigma/oracle-v2` with `npm ci --omit=dev`
 (node 22 is on the box); the site is `pnpm build` of this repository copied to `/var/www/sigma`.
 

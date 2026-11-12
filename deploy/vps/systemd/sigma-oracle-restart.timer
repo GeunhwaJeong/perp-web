@@ -1,0 +1,12 @@
+[Unit]
+Description=Weekly restart of the Sigma price service
+
+# The price service grows until it is restarted (see sigma-oracle.service). The feeds are not
+# signed while it starts, a few seconds to half a minute, so this runs once a week at an hour
+# with little trading: Sunday 20:00 UTC.
+[Timer]
+OnCalendar=Sun *-*-* 20:00:00 UTC
+Persistent=false
+
+[Install]
+WantedBy=timers.target

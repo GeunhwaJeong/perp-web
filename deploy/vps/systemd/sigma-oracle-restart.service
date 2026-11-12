@@ -1,0 +1,6 @@
+[Unit]
+Description=Restart the Sigma price service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/systemctl restart sigma-oracle.service
