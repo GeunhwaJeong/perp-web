@@ -1,0 +1,15 @@
+[Unit]
+Description=Check the Sigma services and the machine
+
+[Service]
+Type=oneshot
+User=sigma
+# PERP_ALERT_WEBHOOK_URL and, optionally, WATCHDOG_PING_URL; root:sigma, mode 640.
+EnvironmentFile=-/etc/sigma/alerts.env
+StateDirectory=sigma-watchdog
+ExecStart=/usr/local/sbin/sigma-watchdog
+TimeoutStartSec=50
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true

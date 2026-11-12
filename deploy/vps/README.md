@@ -92,5 +92,13 @@ Run the keeper once with `--check-only` before its unit starts: `sudo systemd-ru
 unit's arguments> --check-only`. Its database is dumped daily to `/var/backups/sigma-keeper`
 (14 days kept); restore with `pg_restore -d sigma_keeper <dump>`.
 
+`sigma-watchdog.timer` runs `sigma-watchdog` every minute. It checks that the services are active
+and answer their health checks, that the site answers, and the disk, memory and swap, and posts
+what fails twice in a row to the webhook of `alerts.env` (once, again every six hours, and when
+it is over). It also appends the price service's memory to
+`/var/lib/sigma-watchdog/oracle-memory.csv`. With `WATCHDOG_PING_URL` in `alerts.env` it fetches
+that URL at the end of every run, for a service outside the machine to notice when the machine
+is gone. Enable it with `sudo systemctl enable --now sigma-watchdog.timer`.
+
 Health: `curl -s localhost:8787/healthz`, `localhost:3002/health`, `localhost:9188/health`,
 `localhost:9189/health`, `localhost:9191/health`. Logs: `journalctl -u sigma-<name> -f`.

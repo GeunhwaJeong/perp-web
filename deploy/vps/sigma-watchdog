@@ -1,0 +1,203 @@
+#!/usr/bin/env python3
+# Watches what cannot report on itself: the services that have no alerts of their own (price
+# service, indexer, API, name issuer, Caddy, Postgres), any service that has died or hung, and
+# the machine (disk, memory, swap). Runs every minute as `sigma` from sigma-watchdog.timer and
+# posts to the same Discord webhook as the bots (PERP_ALERT_WEBHOOK_URL).
+#
+# A check has to fail on two runs in a row before it is posted, so that a restart of a few
+# seconds says nothing. A failure is posted once, again every six hours while it lasts, and
+# once more when it is over. Each run also appends the price service's memory to a CSV: that
+# process grows until it is restarted, and the file shows how fast.
+#
+# With WATCHDOG_PING_URL set, a run that reaches its end fetches that URL. A service outside
+# this machine that expects the fetch every minute then notices when the machine itself is gone,
+# which nothing on the machine can report.
+
+import json
+import os
+import shutil
+import subprocess
+import sys
+import time
+import urllib.request
+
+STATE_DIR = os.environ.get("STATE_DIRECTORY", "/var/lib/sigma-watchdog")
+STATE_FILE = os.path.join(STATE_DIR, "state.json")
+MEMORY_LOG = os.path.join(STATE_DIR, "oracle-memory.csv")
+WEBHOOK = os.environ.get("PERP_ALERT_WEBHOOK_URL")
+PING = os.environ.get("WATCHDOG_PING_URL")
+
+SERVICES = [
+    "sigma-oracle",
+    "sigma-indexer",
+    "sigma-api",
+    "sigma-liquidator",
+    "sigma-cranker",
+    "sigma-maker",
+    "sigma-keeper",
+    "sigma-names",
+    "caddy",
+    "postgresql@18-main",
+]
+# (name, URL, the field that has to be true or "ok").
+HEALTH = [
+    ("price service", "http://127.0.0.1:8787/healthz", "healthy"),
+    ("API", "http://127.0.0.1:3002/health", "status"),
+    ("liquidator", "http://127.0.0.1:9188/health", "healthy"),
+    ("cranker", "http://127.0.0.1:9189/health", "healthy"),
+    ("maker", "http://127.0.0.1:9190/health", "healthy"),
+    ("keeper", "http://127.0.0.1:9191/health", "healthy"),
+    ("name issuer", "http://127.0.0.1:8790/health", "ok"),
+]
+SITE = "https://sigma.haneul.io/"
+
+FAILS_BEFORE_ALERT = 2
+REMIND_AFTER_S = 6 * 3600
+# The price service is killed at 1,200 MB (sigma-oracle.service); say so before it gets there.
+ORACLE_MEMORY_WARN_MB = 900
+DISK_WARN_PERCENT = 80
+SWAP_WARN_MB = 1024
+AVAILABLE_WARN_MB = 300
+
+
+def fetch(url, timeout=5):
+    request = urllib.request.Request(url, headers={"User-Agent": "sigma-watchdog"})
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        return response.status, response.read()
+
+
+def check_services(problems):
+    for unit in SERVICES:
+        result = subprocess.run(["systemctl", "is-active", unit], capture_output=True, text=True)
+        state = result.stdout.strip() or "unknown"
+        if state != "active":
+            problems[f"service:{unit}"] = f"{unit} is {state}"
+
+
+def check_health(problems):
+    for name, url, field in HEALTH:
+        key = f"health:{name}"
+        try:
+            status, body = fetch(url)
+            value = json.loads(body).get(field)
+            if status != 200 or value not in (True, "ok"):
+                problems[key] = f"the {name} reports itself unhealthy: {body[:200].decode(errors='replace')}"
+        except Exception as error:  # noqa: BLE001 - any failure to answer is the finding
+            problems[key] = f"the {name} does not answer its health check ({error})"
+    try:
+        status, _ = fetch(SITE)
+        if status != 200:
+            problems["site"] = f"{SITE} answers {status}"
+    except Exception as error:  # noqa: BLE001
+        problems["site"] = f"{SITE} does not answer ({error})"
+
+
+def meminfo():
+    values = {}
+    with open("/proc/meminfo") as lines:
+        for line in lines:
+            name, rest = line.split(":", 1)
+            values[name] = int(rest.split()[0]) // 1024
+    return values
+
+
+def oracle_memory_mb():
+    pid = subprocess.run(
+        ["systemctl", "show", "sigma-oracle", "-p", "MainPID", "--value"], capture_output=True, text=True
+    ).stdout.strip()
+    if not pid or pid == "0":
+        return None
+    try:
+        with open(f"/proc/{pid}/status") as lines:
+            for line in lines:
+                if line.startswith("VmRSS:"):
+                    return int(line.split()[1]) // 1024
+    except OSError:
+        return None
+    return None
+
+
+def check_machine(problems, now):
+    disk = shutil.disk_usage("/")
+    used = round(100 * disk.used / disk.total)
+    if used >= DISK_WARN_PERCENT:
+        problems["disk"] = f"the disk is {used}% full ({disk.free // 2**30} GB left)"
+    memory = meminfo()
+    swap_used = memory["SwapTotal"] - memory["SwapFree"]
+    if swap_used >= SWAP_WARN_MB:
+        problems["swap"] = f"{swap_used} MB of swap is in use: some process has outgrown the memory"
+    if memory["MemAvailable"] < AVAILABLE_WARN_MB:
+        problems["memory"] = f"only {memory['MemAvailable']} MB of memory is available"
+    oracle = oracle_memory_mb()
+    if oracle is not None:
+        with open(MEMORY_LOG, "a") as log:
+            log.write(f"{int(now)},{oracle}\n")
+        if oracle >= ORACLE_MEMORY_WARN_MB:
+            problems["oracle_memory"] = (
+                f"the price service holds {oracle} MB; it is killed and restarted at 1,200 MB"
+            )
+
+
+def post(text):
+    if not WEBHOOK:
+        return
+    body = json.dumps({"content": f"[sigma-watchdog] {text}"[:1900]}).encode()
+    request = urllib.request.Request(
+        WEBHOOK, data=body, headers={"Content-Type": "application/json", "User-Agent": "sigma-watchdog"}
+    )
+    try:
+        urllib.request.urlopen(request, timeout=10).read()
+    except Exception as error:  # noqa: BLE001
+        print(f"failed to post an alert: {error}", file=sys.stderr)
+
+
+def duration(seconds):
+    minutes = int(seconds // 60)
+    return f"{minutes} min" if minutes < 120 else f"{minutes // 60} h"
+
+
+def main():
+    now = time.time()
+    try:
+        with open(STATE_FILE) as file:
+            state = json.load(file)
+    except (OSError, ValueError):
+        state = {}
+
+    problems = {}
+    check_services(problems)
+    check_health(problems)
+    check_machine(problems, now)
+
+    for key, message in problems.items():
+        entry = state.setdefault(key, {"fails": 0, "since": now, "posted": None})
+        entry["fails"] += 1
+        entry["message"] = message
+        print(f"problem {key}: {message}")
+        if entry["fails"] < FAILS_BEFORE_ALERT:
+            continue
+        if entry["posted"] is None:
+            post(f"WARNING: {message}")
+            entry["posted"] = now
+        elif now - entry["posted"] >= REMIND_AFTER_S:
+            post(f"WARNING: still, for {duration(now - entry['since'])}: {message}")
+            entry["posted"] = now
+    for key in [key for key in state if key not in problems]:
+        entry = state.pop(key)
+        if entry.get("posted") is not None:
+            post(f"INFO: over after {duration(now - entry['since'])}: {entry.get('message', key)}")
+
+    temporary = STATE_FILE + ".part"
+    with open(temporary, "w") as file:
+        json.dump(state, file)
+    os.replace(temporary, STATE_FILE)
+
+    if PING:
+        try:
+            fetch(PING, timeout=10)
+        except Exception as error:  # noqa: BLE001
+            print(f"failed to ping: {error}", file=sys.stderr)
+
+
+if __name__ == "__main__":
+    main()

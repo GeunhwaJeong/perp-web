@@ -30,6 +30,7 @@ sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='sigma_keepe
   sudo -u postgres createdb -O sigma sigma_keeper
 install -d -o postgres -g postgres -m 700 /var/backups/sigma-keeper
 install -m 755 "$(dirname "$0")/sigma-keeper-backup" /usr/local/sbin/sigma-keeper-backup
+install -m 755 "$(dirname "$0")/sigma-watchdog" /usr/local/sbin/sigma-watchdog
 
 # Login bots fill sshd's default connection backlog (10) and the box drops our sessions.
 printf 'MaxStartups 50:30:200\nLoginGraceTime 20\n' > /etc/ssh/sshd_config.d/70-sigma.conf
