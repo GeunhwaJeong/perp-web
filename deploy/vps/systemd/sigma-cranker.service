@@ -6,7 +6,10 @@ Wants=network-online.target
 [Service]
 User=sigma
 WorkingDirectory=/opt/sigma
-ExecStart=/opt/sigma/bin/perp-cranker --deployment /etc/sigma/perp.mainnet.json --rpc-url http://158.69.54.239:9000 --chain-id BmesG5C6R15WTWTL4feVxmf51fHXDSCMjmrF571aLiKC --key-file /etc/sigma/cranker.key --oracle-updates-url http://127.0.0.1:8787/v1/updates --listen-address 127.0.0.1:9189
+# PERP_ALERT_WEBHOOK_URL, the Discord webhook the bot posts its alerts to; root:sigma, mode 640.
+# Without the file the alerts are only logged.
+EnvironmentFile=-/etc/sigma/alerts.env
+ExecStart=/opt/sigma/bin/perp-cranker --deployment /etc/sigma/perp.mainnet.json --rpc-url http://158.69.54.239:9000 --chain-id BmesG5C6R15WTWTL4feVxmf51fHXDSCMjmrF571aLiKC --key-file /etc/sigma/cranker.key --oracle-updates-url http://127.0.0.1:8787/v1/updates --listen-address 127.0.0.1:9189 --alert-format discord
 Restart=always
 RestartSec=5
 # Exit code 3 means the deployment file changed: start again on the new markets.

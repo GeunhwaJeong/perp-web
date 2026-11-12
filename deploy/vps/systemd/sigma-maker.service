@@ -9,7 +9,10 @@ WorkingDirectory=/opt/sigma
 # DATABASE_URL, ACCOUNT, ACCOUNT_CAP and, with the flow simulator, FLOW_ACCOUNT and
 # FLOW_ACCOUNT_CAP; the keys in maker.key and flow.key. Root-owned, mode 600.
 EnvironmentFile=/etc/sigma/maker.env
-ExecStart=/opt/sigma/bin/perp-maker --deployment /etc/sigma/perp.mainnet.json --database-url ${DATABASE_URL} --rpc-url http://158.69.54.239:9000 --chain-id BmesG5C6R15WTWTL4feVxmf51fHXDSCMjmrF571aLiKC --key-file /etc/sigma/maker.key --account ${ACCOUNT} --account-cap ${ACCOUNT_CAP} --market BTC-USD --oracle-updates-url http://127.0.0.1:8787/v1/updates --listen-address 127.0.0.1:9190 $MAKER_EXTRA_ARGS
+# PERP_ALERT_WEBHOOK_URL, the Discord webhook the bot posts its alerts to; root:sigma, mode 640.
+# Without the file the alerts are only logged.
+EnvironmentFile=-/etc/sigma/alerts.env
+ExecStart=/opt/sigma/bin/perp-maker --deployment /etc/sigma/perp.mainnet.json --database-url ${DATABASE_URL} --rpc-url http://158.69.54.239:9000 --chain-id BmesG5C6R15WTWTL4feVxmf51fHXDSCMjmrF571aLiKC --key-file /etc/sigma/maker.key --account ${ACCOUNT} --account-cap ${ACCOUNT_CAP} --market BTC-USD --oracle-updates-url http://127.0.0.1:8787/v1/updates --listen-address 127.0.0.1:9190 --alert-format discord $MAKER_EXTRA_ARGS
 Restart=always
 RestartSec=5
 # Stopping sends SIGTERM; the maker pulls its quotes before exiting.

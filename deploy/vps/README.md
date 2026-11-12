@@ -46,6 +46,10 @@ Then the secrets, all root-owned and mode 600 under `/etc/sigma`:
   mode 600): the keeper wallet's key, which needs gas and no capability; the tickets name its
   address as their executor, so keep a copy of the key elsewhere.
 
+- `alerts.env` (root:sigma, mode 640): `PERP_ALERT_WEBHOOK_URL=<Discord webhook>`. The liquidator,
+  cranker, maker and keeper read it and post their alerts there; without the file the alerts
+  are only logged. Changing the webhook means changing this one file and restarting the four.
+
 The bots take the chain id in the node's base58 form (`BmesG5C6R15WTWTL4feVxmf51fHXDSCMjmrF571aLiKC`
 for mainnet), which the units carry.
 
