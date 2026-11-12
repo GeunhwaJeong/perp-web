@@ -58,6 +58,11 @@ ORACLE_MEMORY_WARN_MB = 900
 DISK_WARN_PERCENT = 80
 SWAP_WARN_MB = 1024
 AVAILABLE_WARN_MB = 300
+# The price service exports the longest it was late to its own timers in the last minute. A
+# process that keeps up stays under a tenth of a second; one that is late by a second reads
+# the venues' streams late as well, and signs prices that are older than they look.
+ORACLE_METRICS = "http://127.0.0.1:8787/metrics"
+ORACLE_LATE_WARN_S = 1.0
 
 
 def fetch(url, timeout=5):
@@ -90,6 +95,22 @@ def check_health(problems):
             problems["site"] = f"{SITE} answers {status}"
     except Exception as error:  # noqa: BLE001
         problems["site"] = f"{SITE} does not answer ({error})"
+
+
+def check_oracle_lateness(problems):
+    try:
+        _, body = fetch(ORACLE_METRICS)
+    except Exception:  # noqa: BLE001 - the health check already reports a service that is down
+        return
+    for line in body.decode(errors="replace").splitlines():
+        if line.startswith("oracle_event_loop_delay_seconds"):
+            late = float(line.split()[-1])
+            if late >= ORACLE_LATE_WARN_S:
+                problems["oracle_late"] = (
+                    f"the price service was {late:.1f} s late to its own timers in the last minute: "
+                    "it is falling behind the venues"
+                )
+            return
 
 
 def meminfo():
@@ -167,6 +188,7 @@ def main():
     problems = {}
     check_services(problems)
     check_health(problems)
+    check_oracle_lateness(problems)
     check_machine(problems, now)
 
     for key, message in problems.items():
