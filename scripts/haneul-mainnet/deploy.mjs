@@ -65,7 +65,8 @@ const SUPPORT = 'sigma_support';
 
 // ---------------------------------------------------------------- shadow-run parameters
 //
-// BTC-USD on TUSD. Conservative: 10x at most, a $1M open-interest cap, the engine's default
+// BTC-USD on TUSD. Conservative: 10x at most, an open-interest cap of 15 BTC, a book price
+// that counts toward the mark price only within 1% of the index, the engine's default
 // tolerances otherwise. Socialization is off (zeros), so the liquidator must run with the ADL
 // cap, which configure mints to the admin.
 const MARKET = {
@@ -86,13 +87,19 @@ const MARKET = {
   premiumTwapPeriodMs: 60_000n,
   spreadTwapSampleMs: 1_000n,
   spreadTwapPeriodMs: 60_000n,
-  maxOpenInterestUsd: 1_000_000n * ONE,
+  // The engine counts open interest in the base asset, not in dollars: 15 BTC is about $1M at
+  // $66,000, and the cap's dollar value moves with the price.
+  maxOpenInterestBase: 15n * ONE,
+  // The mark price follows the book's mid price up to this distance from the index. At 5%, the
+  // maintenance margin, two one-lot orders on an empty book moved the mark price far enough to
+  // liquidate a 10x position while the index did not move; at 1% they cannot.
+  maxBookIndexSpread: ONE / 100n,
   maxPendingOrders: 100n,
   minOrderUsd: 10n * ONE,
 };
-// The feed TWAP the markets read (the mark price follows it); a minute as in the oracle-v2
-// market check.
-const FEED_TWAP_PERIOD_MS = 60_000n;
+// The feed TWAP the markets read (the mark price follows it). Ten seconds: with a minute, a
+// 15% fall put the index more than 5% from its TWAP and liquidations stopped for 75 seconds.
+const FEED_TWAP_PERIOD_MS = 10_000n;
 // Signer registration: one year, renewed by `source::set_signer` again.
 const SIGNER_LIFETIME_MS = 365n * 24n * 3_600_000n;
 // Fee tiers: one volume tier at the market rates, a 10% staking discount from 10,000 HANEUL,
@@ -428,11 +435,11 @@ const marketStep = () => {
   );
   cmds.push(
     ...call(`${PERP}::clearing_house::set_risk_limit_params`, [s.VK, s.ADMIN, s.TUSD], 'ch', obj(s.perpVk), obj(s.registry),
-      some(u256(m.minOrderUsd)), some(u64(m.maxPendingOrders)), some(u256(m.maxOpenInterestUsd)), 'none', 'none', 'none', 'none', 'none', 'none', 'none')
+      some(u256(m.minOrderUsd)), some(u64(m.maxPendingOrders)), some(u256(m.maxOpenInterestBase)), 'none', 'none', some(u256(m.maxBookIndexSpread)), 'none', 'none', 'none', 'none')
   );
   cmds.push(...call(`${PERP}::clearing_house::register_market`, [s.VK, s.ADMIN, s.TUSD], obj(s.registry), obj(s.perpVk), 'ch'));
   cmds.push(...call(`${PERP}::clearing_house::share`, [s.TUSD], 'ch'));
-  const j = ptb(`create the ${m.marketId} clearing house (10x, $${m.maxOpenInterestUsd / ONE} OI cap)`, cmds);
+  const j = ptb(`create the ${m.marketId} clearing house (10x, ${m.maxOpenInterestBase / ONE} ${m.symbol} OI cap)`, cmds);
   if (!j) return;
   s.clearingHouse = createdShared(j, '::clearing_house::ClearingHouse');
   s.market = { ...Object.fromEntries(Object.entries(m).map(([k, v]) => [k, typeof v === 'bigint' ? v.toString() : v])) };
