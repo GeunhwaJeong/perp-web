@@ -7,7 +7,11 @@ Wants=network-online.target
 User=sigma
 WorkingDirectory=/opt/sigma
 EnvironmentFile=/etc/sigma/api.env
-ExecStart=/opt/sigma/bin/perp-api --database-url ${DATABASE_URL} --deployment /etc/sigma/perp.mainnet.json --listen-address 127.0.0.1:3002 --metrics-address 127.0.0.1:9185
+# The API is public and unauthenticated. --db-statement-timeout-ms 10000 has the database end a
+# query that runs past ten seconds, which otherwise keeps running after the request has timed
+# out. --db-connection-pool-size 20 keeps the API from taking all of Postgres' 100 connections,
+# which the indexer and the bots share (the default pool is 100).
+ExecStart=/opt/sigma/bin/perp-api --database-url ${DATABASE_URL} --deployment /etc/sigma/perp.mainnet.json --listen-address 127.0.0.1:3002 --metrics-address 127.0.0.1:9185 --db-statement-timeout-ms 10000 --db-connection-pool-size 20
 Restart=always
 RestartSec=5
 LimitNOFILE=65536
