@@ -92,8 +92,17 @@ Run the keeper once with `--check-only` before its unit starts: `sudo systemd-ru
 unit's arguments> --check-only`. Its database is dumped daily to `/var/backups/sigma-keeper`
 (14 days kept); restore with `pg_restore -d sigma_keeper <dump>`.
 
+`sigma-indexer-prune.timer` runs `sigma-indexer-prune` once a day. Nothing in the indexer deletes,
+and two of its tables grew about 190 MB a day: `raw_events`, the ledger no service reads, and
+`orders`, where nine rows in ten are quotes the maker canceled without a fill. The job keeps 30
+days of `raw_events` and of those unfilled canceled orders, measured on the chain's clock; orders
+that filled and the fills are kept. What it deletes cannot be brought back. `sudo -u postgres
+SIGMA_PRUNE_DRY_RUN=1 /usr/local/sbin/sigma-indexer-prune` counts what a run would delete. Enable
+it with `sudo systemctl enable --now sigma-indexer-prune.timer`.
+
 `sigma-watchdog.timer` runs `sigma-watchdog` every minute. It checks that the services are active
-and answer their health checks, that the site answers, and the disk, memory and swap, and posts
+and answer their health checks, that the last run of the daily jobs did not fail, that the site
+answers, and the disk, memory and swap, and posts
 what fails twice in a row to the webhook of `alerts.env` (once, again every six hours, and when
 it is over). It also appends the price service's memory to
 `/var/lib/sigma-watchdog/oracle-memory.csv`. With `WATCHDOG_PING_URL` in `alerts.env` it fetches

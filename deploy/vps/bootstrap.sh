@@ -30,6 +30,9 @@ sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='sigma_keepe
   sudo -u postgres createdb -O sigma sigma_keeper
 install -d -o postgres -g postgres -m 700 /var/backups/sigma-keeper
 install -m 755 "$(dirname "$0")/sigma-keeper-backup" /usr/local/sbin/sigma-keeper-backup
+# The indexer's database is trimmed daily instead (sigma-indexer-prune.timer): nothing in the
+# indexer deletes, and its two largest tables would fill the disk.
+install -m 755 "$(dirname "$0")/sigma-indexer-prune" /usr/local/sbin/sigma-indexer-prune
 install -m 755 "$(dirname "$0")/sigma-watchdog" /usr/local/sbin/sigma-watchdog
 
 # Login bots fill sshd's default connection backlog (10) and the box drops our sessions.

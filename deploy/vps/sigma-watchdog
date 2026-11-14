@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Watches what cannot report on itself: the services that have no alerts of their own (price
-# service, indexer, API, name issuer, Caddy, Postgres), any service that has died or hung, and
-# the machine (disk, memory, swap). Runs every minute as `sigma` from sigma-watchdog.timer and
+# service, indexer, API, name issuer, Caddy, Postgres), any service that has died or hung, the
+# daily jobs (the keeper's backup, the indexer's pruning), and the machine (disk, memory, swap). Runs every minute as `sigma` from sigma-watchdog.timer and
 # posts to the same Discord webhook as the bots (PERP_ALERT_WEBHOOK_URL).
 #
 # A check has to fail on two runs in a row before it is posted, so that a restart of a few
@@ -38,6 +38,12 @@ SERVICES = [
     "sigma-names",
     "caddy",
     "postgresql@18-main",
+]
+# Jobs a timer runs once a day. A run that failed leaves its unit failed until a later run
+# succeeds, and nothing else says so: the dumps stop, or the indexer's tables grow again.
+JOBS = [
+    "sigma-keeper-backup",
+    "sigma-indexer-prune",
 ]
 # (name, URL, the field that has to be true or "ok").
 HEALTH = [
@@ -77,6 +83,13 @@ def check_services(problems):
         state = result.stdout.strip() or "unknown"
         if state != "active":
             problems[f"service:{unit}"] = f"{unit} is {state}"
+
+
+def check_jobs(problems):
+    for unit in JOBS:
+        result = subprocess.run(["systemctl", "is-failed", unit], capture_output=True, text=True)
+        if result.stdout.strip() == "failed":
+            problems[f"job:{unit}"] = f"the last run of {unit} failed (journalctl -u {unit})"
 
 
 def check_health(problems):
@@ -187,6 +200,7 @@ def main():
 
     problems = {}
     check_services(problems)
+    check_jobs(problems)
     check_health(problems)
     check_oracle_lateness(problems)
     check_machine(problems, now)

@@ -1,0 +1,95 @@
+#!/bin/sh
+# Daily pruning of the indexer database (perp_indexer), which nothing else trims. Runs as
+# postgres from sigma-indexer-prune.service.
+#
+# Two tables grow without bound. `raw_events`, the ledger of every event, is written by the
+# indexer and read by no service: only the last SIGMA_PRUNE_DAYS (30) days are kept. `orders`
+# keeps every order ever posted, and nine in ten are the maker's quotes, canceled without a
+# fill: those are deleted once their cancellation is older than the same number of days. An
+# order that filled, whole or in part, is kept, and so are the fills.
+#
+# The age is measured on the chain's clock, from the time the indexer has reached, not on this
+# machine's: a wrong clock here deletes nothing it should not, and an indexer that has stopped
+# stops the pruning with it. `pnl_tick_runs` has one row an hour with a checkpoint and its
+# time, and gives the checkpoint of that age.
+#
+# Rows go in batches, each in a transaction of its own, so that a run never holds a long lock.
+# What is deleted cannot be brought back: the full node keeps a few days of checkpoints.
+#
+# SIGMA_PRUNE_DRY_RUN=1 counts what a run would delete and deletes nothing.
+set -eu
+
+db=${SIGMA_PRUNE_DB:-perp_indexer}
+days=${SIGMA_PRUNE_DAYS:-30}
+batch=${SIGMA_PRUNE_BATCH:-50000}
+dry=${SIGMA_PRUNE_DRY_RUN:-0}
+
+for value in "$days" "$batch"; do
+    case "$value" in
+        '' | *[!0-9]*)
+            echo "SIGMA_PRUNE_DAYS and SIGMA_PRUNE_BATCH are whole numbers" >&2
+            exit 2
+            ;;
+    esac
+done
+# A week is the least a mistyped setting may leave.
+if [ "$days" -lt 7 ]; then
+    echo "refusing to keep fewer than 7 days (SIGMA_PRUNE_DAYS=$days)" >&2
+    exit 2
+fi
+if [ "$batch" -lt 1 ]; then
+    echo "SIGMA_PRUNE_BATCH has to be at least 1" >&2
+    exit 2
+fi
+
+sql() {
+    psql -X -q -At -v ON_ERROR_STOP=1 -d "$db" -c "$1"
+}
+
+reached=$(sql "SELECT min(timestamp_ms_hi_inclusive) FROM watermarks WHERE pipeline IN ('raw_events', 'state')")
+if [ -z "$reached" ]; then
+    echo "the indexer has no watermark yet: nothing to prune"
+    exit 0
+fi
+cutoff_ms=$((reached - days * 86400000))
+cutoff=$(sql "SELECT max(checkpoint) FROM pnl_tick_runs WHERE timestamp_ms <= $cutoff_ms")
+if [ -z "$cutoff" ]; then
+    echo "nothing is older than $days days yet"
+    exit 0
+fi
+before=$(sql "SELECT to_char(to_timestamp($cutoff_ms / 1000) AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI')")
+
+old_events="checkpoint < $cutoff"
+old_orders="status = 'canceled' AND filled = 0 AND updated_checkpoint < $cutoff"
+
+if [ "$dry" = 1 ]; then
+    events=$(sql "SELECT count(*) FROM raw_events WHERE $old_events")
+    orders=$(sql "SELECT count(*) FROM orders WHERE $old_orders")
+    echo "dry run: $events raw events and $orders unfilled canceled orders are older than $before UTC (checkpoint $cutoff, $days days kept); nothing deleted"
+    exit 0
+fi
+
+# Deletes the rows of $1 that match $2, a batch at a time and the oldest by $3 first, and prints
+# how many went. The order keeps every batch on the index of $3: without it the planner may
+# read the table from its start, where pruned space fills with new rows, to find the old ones.
+prune() {
+    total=0
+    while :; do
+        gone=$(sql "WITH gone AS (
+            DELETE FROM $1 WHERE ctid = ANY (ARRAY(SELECT ctid FROM $1 WHERE $2 ORDER BY $3 LIMIT $batch)) RETURNING 1
+        ) SELECT count(*) FROM gone")
+        total=$((total + gone))
+        if [ "$gone" -lt "$batch" ]; then
+            break
+        fi
+        sleep 1
+    done
+    echo "$total"
+}
+
+events=$(prune raw_events "$old_events" checkpoint)
+orders=$(prune orders "$old_orders" updated_checkpoint)
+# The space the rows held is reused by the rows to come; the files do not shrink.
+sql "VACUUM (ANALYZE) raw_events"
+sql "VACUUM (ANALYZE) orders"
+echo "pruned $events raw events and $orders unfilled canceled orders older than $before UTC (checkpoint $cutoff, $days days kept)"
