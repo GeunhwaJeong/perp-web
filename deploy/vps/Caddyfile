@@ -59,9 +59,17 @@ api.sigma.haneul.io {
     reverse_proxy 127.0.0.1:3002
 }
 
-# The price service's signed updates, which trades put in front of themselves.
+# The price service's signed updates, which trades put in front of themselves. Only the updates
+# are public: the service answers on the process that signs the prices, so its health and
+# metrics stay on the loopback, where the watchdog reads them.
 oracle.haneul.io {
-    reverse_proxy 127.0.0.1:8787
+    @updates path /v1/updates
+    handle @updates {
+        reverse_proxy 127.0.0.1:8787
+    }
+    handle {
+        respond 404
+    }
 }
 
 # TLS in front of the public full node's gRPC (plaintext h2c on the validator host), so that
