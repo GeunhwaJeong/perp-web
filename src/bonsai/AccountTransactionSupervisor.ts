@@ -25,6 +25,7 @@ import {
   imrToLeverage,
   leverageToImr,
   listCollateralCoins,
+  loadKnownAccounts,
   loadPerpDeployment,
   ORDER_TYPE,
   PerpTransactionBuilder,
@@ -40,6 +41,7 @@ import {
   readAccountFees,
   readFeeSchedule,
   readPosition,
+  rememberAccount,
   selectPriceUpdates,
   sizeToUnits,
   standaloneStopCommitment,
@@ -50,6 +52,7 @@ import {
   twapCommitment,
   twapJson,
   unitsToCollateral,
+  type AccountExposure,
   type CollateralReturn,
   type OrderSpec,
   type PerpAccount,
@@ -236,6 +239,15 @@ const TRANSFERS_REFRESH_DELAY_MS = 3_000;
 
 const failure = (message: string, stringKey?: string) => wrapSimpleError(FN, message, stringKey);
 
+// An account with exposure (see `findPerpAccount`) takes no deposit and no new risk: another
+// address could trade away what the wallet puts on it.
+const EXPOSED_ACCOUNT: Record<AccountExposure, string> = {
+  assistants:
+    'Another address holds an assistant capability of this trading account and can trade with what the account holds. Deposits and new orders are off. Withdrawals and cancels work.',
+  tickets:
+    'This trading account holds conditional orders that this device did not place. Cancel them to deposit and trade. Withdrawals and cancels work.',
+};
+
 /**
  * Write path for the perpetuals engine. Orders, cancels and closes become programmable
  * transactions signed by the connected wallet; on-chain finality is the confirmation, so
@@ -283,20 +295,46 @@ export class AccountTransactionSupervisor {
     });
   }
 
-  private async context(): Promise<OperationResult<Context>> {
+  /**
+   * Deployment, wallet and trading account. An operation that puts collateral or new risk on the
+   * account is refused on one with exposure to another address. One that only takes collateral,
+   * orders or tickets off the account, or reads it, passes `exposedAllowed`.
+   */
+  private async context({ exposedAllowed = false } = {}): Promise<OperationResult<Context>> {
     const wallet = await this.walletContext();
     if (isOperationFailure(wallet)) return wallet;
     const { deployment, address } = wallet.payload;
     const key = `${deployment.network}:${address}`;
     let account = this.accounts.get(key);
     if (!account) {
-      account = await findPerpAccount(dAppKit.getClient(), deployment, address);
+      account = await this.findAccount(deployment, address);
       if (!account) {
         return failure('Deposit collateral to open a trading account first');
       }
-      this.accounts.set(key, account);
+      // An account with exposure is read again each time: canceling its tickets clears it.
+      if (account.exposure == null) this.accounts.set(key, account);
+    }
+    if (account.exposure != null && !exposedAllowed) {
+      return failure(EXPOSED_ACCOUNT[account.exposure]);
     }
     return wrapOperationSuccess({ ...wallet.payload, account });
+  }
+
+  /**
+   * The wallet's trading account. One found without exposure is recorded as the wallet's own on
+   * this device, so the tickets the wallet places on it later do not count against it.
+   */
+  private async findAccount(deployment: PerpDeployment, address: string) {
+    const account = await findPerpAccount(
+      dAppKit.getClient(),
+      deployment,
+      address,
+      loadKnownAccounts(deployment.network, address)
+    );
+    if (account != null && account.exposure == null) {
+      rememberAccount(deployment.network, address, account.account);
+    }
+    return account;
   }
 
   /** Drops the cached account so the next operation reads its balance and caps again. */
@@ -656,7 +694,10 @@ export class AccountTransactionSupervisor {
       AnalyticsEvents.TradePlaceOrder({ ...payload, source, volume: payload.size * payload.price })
     );
 
-    const ctx = await this.context();
+    // A reduce-only order that brings no ticket only takes risk off the account.
+    const ctx = await this.context({
+      exposedAllowed: payload.reduceOnly === true && (triggers == null || triggers.length === 0),
+    });
     let attach: SessionAttachment = {};
     if (!isOperationFailure(ctx) && triggers != null && triggers.length > 0) {
       const levels = planStopLossTakeProfit(triggers, []).create;
@@ -711,7 +752,9 @@ export class AccountTransactionSupervisor {
         })
       )
     );
-    const ctx = await this.context();
+    const ctx = await this.context({
+      exposedAllowed: payloads.every((p) => p.reduceOnly === true),
+    });
     const result = isOperationFailure(ctx)
       ? ctx
       : await this.executeSession(ctx.payload, marketId, payloads, source);
@@ -782,7 +825,7 @@ export class AccountTransactionSupervisor {
   private async cancelIds(
     byMarket: Record<string, string[]>
   ): Promise<OperationResult<{ canceled: string[] }>> {
-    const ctx = await this.context();
+    const ctx = await this.context({ exposedAllowed: true });
     if (isOperationFailure(ctx)) return ctx;
     const ids: Record<string, bigint[]> = {};
     try {
@@ -980,7 +1023,10 @@ export class AccountTransactionSupervisor {
   private async placeTriggerTickets(
     triggers: TriggerOrderActions[]
   ): Promise<OperationResult<{ digest: string }>> {
-    const ctx = await this.context();
+    // Edits that only cancel tickets take them off the account.
+    const ctx = await this.context({
+      exposedAllowed: triggers.every((t) => t.placePayload == null),
+    });
     if (isOperationFailure(ctx)) return ctx;
     const { deployment, builder, account } = ctx.payload;
     const state = this.store.getState();
@@ -1163,7 +1209,7 @@ export class AccountTransactionSupervisor {
     /** The TWAP's market, whose collateral its cancellation releases. */
     marketId?: string;
   }): Promise<OperationResult<{ digest: string }>> {
-    const ctx = await this.context();
+    const ctx = await this.context({ exposedAllowed: true });
     if (isOperationFailure(ctx)) return ctx;
     const { builder, account, address } = ctx.payload;
     const ref = { account: account.account, cap: account.cap };
@@ -1243,7 +1289,7 @@ export class AccountTransactionSupervisor {
         }))
       )
     );
-    const ctx = await this.context();
+    const ctx = await this.context({ exposedAllowed: true });
     if (isOperationFailure(ctx)) {
       this.settlePlacements(ctx, payloads);
       return ctx;
@@ -1310,7 +1356,7 @@ export class AccountTransactionSupervisor {
       const client = dAppKit.getClient();
       const [coins, account] = await Promise.all([
         listCollateralCoins(client, deployment, address),
-        findPerpAccount(client, deployment, address),
+        this.findAccount(deployment, address),
       ]);
       const held = coins.reduce((sum, c) => sum + c.balance, 0n);
       const returnable = account
@@ -1352,7 +1398,10 @@ export class AccountTransactionSupervisor {
       if (balance < units) {
         return failure('Not enough collateral in the wallet', STRING_KEYS.INSUFFICIENT_BALANCE);
       }
-      const account = await findPerpAccount(client, deployment, address);
+      const account = await this.findAccount(deployment, address);
+      // No second account is opened beside one with exposure: perp-api serves the wallet's
+      // lowest-numbered account, so the deposit would not show.
+      if (account?.exposure != null) return failure(EXPOSED_ACCOUNT[account.exposure]);
       const ids = coins.map((c) => c.objectId);
       const tx = account
         ? builder.deposit({
@@ -1362,6 +1411,10 @@ export class AccountTransactionSupervisor {
           })
         : builder.createAccount({ sender: address, coins: ids, amount: units });
       const result = await signAndExecute(tx);
+      if (!account) {
+        const opened = eventsOf(result.events, '::events::CreatedAccount')[0]?.account_obj_id;
+        if (typeof opened === 'string') rememberAccount(deployment.network, address, opened);
+      }
       this.forgetWalletAccount(deployment, address);
       appQueryClient
         .invalidateQueries({ queryKey: ['validator', 'accountBalances'] })
@@ -1385,7 +1438,7 @@ export class AccountTransactionSupervisor {
    * to be moved back with that market's margin controls first.
    */
   public async withdrawCollateral(amount: number): Promise<OperationResult<{ digest: string }>> {
-    const ctx = await this.context();
+    const ctx = await this.context({ exposedAllowed: true });
     if (isOperationFailure(ctx)) return ctx;
     const { deployment, builder, address, account } = ctx.payload;
     const units = collateralToUnits(amount, deployment.collateral.decimals);
@@ -1524,7 +1577,7 @@ export class AccountTransactionSupervisor {
     amount: number;
     toMarket: boolean;
   }): Promise<OperationResult<{ digest: string }>> {
-    const ctx = await this.context();
+    const ctx = await this.context({ exposedAllowed: !toMarket });
     if (isOperationFailure(ctx)) return ctx;
     const { deployment, builder, account } = ctx.payload;
     const market = deployment.markets[marketId];
@@ -1601,7 +1654,7 @@ export class AccountTransactionSupervisor {
    * opens at its market's ratio.
    */
   public async readMarketLeverages(): Promise<Record<string, number>> {
-    const ctx = await this.context();
+    const ctx = await this.context({ exposedAllowed: true });
     if (isOperationFailure(ctx)) return {};
     const { deployment, account } = ctx.payload;
     const client = dAppKit.getClient();
@@ -1624,7 +1677,7 @@ export class AccountTransactionSupervisor {
   public async readAccountFees() {
     const wallet = await this.walletContext();
     if (isOperationFailure(wallet)) return undefined;
-    const ctx = await this.context();
+    const ctx = await this.context({ exposedAllowed: true });
     const account = isOperationFailure(ctx) ? undefined : ctx.payload.account;
     const { deployment, address } = wallet.payload;
     return readAccountFees(dAppKit.getClient(), deployment, address, account);

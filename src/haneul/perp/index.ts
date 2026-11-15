@@ -6,6 +6,7 @@ export * from './execution';
 export * from './fees';
 export * from './indexerClient';
 export * from './keeper';
+export * from './knownAccounts';
 export * from './prices';
 export * from './tickets';
 export * from './units';

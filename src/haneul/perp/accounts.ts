@@ -23,6 +23,13 @@ const AccountBcs = bcs.struct('Account', {
   active_assistants: bcs.vector(bcs.Address),
 });
 
+/**
+ * What on an account lets an address other than the wallet act on it: an assistant capability,
+ * which trades with the account and allocates its balance, or an order ticket, whose executor
+ * places the order it commits to and allocates the balance to it.
+ */
+export type AccountExposure = 'assistants' | 'tickets';
+
 export type PerpAccount = {
   /** Shared account object id. */
   account: string;
@@ -32,6 +39,11 @@ export type PerpAccount = {
   accountId: bigint;
   /** Unallocated collateral held on the account, in coin units. */
   collateral: bigint;
+  /**
+   * Set when the account has such exposure and this device has not recorded it as the wallet's
+   * own (see `findPerpAccount`). The app then only takes collateral, orders and tickets off it.
+   */
+  exposure?: AccountExposure;
 };
 
 export const listAccountCaps = async (
@@ -66,23 +78,74 @@ export const readAccount = async (client: ClientWithCoreApi, accountObjectId: st
     include: { content: true },
   });
   const parsed = AccountBcs.parse(obj.object.content);
-  return { accountId: BigInt(parsed.account_id), collateral: BigInt(parsed.collateral) };
+  return {
+    accountId: BigInt(parsed.account_id),
+    collateral: BigInt(parsed.collateral),
+    /** Assistant capabilities the account accepts. */
+    assistants: parsed.active_assistants.length,
+  };
+};
+
+// The engine keeps stop and TWAP tickets on the account under `perpetuals::keys::OrderTicketKey`.
+const ORDER_TICKET_KEY = '::keys::OrderTicketKey';
+
+/** Whether the account holds an order ticket, each a dynamic field of the account object. */
+export const hasOrderTickets = async (client: ClientWithCoreApi, accountObjectId: string) => {
+  let cursor: string | null = null;
+  do {
+    const page: HaneulClientTypes.ListDynamicFieldsResponse =
+      // eslint-disable-next-line no-await-in-loop -- pages are sequential by cursor
+      await client.core.listDynamicFields({ parentId: accountObjectId, cursor });
+    if (page.dynamicFields.some((field) => field.name.type.endsWith(ORDER_TICKET_KEY))) {
+      return true;
+    }
+    cursor = page.hasNextPage ? page.cursor : null;
+  } while (cursor);
+  return false;
+};
+
+const preference = (isKnown: boolean, exposure: AccountExposure | undefined) => {
+  if (isKnown) return 0;
+  return exposure == null ? 1 : 2;
 };
 
 /**
- * Finds the signer's trading account for a deployment. The first cap wins; the app keeps
- * one account per wallet and the engine allows more only for assistants.
+ * Finds the signer's trading account for a deployment.
+ *
+ * The admin capability is an object anyone can send to the wallet, and its sender may still act
+ * on the account it names: through an assistant capability minted before the transfer, or
+ * through an order ticket created before it, which the ticket's executor runs with no capability
+ * at all. Collateral deposited into such an account is the sender's to trade away. `known` are
+ * the accounts this device has recorded as the wallet's own; any other account with an assistant
+ * capability or a ticket is returned with `exposure` set.
+ *
+ * Among several capabilities a known account comes first, then one without exposure, then the
+ * rest; within each the lowest account number, which is the account perp-api serves.
  */
 export const findPerpAccount = async (
   client: ClientWithCoreApi,
   deployment: PerpDeployment,
-  owner: string
+  owner: string,
+  known: readonly string[] = []
 ): Promise<PerpAccount | undefined> => {
   const caps = await listAccountCaps(client, deployment, owner);
-  const first = caps[0];
-  if (!first) return undefined;
-  const { accountId, collateral } = await readAccount(client, first.account);
-  return { account: first.account, cap: first.cap, accountId, collateral };
+  const candidates = await Promise.all(
+    caps.map(async ({ cap, account }) => {
+      const { accountId, collateral, assistants } = await readAccount(client, account);
+      const isKnown = known.includes(account);
+      let exposure: AccountExposure | undefined;
+      if (!isKnown) {
+        if (assistants > 0) exposure = 'assistants';
+        else if (await hasOrderTickets(client, account)) exposure = 'tickets';
+      }
+      return {
+        rank: preference(isKnown, exposure),
+        found: { account, cap, accountId, collateral, exposure },
+      };
+    })
+  );
+  candidates.sort((a, b) => a.rank - b.rank || (a.found.accountId < b.found.accountId ? -1 : 1));
+  return candidates[0]?.found;
 };
 
 /** Coin objects of the collateral type owned by `owner`, largest first. */
