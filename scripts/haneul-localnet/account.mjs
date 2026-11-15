@@ -2,8 +2,9 @@
 
 /**
  * Drives the account dialog end to end in a browser: the password account with Face ID,
- * the recovery phrase and the 12-word restore, and the chain-native passkey account with
- * its recovery. Needs only `pnpm dev`; no chain, since the dev environment answers every
+ * the recovery phrase and the 12-word restore, the chain-native passkey account with its
+ * recovery, and the two places that lead a new account to its recovery phrase (the deposit
+ * dialog's warning and the completion screen's button). Needs only `pnpm dev`; no chain, since the dev environment answers every
  * name as available and the account never has to sign on chain here.
  *
  * WebAuthn is served by a CDP virtual authenticator standing in for Touch ID / Face ID,
@@ -95,6 +96,17 @@ const toConnectScreen = async () => {
     .first()
     .click();
   await page.getByText('Connect a wallet').waitFor();
+};
+
+const BACKUP_WARNING = 'Back up your recovery phrase before you deposit';
+// The dev environment has no chain, so the dialog shows no balances; its form still renders.
+const openDepositDialog = async () => {
+  await button(/^deposit$/i)
+    .first()
+    .click();
+  const dialog = page.locator('[role="dialog"]').last();
+  await dialog.getByText('Amount').waitFor({ timeout: 10000 });
+  return dialog;
 };
 
 const restoreFromPhrase = async (words, password) => {
@@ -207,6 +219,22 @@ try {
       'View portfolio',
     ].every((s) => menu.includes(s))
   );
+
+  let depositDialog = await openDepositDialog();
+  check(
+    'deposit dialog warns that the phrase is not backed up',
+    (await depositDialog.innerText()).includes(BACKUP_WARNING)
+  );
+  await button(/^back up now$/i).click();
+  await page.getByText('Before you view it').waitFor({ timeout: 10000 });
+  check('"Back up now" opens the recovery phrase dialog', true);
+  await page.keyboard.press('Escape');
+  await page.getByText(BACKUP_WARNING).waitFor({ timeout: 10000 });
+  check('closing it returns to the deposit dialog, which still warns', true);
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(600);
+
+  await openMenu();
   await button(/^settings$/i).click();
   await page.waitForTimeout(500);
   const settings = await page.locator('body').innerText();
@@ -240,7 +268,15 @@ try {
     'backup card gone once backed up',
     !(await page.locator('body').innerText()).includes('Back up your recovery phrase')
   );
+  depositDialog = await openDepositDialog();
+  check(
+    'deposit dialog does not warn once backed up',
+    !(await depositDialog.innerText()).includes(BACKUP_WARNING)
+  );
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(600);
 
+  await openMenu();
   await button(/^settings$/i).click();
   await page.getByRole('switch').waitFor({ timeout: 10000 });
   await page.waitForTimeout(300);
@@ -340,6 +376,46 @@ try {
   await page.waitForTimeout(1200);
   // Recovery finds no name here (dev has no name service), so the address shows.
   check('recovered passkey account connected', await headerShows(passkeyAddress));
+
+  // ---- 4. The completion screen's "Back up recovery phrase now" --------------------------
+  await freshAuthenticator();
+  await openFresh();
+  await toConnectScreen();
+  await button(/^create account$/i).click();
+  await page.getByText('Welcome to Sigma').waitFor({ timeout: 10000 });
+  await button(/^continue$/i).click();
+  await page.getByPlaceholder('yourname').waitFor({ timeout: 15000 });
+  await page.waitForTimeout(800);
+  await button(/^continue$/i).click();
+  await page.getByPlaceholder('New password').fill(PASSWORD);
+  await page.getByPlaceholder('Confirm password').fill(PASSWORD);
+  await button(/create wallet/i).click();
+  await button(/enable face id/i).waitFor({ timeout: 15000 });
+  await button(/not now/i).click();
+  await page.getByText("You're all set").waitFor({ timeout: 15000 });
+  check('a new account is not backed up', !(await stored())?.backedUpAt);
+  await button(/back up recovery phrase now/i).click();
+  await page.getByText('Before you view it').waitFor({ timeout: 10000 });
+  check('"Back up recovery phrase now" opens the recovery phrase dialog', true);
+  await button(/view phrase/i).click();
+  await page.getByText('Confirm your password').waitFor({ timeout: 10000 });
+  await page.getByPlaceholder('Password').fill(PASSWORD);
+  await button(/^continue$/i).click();
+  await page.getByText('Your recovery phrase').waitFor({ timeout: 15000 });
+  await button(/^show$/i).click();
+  await page.waitForTimeout(400);
+  const newWords = (await page.locator('[role="dialog"]').last().innerText())
+    .split(/\s+/)
+    .filter((w) => /^[a-z]{3,8}$/.test(w))
+    .slice(-12);
+  check("the new account's twelve words are shown", newWords.length === 12);
+  await button(/^done$/i).click();
+  await page.waitForTimeout(800);
+  check('Done records the backup of the new account', !!(await stored())?.backedUpAt);
+  check(
+    'the account stays connected after the backup',
+    (await sessionOpen()) && (await button(/^log in$/i).count()) === 0
+  );
 
   console.log(`\n${passed} checks passed`);
 } catch (e) {

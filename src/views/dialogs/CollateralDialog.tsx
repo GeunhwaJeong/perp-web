@@ -6,11 +6,17 @@ import { collateralDisplayDecimals } from '@/haneul/perp';
 import BigNumber from 'bignumber.js';
 
 import { AlertType } from '@/constants/alerts';
-import { ButtonAction, ButtonType } from '@/constants/buttons';
-import { DepositDialog2Props, DialogProps, WithdrawDialog2Props } from '@/constants/dialogs';
+import { ButtonAction, ButtonSize, ButtonType } from '@/constants/buttons';
+import {
+  DepositDialog2Props,
+  DialogProps,
+  DialogTypes,
+  WithdrawDialog2Props,
+} from '@/constants/dialogs';
 import { STRING_KEYS } from '@/constants/localization';
 
 import { useCustomNotification } from '@/hooks/useCustomNotification';
+import { useNeedsBackup } from '@/hooks/useNeedsBackup';
 import { useStringGetter } from '@/hooks/useStringGetter';
 
 import { AlertMessage } from '@/components/AlertMessage';
@@ -21,9 +27,15 @@ import { Icon, IconName } from '@/components/Icon';
 import { InputType } from '@/components/Input';
 import { Output, OutputType } from '@/components/Output';
 
+import { useAppDispatch } from '@/state/appTypes';
+import { forceOpenDialog } from '@/state/dialogs';
+
 import { operationFailureToErrorParams } from '@/lib/errorHelpers';
 
 type Mode = 'deposit' | 'withdraw';
+
+const BACKUP_WARNING =
+  "Back up your recovery phrase before you deposit. It is the only way back into this wallet if this browser's data is cleared or the password is forgotten.";
 
 type Balances = {
   wallet: number;
@@ -49,6 +61,8 @@ const CollateralDialog = ({
 }) => {
   const stringGetter = useStringGetter();
   const notify = useCustomNotification();
+  const dispatch = useAppDispatch();
+  const needsBackup = useNeedsBackup();
   const [amount, setAmount] = useState('');
   const [balances, setBalances] = useState<Balances>();
   const [error, setError] = useState<string>();
@@ -97,6 +111,10 @@ const CollateralDialog = ({
     setIsOpen(false);
   };
 
+  // This dialog moves to the front of the queue and comes back when the phrase dialog closes.
+  const backUp = () =>
+    dispatch(forceOpenDialog(DialogTypes.AccountSecurity({ intent: 'recoveryPhrase' })));
+
   // Exact to the coin's decimals and rounded down, so the amount shown can be typed in and moved.
   const balanceRow = (label: string, balance: number | undefined) => (
     <div tw="row justify-between text-color-text-0 font-small-medium">
@@ -123,6 +141,20 @@ const CollateralDialog = ({
       title={stringGetter({ key: mode === 'deposit' ? STRING_KEYS.DEPOSIT : STRING_KEYS.WITHDRAW })}
     >
       <form tw="flexColumn mt-1.25 gap-1.25" onSubmit={onSubmit}>
+        {mode === 'deposit' && needsBackup ? (
+          <AlertMessage type={AlertType.Warning}>
+            {BACKUP_WARNING}
+            <Button
+              tw="mt-0.5 justify-self-start"
+              type={ButtonType.Button}
+              action={ButtonAction.Base}
+              size={ButtonSize.Small}
+              onClick={backUp}
+            >
+              Back up now
+            </Button>
+          </AlertMessage>
+        ) : null}
         {balanceRow(stringGetter({ key: STRING_KEYS.WALLET_BALANCE }), balances?.wallet)}
         {balanceRow(
           stringGetter({ key: STRING_KEYS.AVAILABLE_BALANCE }),

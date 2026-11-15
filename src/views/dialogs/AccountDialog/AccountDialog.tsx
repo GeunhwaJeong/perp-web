@@ -19,7 +19,7 @@ import {
   type NameOwner,
 } from '@/haneul/names';
 
-import { DialogProps, OnboardingDialogProps } from '@/constants/dialogs';
+import { DialogProps, DialogTypes, OnboardingDialogProps } from '@/constants/dialogs';
 import { type WalletInfo } from '@/constants/wallets';
 
 import { useAccounts } from '@/hooks/useAccounts';
@@ -29,6 +29,7 @@ import { useSuggestedName } from '@/hooks/useSuggestedName';
 import { setDisplayChooseWallet, setOnboardedThisSession } from '@/state/account';
 import { calculateOnboardingStep } from '@/state/accountCalculators';
 import { useAppDispatch, useAppSelector } from '@/state/appTypes';
+import { openDialog } from '@/state/dialogs';
 
 import { log } from '@/lib/telemetry';
 
@@ -132,6 +133,12 @@ export const AccountDialog = ({ setIsOpen: setIsOpenRaw }: DialogProps<Onboardin
     [dispatch, setIsOpenRaw]
   );
   const close = useCallback(() => setIsOpen(false), [setIsOpen]);
+
+  // The recovery phrase dialog queues behind this one and opens as this one closes.
+  const backUp = useCallback(() => {
+    dispatch(openDialog(DialogTypes.AccountSecurity({ intent: 'recoveryPhrase' })));
+    close();
+  }, [close, dispatch]);
 
   useEffect(
     () => () => {
@@ -453,7 +460,7 @@ export const AccountDialog = ({ setIsOpen: setIsOpenRaw }: DialogProps<Onboardin
           address={completed.address}
           nameStatus={completed.nameStatus}
           onDone={close}
-          onBackUp={close}
+          onBackUp={backUp}
         />
       </Pager>
     </AccountModal>

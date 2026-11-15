@@ -15,6 +15,7 @@ import { useAccountBalance } from '@/hooks/useAccountBalance';
 import { useAccounts } from '@/hooks/useAccounts';
 import { useCopyValue } from '@/hooks/useCopyValue';
 import { useLocalAccount } from '@/hooks/useLocalAccount';
+import { useNeedsBackup } from '@/hooks/useNeedsBackup';
 import { usePasskeyAccount } from '@/hooks/usePasskeyAccount';
 import { useTokenConfigs } from '@/hooks/useTokenConfigs';
 
@@ -69,6 +70,7 @@ export const AccountDrawer = ({ trigger }: { trigger: ReactNode }) => {
     dydxAddress,
   } = useAccounts();
   const { account: localAccount, store } = useLocalAccount();
+  const needsBackup = useNeedsBackup();
   const passkeyAccount = usePasskeyAccount();
   const { nativeTokenBalance, usdcBalance } = useAccountBalance();
   const { usdcLabel } = useTokenConfigs();
@@ -114,7 +116,7 @@ export const AccountDrawer = ({ trigger }: { trigger: ReactNode }) => {
               name={record?.username}
               nameStatus={record?.nameStatus}
               isSigmaAccount={isLocalAccount || isPasskeyAccount}
-              needsBackup={isLocalAccount && !localAccount.backedUpAt}
+              needsBackup={needsBackup}
               walletHaneul={nativeTokenBalance.toNumber()}
               walletCollateral={usdcBalance}
               collateralLabel={usdcLabel}
