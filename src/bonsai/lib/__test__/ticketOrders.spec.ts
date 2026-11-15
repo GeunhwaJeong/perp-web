@@ -25,8 +25,10 @@ import {
   parseTicketOrderId,
   planStopLossTakeProfit,
   standaloneStopFromPayload,
+  stopLossTakeProfitFromLevel,
   stopLossTakeProfitOrders,
   ticketOrderId,
+  triggeredMarketOrderPrice,
   triggersAtOrAbove,
   twapFromPayload,
 } from '../ticketOrders';
@@ -140,10 +142,16 @@ describe('stopLossTakeProfitOrders', () => {
   });
 });
 
-const place = (type: OrderType, triggerPrice: number, size = 0.1): TriggerOrderActions => ({
+const place = (
+  type: OrderType,
+  triggerPrice: number,
+  price: number,
+  size = 0.1
+): TriggerOrderActions => ({
   placePayload: {
     type,
     triggerPrice,
+    price,
     size,
     marketId: 'BTC-USD',
     side: OrderSide.SELL,
@@ -153,42 +161,120 @@ const cancel = (orderId: string): TriggerOrderActions => ({
   cancelPayload: { orderId } as TriggerOrderActions['cancelPayload'],
 });
 
-describe('planStopLossTakeProfit', () => {
-  const existing = openStopLossTakeProfits([ticket('0x1', 'aa')], { aa: sltp });
+describe('triggeredMarketOrderPrice', () => {
+  it('moves the trigger against the order by 5% on a major market and by 10% elsewhere', () => {
+    expect(triggeredMarketOrderPrice(OrderSide.SELL, 100_000, 'BTC-USD')).toBeCloseTo(95_000, 6);
+    expect(triggeredMarketOrderPrice(OrderSide.BUY, 100_000, 'BTC-USD')).toBeCloseTo(105_000, 6);
+    expect(triggeredMarketOrderPrice(OrderSide.SELL, 200, 'DOGE-USD')).toBeCloseTo(180, 9);
+    expect(triggeredMarketOrderPrice(OrderSide.BUY, 200, 'DOGE-USD')).toBeCloseTo(220, 9);
+  });
+});
 
-  it('makes one ticket of a new stop loss and take profit', () => {
+describe('planStopLossTakeProfit', () => {
+  // A ticket from before the levels had tickets of their own: both levels, at no price.
+  const both = openStopLossTakeProfits([ticket('0x1', 'aa')], { aa: sltp });
+  // The tickets as they are made now, one per level.
+  const split = openStopLossTakeProfits([ticket('0x2', 'bb'), ticket('0x3', 'cc')], {
+    bb: stored('stopLossTakeProfit', {
+      stopLossPrice: '99000000000000000000000',
+      positionIsAsk: false,
+      size: '100000000',
+    }),
+    cc: stored('stopLossTakeProfit', {
+      takeProfitPrice: '105000000000000000000000',
+      positionIsAsk: false,
+      size: '100000000',
+    }),
+  });
+
+  it('makes a ticket of each new level, at the price the form gives it', () => {
     expect(
       planStopLossTakeProfit(
-        [place(OrderType.STOP_MARKET, 99_000), place(OrderType.TAKE_PROFIT_MARKET, 105_000)],
+        [
+          place(OrderType.STOP_MARKET, 99_000, 94_050),
+          place(OrderType.TAKE_PROFIT_MARKET, 105_000, 99_750),
+        ],
         []
       )
     ).toEqual({
       cancelTicketIds: [],
-      create: { stopLoss: 99_000, takeProfit: 105_000, size: 0.1 },
+      create: [
+        { leg: 'sl', triggerPrice: 99_000, price: 94_050, size: 0.1 },
+        { leg: 'tp', triggerPrice: 105_000, price: 99_750, size: 0.1 },
+      ],
     });
   });
 
-  it('carries the level the form leaves alone into the ticket that replaces the old one', () => {
+  it('takes a limit level at its limit price', () => {
+    expect(planStopLossTakeProfit([place(OrderType.STOP_LIMIT, 99_000, 98_500)], [])).toEqual({
+      cancelTicketIds: [],
+      create: [{ leg: 'sl', triggerPrice: 99_000, price: 98_500, size: 0.1 }],
+    });
+  });
+
+  it('replaces the ticket of the level the form changes and leaves the other alone', () => {
     expect(
       planStopLossTakeProfit(
-        [cancel('ticket:0x1:sl'), place(OrderType.STOP_MARKET, 98_000)],
-        existing
+        [cancel('ticket:0x2:sl'), place(OrderType.STOP_MARKET, 98_000, 93_100)],
+        split
+      )
+    ).toEqual({
+      cancelTicketIds: ['0x2'],
+      create: [{ leg: 'sl', triggerPrice: 98_000, price: 93_100, size: 0.1 }],
+    });
+    // The level's ticket goes even when the form sends no cancel with the new level.
+    expect(
+      planStopLossTakeProfit([place(OrderType.TAKE_PROFIT_MARKET, 106_000, 100_700)], split)
+    ).toEqual({
+      cancelTicketIds: ['0x3'],
+      create: [{ leg: 'tp', triggerPrice: 106_000, price: 100_700, size: 0.1 }],
+    });
+    expect(planStopLossTakeProfit([cancel('ticket:0x3:tp')], split)).toEqual({
+      cancelTicketIds: ['0x3'],
+      create: [],
+    });
+  });
+
+  it('carries the level a ticket of both keeps into a ticket of its own, at the market slippage', () => {
+    expect(
+      planStopLossTakeProfit(
+        [cancel('ticket:0x1:sl'), place(OrderType.STOP_MARKET, 98_000, 93_100)],
+        both
       )
     ).toEqual({
       cancelTicketIds: ['0x1'],
-      create: { stopLoss: 98_000, takeProfit: 105_000, size: 0.1 },
+      create: [
+        { leg: 'sl', triggerPrice: 98_000, price: 93_100, size: 0.1 },
+        // The long's take profit sells: 5% under its trigger on BTC-USD.
+        { leg: 'tp', triggerPrice: 105_000, price: expect.closeTo(99_750, 6), size: 0.1 },
+      ],
     });
-    expect(planStopLossTakeProfit([cancel('ticket:0x1:tp')], existing)).toEqual({
+    expect(planStopLossTakeProfit([cancel('ticket:0x1:tp')], both)).toEqual({
       cancelTicketIds: ['0x1'],
-      create: { stopLoss: 99_000, takeProfit: undefined, size: 0.1 },
+      create: [{ leg: 'sl', triggerPrice: 99_000, price: expect.closeTo(94_050, 6), size: 0.1 }],
     });
   });
 
   it('only cancels once no level is left, and does nothing without a change', () => {
     expect(
-      planStopLossTakeProfit([cancel('ticket:0x1:sl'), cancel('ticket:0x1:tp')], existing)
-    ).toEqual({ cancelTicketIds: ['0x1'] });
-    expect(planStopLossTakeProfit([], [])).toEqual({ cancelTicketIds: [] });
+      planStopLossTakeProfit([cancel('ticket:0x1:sl'), cancel('ticket:0x1:tp')], both)
+    ).toEqual({ cancelTicketIds: ['0x1'], create: [] });
+    expect(
+      planStopLossTakeProfit([cancel('ticket:0x2:sl'), cancel('ticket:0x3:tp')], split)
+    ).toEqual({ cancelTicketIds: ['0x2', '0x3'], create: [] });
+    expect(planStopLossTakeProfit([], split)).toEqual({ cancelTicketIds: [], create: [] });
+  });
+
+  it('leaves out a level without a size or a price', () => {
+    expect(
+      planStopLossTakeProfit(
+        [
+          place(OrderType.STOP_MARKET, 99_000, 94_050, 0),
+          place(OrderType.TAKE_PROFIT_MARKET, 105_000, 0),
+        ],
+        []
+      )
+    ).toEqual({ cancelTicketIds: [], create: [] });
   });
 });
 
@@ -211,6 +297,46 @@ const order = (fields: Partial<TriggerOrderActions['placePayload'] & object>) =>
     goodTilTimeInSeconds: 28 * 24 * 3600,
     ...fields,
   }) as NonNullable<TriggerOrderActions['placePayload']>;
+
+describe('stopLossTakeProfitFromLevel', () => {
+  it("closes a long at its stop loss with an immediate-or-cancel ask, no lower than the level's price", () => {
+    expect(
+      stopLossTakeProfitFromLevel(
+        { leg: 'sl', triggerPrice: 99_000, price: 94_050.4, size: 0.1 },
+        false,
+        MARKET
+      )
+    ).toEqual({
+      clearingHouse: MARKET.clearingHouse,
+      isLimitOrder: true,
+      triggerPriceType: 0,
+      stopLossPrice: 99_000n * E18,
+      takeProfitPrice: undefined,
+      positionIsAsk: false,
+      size: 100_000_000n,
+      // An ask rounds up to the tick, so the sale is never under the price.
+      price: 94_051_000_000_000n,
+      orderType: 3n,
+    });
+  });
+
+  it("closes a short at its take profit with a bid, no higher than the level's price", () => {
+    expect(
+      stopLossTakeProfitFromLevel(
+        { leg: 'tp', triggerPrice: 59_000, price: 61_950.7, size: 0.25 },
+        true,
+        MARKET
+      )
+    ).toMatchObject({
+      stopLossPrice: undefined,
+      takeProfitPrice: 59_000n * E18,
+      positionIsAsk: true,
+      size: 250_000_000n,
+      price: 61_950_000_000_000n,
+      orderType: 3n,
+    });
+  });
+});
 
 describe('triggersAtOrAbove', () => {
   it('has a stop buy and a take profit sell wait for the index to rise, the others to fall', () => {

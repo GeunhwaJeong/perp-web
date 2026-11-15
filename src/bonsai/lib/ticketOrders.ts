@@ -16,10 +16,12 @@ import {
   sizeToUnits,
   type PerpMarketConfig,
   type StandaloneStopDetails,
+  type StopLossTakeProfitDetails,
   type TwapDetails,
 } from '@/haneul/perp';
 import BigNumber from 'bignumber.js';
 
+import { MAJOR_MARKETS } from '@/constants/markets';
 import {
   IndexerOrderSide,
   IndexerOrderType,
@@ -32,9 +34,10 @@ import { normalizeCommitment, type StoredTicketDetails } from '@/state/ticketDet
 
 /**
  * Stop loss / take profit tickets seen as the conditional orders the dYdX screens know. A
- * ticket holds both levels; each becomes an order whose id names the ticket and the level, so
- * the positions table and the triggers form show and edit them as they would two orders, and
- * the account transaction supervisor turns the form's edits back into tickets.
+ * ticket holds one level (one made before the levels had tickets of their own holds both); each
+ * level becomes an order whose id names the ticket and the level, so the positions table and
+ * the triggers form show and edit them as they would two orders, and the account transaction
+ * supervisor turns the form's edits back into tickets.
  */
 
 const PREFIX = 'ticket:';
@@ -179,48 +182,109 @@ export function stopLossTakeProfitOrders(
   });
 }
 
+/** One level of a position's stop loss / take profit: the ticket that will hold it. */
+export type StopLossTakeProfitLevel = {
+  leg: TicketLeg;
+  /** The index price the level triggers at. */
+  triggerPrice: number;
+  /**
+   * The worst price the close may fill at: a market level's trigger moved by the slippage of
+   * `triggeredMarketOrderPrice`, a limit level's limit price.
+   */
+  price: number;
+  size: number;
+};
+
 export type StopLossTakeProfitPlan = {
   /** The tickets the edit replaces or removes. */
   cancelTicketIds: string[];
-  /** The ticket to create, holding both levels; none when every level was removed. */
-  create?: { stopLoss?: number; takeProfit?: number; size: number };
+  /** The tickets to create, one per level. */
+  create: StopLossTakeProfitLevel[];
 };
+
+const TRIGGERED_MARKET_ORDER_SLIPPAGE_MAJOR_MARKET = 0.05;
+const TRIGGERED_MARKET_ORDER_SLIPPAGE = 0.1;
+
+/**
+ * The worst price a triggered market stop loss or take profit may fill at: its trigger moved
+ * against the order by 5% on a major market and by 10% elsewhere, as in dYdX's client.
+ */
+export const triggeredMarketOrderPrice = (
+  side: OrderSide,
+  triggerPrice: number,
+  market: string
+) => {
+  const slippage = MAJOR_MARKETS.has(market)
+    ? TRIGGERED_MARKET_ORDER_SLIPPAGE_MAJOR_MARKET
+    : TRIGGERED_MARKET_ORDER_SLIPPAGE;
+  return side === OrderSide.BUY ? triggerPrice * (1 + slippage) : triggerPrice * (1 - slippage);
+};
+
+const LEGS: TicketLeg[] = ['sl', 'tp'];
 
 const legOf = (type: OrderType): TicketLeg =>
   type === OrderType.STOP_MARKET || type === OrderType.STOP_LIMIT ? 'sl' : 'tp';
 
+const levelOf = (ticket: OpenStopLossTakeProfit, leg: TicketLeg) =>
+  leg === 'sl' ? ticket.stopLoss : ticket.takeProfit;
+
 /**
- * What the triggers form's actions come to with tickets. A ticket holds both levels, so a level
- * the form leaves alone is carried over from the ticket it replaces: every edit cancels the
- * market's open ticket and, unless no level is left, creates one ticket with the levels after
- * the edit.
+ * What the triggers form's actions come to with tickets. A ticket commits to one price, and a
+ * position's stop loss and take profit sit on opposite sides of its entry, so each level is a
+ * ticket of its own and closes within its own worst price. Placing a level cancels the ticket
+ * that held it and creates a new one; the other level's ticket is left alone.
+ *
+ * A ticket from before this held both levels at no price. It goes with either of its levels,
+ * and the level the form left alone is carried into a ticket of its own, at the market slippage
+ * from its trigger.
  */
 export function planStopLossTakeProfit(
   actions: TriggerOrderActions[],
   existing: OpenStopLossTakeProfit[]
 ): StopLossTakeProfitPlan {
-  const current = existing[0];
-  const levels: Record<TicketLeg, number | undefined> = {
-    sl: current?.stopLoss?.toNumber(),
-    tp: current?.takeProfit?.toNumber(),
-  };
-  let size = current?.size.toNumber();
+  const cancel = new Set<string>();
+  const removed = new Set<TicketLeg>();
+  const placed = new Map<TicketLeg, StopLossTakeProfitLevel>();
   actions.forEach(({ placePayload, cancelPayload }) => {
     if (placePayload != null) {
-      levels[legOf(placePayload.type)] = placePayload.triggerPrice;
-      size = placePayload.size;
+      const leg = legOf(placePayload.type);
+      existing.filter((t) => levelOf(t, leg) != null).forEach((t) => cancel.add(t.ticketId));
+      if (placePayload.triggerPrice != null) {
+        placed.set(leg, {
+          leg,
+          triggerPrice: placePayload.triggerPrice,
+          price: placePayload.price,
+          size: placePayload.size,
+        });
+      }
     } else if (cancelPayload != null) {
-      const leg = parseTicketOrderId(cancelPayload.orderId)?.leg;
-      if (leg != null) levels[leg] = undefined;
+      const parsed = parseTicketOrderId(cancelPayload.orderId);
+      if (parsed == null) return;
+      existing.filter((t) => t.ticketId === parsed.ticketId).forEach((t) => cancel.add(t.ticketId));
+      removed.add(parsed.leg);
     }
   });
-  const cancelTicketIds = existing.map((e) => e.ticketId);
-  if ((levels.sl == null && levels.tp == null) || size == null || !(size > 0)) {
-    return { cancelTicketIds };
-  }
+  existing
+    .filter((t) => cancel.has(t.ticketId))
+    .forEach((t) =>
+      LEGS.forEach((leg) => {
+        const level = levelOf(t, leg)?.toNumber();
+        if (level == null || placed.has(leg) || removed.has(leg)) return;
+        const side = t.positionIsAsk ? OrderSide.BUY : OrderSide.SELL;
+        placed.set(leg, {
+          leg,
+          triggerPrice: level,
+          price: triggeredMarketOrderPrice(side, level, t.marketId),
+          size: t.size.toNumber(),
+        });
+      })
+    );
   return {
-    cancelTicketIds,
-    create: { stopLoss: levels.sl, takeProfit: levels.tp, size },
+    cancelTicketIds: [...cancel],
+    create: LEGS.map((leg) => placed.get(leg)).filter(
+      (level): level is StopLossTakeProfitLevel =>
+        level != null && level.size > 0 && level.price > 0 && level.triggerPrice > 0
+    ),
   };
 }
 
@@ -248,6 +312,34 @@ type Planned<T> = { details: Omit<T, 'salt'> } | { error: string };
 
 // Stops and take profits trigger on the index price, the oracle price the forms show.
 const TRIGGER_ON_INDEX = 0;
+
+/**
+ * A level of a position's stop loss / take profit as its ticket. The close is an order on the
+ * other side of the position, immediate-or-cancel at the level's worst price: the chain bounds
+ * the fill and takes what the book has within the price. The engine's market order has no price
+ * and fails unless it fills in full, so a position larger than the book would not close at all.
+ * When nothing fills the execution fails and the ticket stays for the keeper's next round; once
+ * a part fills the ticket is spent, and what is left of the position has this level no more.
+ */
+export function stopLossTakeProfitFromLevel(
+  level: StopLossTakeProfitLevel,
+  positionIsAsk: boolean,
+  market: Market
+): Omit<StopLossTakeProfitDetails, 'salt'> {
+  const trigger = priceToIfixed(level.triggerPrice);
+  return {
+    clearingHouse: market.clearingHouse,
+    isLimitOrder: true,
+    triggerPriceType: TRIGGER_ON_INDEX,
+    stopLossPrice: level.leg === 'sl' ? trigger : undefined,
+    takeProfitPrice: level.leg === 'tp' ? trigger : undefined,
+    positionIsAsk,
+    size: sizeToUnits(level.size, market.lotSize),
+    // A long's close sells, a short's buys.
+    price: limitPriceToUnits(level.price, !positionIsAsk, market.tickSize),
+    orderType: ORDER_TYPE.IOC,
+  };
+}
 
 /**
  * How a triggered stop limit order trades. The form shows only its execution; the payload's time

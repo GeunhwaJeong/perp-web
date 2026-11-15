@@ -1,4 +1,5 @@
 import { getPositionBaseEquity } from '@/bonsai/calculators/subaccount';
+import { triggeredMarketOrderPrice } from '@/bonsai/lib/ticketOrders';
 import {
   MarketInfo,
   OrderExecution,
@@ -351,14 +352,6 @@ function createPlaceOrderPayload(
   };
 }
 
-const MAJOR_MARKETS = new Set(['ETH-USD', 'BTC-USD', 'SOL-USD']);
-const STOP_MARKET_ORDER_SLIPPAGE_BUFFER_MAJOR_MARKET = 0.05;
-const TAKE_PROFIT_MARKET_ORDER_SLIPPAGE_BUFFER_MAJOR_MARKET = 0.05;
-const STOP_MARKET_ORDER_SLIPPAGE_BUFFER = 0.1;
-const TAKE_PROFIT_MARKET_ORDER_SLIPPAGE_BUFFER = 0.1;
-// const MARKET_ORDER_MAX_SLIPPAGE = 0.05;
-// const SLIPPAGE_STEP_SIZE = 0.00001;
-
 function getPrice(
   orderType: OrderType,
   side: OrderSide,
@@ -370,26 +363,9 @@ function getPrice(
     return undefined;
   }
 
-  // For market orders, calculate price with slippage based on the trigger price
+  // For market orders, the worst price the order may fill at: the trigger with its slippage
   if (orderType === OrderType.STOP_MARKET || orderType === OrderType.TAKE_PROFIT_MARKET) {
-    const isMajorMarket = MAJOR_MARKETS.has(market);
-
-    // Slippage percentages based on market type and order type
-    const slippagePercentage = calc(() => {
-      if (isMajorMarket) {
-        return orderType === OrderType.STOP_MARKET
-          ? STOP_MARKET_ORDER_SLIPPAGE_BUFFER_MAJOR_MARKET
-          : TAKE_PROFIT_MARKET_ORDER_SLIPPAGE_BUFFER_MAJOR_MARKET;
-      }
-      return orderType === OrderType.STOP_MARKET
-        ? STOP_MARKET_ORDER_SLIPPAGE_BUFFER
-        : TAKE_PROFIT_MARKET_ORDER_SLIPPAGE_BUFFER;
-    });
-
-    if (side === OrderSide.BUY) {
-      return triggerPrice * (1 + slippagePercentage);
-    }
-    return triggerPrice * (1 - slippagePercentage);
+    return triggeredMarketOrderPrice(side, triggerPrice, market);
   }
 
   // For limit orders, use the limit price

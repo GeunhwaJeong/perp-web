@@ -34,7 +34,6 @@ import {
   SIDE,
   collateralToUnits,
   limitPriceToUnits,
-  priceToIfixed,
   priceToUnits,
   randomSalt,
   readAccount,
@@ -123,7 +122,9 @@ import {
   parseTicketOrderId,
   planStopLossTakeProfit,
   standaloneStopFromPayload,
+  stopLossTakeProfitFromLevel,
   twapFromPayload,
+  type StopLossTakeProfitLevel,
 } from './lib/ticketOrders';
 import { logBonsaiError, logBonsaiInfo } from './logs';
 
@@ -149,12 +150,8 @@ type PreparedTicket = {
   twap?: TwapDetails;
 };
 
-/** Ticket work a session carries in its transaction. */
-type SessionAttachment = { ticket?: PreparedTicket };
-
-// Stop loss and take profit levels trigger on the index price, the oracle price the forms show
-// (`stop_orders` trigger price type 0).
-const TRIGGER_ON_INDEX = 0;
+/** Ticket work a session carries in its transaction: the tickets of the take profit and stop loss. */
+type SessionAttachment = { tickets?: PreparedTicket[] };
 
 // The indexer recorded a ticket about two seconds after its transaction on localnet; the
 // details are handed in again until the keeper sees the ticket hold them.
@@ -608,14 +605,17 @@ export class AccountTransactionSupervisor {
       priceUpdates,
     });
     staleTickets.forEach((ticketId) => ctx.builder.appendCancelStopTicket(tx, ref, ticketId));
-    if (attach.ticket?.stopLossTakeProfit) {
-      ctx.builder.appendStopLossTakeProfitTicket(tx, ref, attach.ticket.stopLossTakeProfit);
-    }
+    const tickets = attach.tickets ?? [];
+    tickets.forEach((ticket) => {
+      if (ticket.stopLossTakeProfit) {
+        ctx.builder.appendStopLossTakeProfitTicket(tx, ref, ticket.stopLossTakeProfit);
+      }
+    });
     try {
-      if (attach.ticket) await this.handInBeforeSigning(ctx, attach.ticket);
+      await Promise.all(tickets.map((ticket) => this.handInBeforeSigning(ctx, ticket)));
       const result = await signAndExecute(tx);
       this.markPosition(ctx, marketId);
-      if (attach.ticket) this.ticketLanded(ctx, attach.ticket);
+      tickets.forEach((ticket) => this.ticketLanded(ctx, ticket));
       if (staleTickets.length > 0) {
         logBonsaiInfo(FN, 'stop tickets canceled with the position', {
           digest: result.digest,
@@ -700,15 +700,16 @@ export class AccountTransactionSupervisor {
     });
     let attach: SessionAttachment = {};
     if (!isOperationFailure(ctx) && triggers != null && triggers.length > 0) {
-      const levels = planStopLossTakeProfit(triggers, []).create;
-      if (levels != null) {
-        attach = {
-          ticket: this.prepareStopLossTakeProfit(ctx.payload, payload.marketId, {
-            ...levels,
-            positionIsAsk: payload.side === OrderSide.SELL,
-          }),
-        };
-      }
+      attach = {
+        tickets: planStopLossTakeProfit(triggers, []).create.map((level) =>
+          this.prepareStopLossTakeProfit(
+            ctx.payload,
+            payload.marketId,
+            level,
+            payload.side === OrderSide.SELL
+          )
+        ),
+      };
     }
     const result = isOperationFailure(ctx)
       ? ctx
@@ -922,24 +923,16 @@ export class AccountTransactionSupervisor {
       .map((t) => t.ticketId);
   }
 
+  /** The ticket of one level of a position's take profit / stop loss (see `ticketOrders.ts`). */
   private prepareStopLossTakeProfit(
     ctx: Context,
     marketId: string,
-    levels: { stopLoss?: number; takeProfit?: number; size: number; positionIsAsk: boolean }
+    level: StopLossTakeProfitLevel,
+    positionIsAsk: boolean
   ): PreparedTicket {
     const market = ctx.deployment.markets[marketId]!;
-    // One ticket holds both levels: the engine consumes it at whichever triggers first, which
-    // cancels the other. It closes at market; the keeper holds back a fill far from the index.
     const details: StopLossTakeProfitDetails = {
-      clearingHouse: market.clearingHouse,
-      isLimitOrder: false,
-      triggerPriceType: TRIGGER_ON_INDEX,
-      stopLossPrice: levels.stopLoss != null ? priceToIfixed(levels.stopLoss) : undefined,
-      takeProfitPrice: levels.takeProfit != null ? priceToIfixed(levels.takeProfit) : undefined,
-      positionIsAsk: levels.positionIsAsk,
-      size: sizeToUnits(levels.size, market.lotSize),
-      price: 0n,
-      orderType: ORDER_TYPE.GTC,
+      ...stopLossTakeProfitFromLevel(level, positionIsAsk, market),
       salt: randomSalt(),
     };
     return {
@@ -1016,9 +1009,9 @@ export class AccountTransactionSupervisor {
   }
 
   /**
-   * The triggers form's take profit and stop loss edits on one position, as tickets: the open
-   * ticket of the market is canceled and, unless no level is left, one ticket with the levels
-   * after the edit is created, in one transaction.
+   * The triggers form's take profit and stop loss edits on one position, as tickets: the ticket
+   * of each level the form changed is canceled and, unless the level was removed, a ticket with
+   * the new level is created, in one transaction.
    */
   private async placeTriggerTickets(
     triggers: TriggerOrderActions[]
@@ -1051,31 +1044,37 @@ export class AccountTransactionSupervisor {
       triggers,
       this.stopLossTakeProfitsOn(ctx.payload, marketId)
     );
-    if (plan.create == null && plan.cancelTicketIds.length === 0)
+    if (plan.create.length === 0 && plan.cancelTicketIds.length === 0)
       return wrapOperationSuccess({ digest: '' });
     const position = (BonsaiCore.account.parentSubaccountPositions.data(state) ?? []).find(
       (p) => p.market === marketId && p.status === IndexerPerpetualPositionStatus.OPEN
     );
-    if (plan.create != null && position == null) {
+    if (plan.create.length > 0 && position == null) {
       return failure('Take profit and stop loss need an open position');
     }
     const ref = { account: account.account, cap: account.cap };
     const tx = new Transaction();
     plan.cancelTicketIds.forEach((ticketId) => builder.appendCancelStopTicket(tx, ref, ticketId));
-    const ticket =
-      plan.create != null && position != null
-        ? this.prepareStopLossTakeProfit(ctx.payload, marketId, {
-            ...plan.create,
-            positionIsAsk: position.side === IndexerPositionSide.SHORT,
-          })
-        : undefined;
-    if (ticket?.stopLossTakeProfit) {
-      builder.appendStopLossTakeProfitTicket(tx, ref, ticket.stopLossTakeProfit);
-    }
+    const tickets =
+      position == null
+        ? []
+        : plan.create.map((level) =>
+            this.prepareStopLossTakeProfit(
+              ctx.payload,
+              marketId,
+              level,
+              position.side === IndexerPositionSide.SHORT
+            )
+          );
+    tickets.forEach((ticket) => {
+      if (ticket.stopLossTakeProfit) {
+        builder.appendStopLossTakeProfitTicket(tx, ref, ticket.stopLossTakeProfit);
+      }
+    });
     try {
-      if (ticket) await this.handInBeforeSigning(ctx.payload, ticket);
+      await Promise.all(tickets.map((ticket) => this.handInBeforeSigning(ctx.payload, ticket)));
       const result = await signAndExecute(tx);
-      if (ticket) this.ticketLanded(ctx.payload, ticket);
+      if (tickets.length > 0) tickets.forEach((ticket) => this.ticketLanded(ctx.payload, ticket));
       else this.refreshTickets();
       logBonsaiInfo(FN, 'take profit / stop loss tickets', {
         digest: result.digest,
