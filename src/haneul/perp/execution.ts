@@ -57,6 +57,11 @@ export const settleTransaction = async (
 
 const ABORT_IN_MESSAGE = /abort code: (\d+), in '0x[0-9a-f]+::(\w+)::(\w+)'/;
 
+// What the validators answer when another transaction of the same wallet holds its gas coin or
+// its account capability. This site sends one at a time; another device or browser may not.
+const LOCKED_BY_ANOTHER = /already locked by a different transaction/;
+export const WALLET_BUSY = 'Another transaction from this wallet was still under way. Try again.';
+
 /**
  * Errors raised before execution (the SDK simulates while resolving gas and inputs) carry
  * the abort only in their message. Normalize them so callers see the same
@@ -86,6 +91,9 @@ export const normalizeTransactionError = (error: unknown): HaneulTransactionErro
     });
   }
   const messages = chain.map((e) => (e instanceof Error ? e.message : String(e)));
+  if (messages.some((msg) => LOCKED_BY_ANOTHER.test(msg))) {
+    return new HaneulTransactionError(WALLET_BUSY, { cause: error });
+  }
   const m = messages.map((msg) => ABORT_IN_MESSAGE.exec(msg)).find((x) => x != null);
   if (m) {
     const abort: HaneulAbort = { code: Number(m[1]), module: m[2]!, function: m[3] };

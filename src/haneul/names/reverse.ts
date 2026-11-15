@@ -2,6 +2,7 @@ import type { ClientWithCoreApi } from '@haneullabs/haneul/client';
 import type { Signer } from '@haneullabs/haneul/cryptography';
 import { Transaction } from '@haneullabs/haneul/transactions';
 
+import { exclusive, transactionTurn } from '../exclusive';
 import type { NameServiceConfig } from './config';
 import { fullName } from './format';
 
@@ -27,16 +28,24 @@ export const setReverseLookup = async ({
 }): Promise<{ digest: string }> => {
   if (afterDigest) await client.core.waitForTransaction({ digest: afterDigest });
 
+  const sender = signer.getPublicKey().toHaneulAddress();
   const tx = new Transaction();
-  tx.setSender(signer.getPublicKey().toHaneulAddress());
+  tx.setSender(sender);
   tx.moveCall({
     target: `${config.packageId}::controller::set_reverse_lookup`,
     arguments: [tx.object(config.haneulNs), tx.pure.string(fullName(name))],
   });
 
-  const result = await signer.signAndExecuteTransaction({ transaction: tx, client });
-  if (result.FailedTransaction) {
-    throw new Error(`Reverse lookup failed on chain: ${result.FailedTransaction.digest}`);
-  }
-  return { digest: result.Transaction!.digest };
+  // This runs behind the screen right after the account is made, when its owner may be making
+  // the first deposit: it takes the wallet's turn like every other transaction, and keeps it
+  // until the node shows the result, so the next one is built from the gas coin this one left.
+  return exclusive(transactionTurn(client.network, sender), async () => {
+    const result = await signer.signAndExecuteTransaction({ transaction: tx, client });
+    if (result.FailedTransaction) {
+      throw new Error(`Reverse lookup failed on chain: ${result.FailedTransaction.digest}`);
+    }
+    const { digest } = result.Transaction!;
+    await client.core.waitForTransaction({ digest });
+    return { digest };
+  });
 };
