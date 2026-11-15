@@ -153,6 +153,27 @@ describe('cancel with returns', () => {
     });
     expect(moveCalls(tx).map(({ call }) => call.function)).toEqual(['cancel_orders']);
   });
+
+  it('passes over orders that are not on the book when told to, with the same arguments', () => {
+    const cancel = (skipMissing: boolean) =>
+      moveCalls(
+        new PerpTransactionBuilder(deployment).cancelOrdersAcrossMarkets({
+          ref,
+          byMarket: { 'BTC-USD': [7n, 9n] },
+          returns: [{ marketId: 'BTC-USD', restoreImr: RESTORE }],
+          skipMissing,
+        })
+      ).map(({ call }) => call);
+    const [strict, lenient] = [cancel(false), cancel(true)];
+    expect(lenient.map((call) => call.function)).toEqual([
+      'try_cancel_orders',
+      'set_position_initial_margin_ratio',
+      'deallocate_free_collateral',
+      'set_position_initial_margin_ratio',
+    ]);
+    expect(lenient[0]!.arguments).toEqual(strict[0]!.arguments);
+    expect(lenient[0]!.typeArguments).toEqual(strict[0]!.typeArguments);
+  });
 });
 
 describe('returnableCollateral', () => {

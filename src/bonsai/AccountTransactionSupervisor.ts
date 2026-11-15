@@ -106,6 +106,7 @@ import { isTruthy } from '@/lib/isTruthy';
 
 import { TradeFormPayload } from './forms/trade/types';
 import { CancelOrderPayload, PlaceOrderPayload, TriggerOrderActions } from './forms/triggers/types';
+import { canceledOrders, ORDER_NO_LONGER_OPEN } from './lib/cancelOutcome';
 import { unsupportedOrderTypeReason } from './lib/engineOrderSupport';
 import {
   isOperationFailure,
@@ -497,9 +498,11 @@ export class AccountTransactionSupervisor {
   private async cancelReturningCollateral(
     ctx: Context,
     ref: PerpAccountRef,
-    ids: Record<string, bigint[]>
+    ids: Record<string, bigint[]>,
+    skipMissing = false
   ) {
-    const cancelAlone = () => ctx.builder.cancelOrdersAcrossMarkets({ ref, byMarket: ids });
+    const cancelAlone = () =>
+      ctx.builder.cancelOrdersAcrossMarkets({ ref, byMarket: ids, skipMissing });
     const returns = await this.marketsEmptiedByCancel(ctx, ids);
     if (returns.length === 0) return signAndExecute(cancelAlone());
     const priceUpdates = await this.priceUpdatesForMarkets(
@@ -507,7 +510,13 @@ export class AccountTransactionSupervisor {
       returns.map((r) => r.marketId)
     );
     const withReturns = () =>
-      ctx.builder.cancelOrdersAcrossMarkets({ ref, byMarket: ids, returns, priceUpdates });
+      ctx.builder.cancelOrdersAcrossMarkets({
+        ref,
+        byMarket: ids,
+        returns,
+        priceUpdates,
+        skipMissing,
+      });
     const markets = returns.map((r) => r.marketId);
     try {
       const simulated = withReturns();
@@ -823,8 +832,14 @@ export class AccountTransactionSupervisor {
     return result;
   }
 
+  /**
+   * Cancels the orders in one transaction and answers which of them the chain canceled. With
+   * `skipMissing`, an order that is no longer on the book is passed over; without it, such an
+   * order fails the whole cancel, which is what a cancel of one order should say.
+   */
   private async cancelIds(
-    byMarket: Record<string, string[]>
+    byMarket: Record<string, string[]>,
+    { skipMissing = false } = {}
   ): Promise<OperationResult<{ canceled: string[] }>> {
     const ctx = await this.context({ exposedAllowed: true });
     if (isOperationFailure(ctx)) return ctx;
@@ -840,12 +855,15 @@ export class AccountTransactionSupervisor {
       const result = await this.cancelReturningCollateral(
         ctx.payload,
         { account: ctx.payload.account.account, cap: ctx.payload.account.cap },
-        ids
+        ids,
+        skipMissing
       );
       const canceled = eventsOf(result.events, '::events::CanceledOrder').map((e) =>
         String(e.order_id)
       );
-      canceled.forEach((id) => this.orderMarkets.delete(id));
+      // The transaction went through, so every order it named is off the book now: canceled
+      // here, or gone before. None of them is an order of this session to cancel again.
+      Object.values(byMarket).forEach((list) => list.forEach((id) => this.orderMarkets.delete(id)));
       const returned = eventsOf(result.events, '::events::DeallocatedCollateral').map((e) =>
         String(e.collateral)
       );
@@ -859,7 +877,15 @@ export class AccountTransactionSupervisor {
     }
   }
 
-  public async cancelAllOrders({ marketId }: { marketId?: string }): Promise<OperationResult<any>> {
+  /**
+   * Cancels every open order, of one market or of all, in one transaction. The answer names the
+   * orders the chain canceled; one that was no longer open is not among them.
+   */
+  public async cancelAllOrders({
+    marketId,
+  }: {
+    marketId?: string;
+  }): Promise<OperationResult<{ canceled: string[] }>> {
     track(AnalyticsEvents.TradeCancelAllOrdersClick({ marketId }));
     const state = this.store.getState();
     const openOrders = BonsaiCore.account.allOrders
@@ -886,9 +912,18 @@ export class AccountTransactionSupervisor {
     if (cancels.length > 0) {
       this.store.dispatch(cancelAllSubmitted({ marketId, cancels }));
     }
-    const result = await this.cancelIds(byMarket);
+    // The list holds every order placed in this session, whatever became of it, and an order
+    // may fill between the click and the transaction: the cancel passes over those.
+    const result = await this.cancelIds(byMarket, { skipMissing: true });
     if (isOperationSuccess(result)) {
-      cancels.forEach((c) => this.store.dispatch(cancelOrderConfirmed({ uuid: c.uuid })));
+      const wasCanceled = canceledOrders(result.payload.canceled);
+      cancels.forEach((c) =>
+        this.store.dispatch(
+          wasCanceled(c.orderId)
+            ? cancelOrderConfirmed({ uuid: c.uuid })
+            : cancelOrderFailed({ uuid: c.uuid, errorParams: ORDER_NO_LONGER_OPEN })
+        )
+      );
     } else {
       cancels.forEach((c) =>
         this.store.dispatch(

@@ -390,12 +390,18 @@ export class PerpTransactionBuilder {
     byMarket,
     returns = [],
     priceUpdates = [],
+    skipMissing = false,
   }: {
     ref: PerpAccountRef;
     byMarket: Record<string, bigint[]>;
     returns?: CollateralReturn[];
     /** Signed prices the returns' margin checks read. */
     priceUpdates?: SignedPriceUpdate[];
+    /**
+     * Cancel the orders that are on the book and pass over the rest, instead of failing on the
+     * first one that is not. The `CanceledOrder` events tell which were canceled.
+     */
+    skipMissing?: boolean;
   }) {
     const tx = new Transaction();
     if (returns.length > 0) addPriceUpdates(tx, this.deployment, priceUpdates);
@@ -403,7 +409,7 @@ export class PerpTransactionBuilder {
     Object.entries(byMarket).forEach(([marketId, ids]) => {
       if (ids.length === 0) return;
       count += ids.length;
-      this.addCancel(tx, ref, this.market(marketId), ids);
+      this.addCancel(tx, ref, this.market(marketId), ids, skipMissing);
     });
     if (count === 0) throw new Error('No orders to cancel');
     returns.forEach(({ marketId, restoreImr }) => {
@@ -849,11 +855,18 @@ export class PerpTransactionBuilder {
     tx: Transaction,
     ref: PerpAccountRef,
     market: PerpMarketConfig,
-    orderIds: bigint[]
+    orderIds: bigint[],
+    skipMissing = false
   ) {
     const ids = tx.makeMoveVec({ type: 'u128', elements: orderIds.map((id) => tx.pure.u128(id)) });
     tx.moveCall({
-      target: target(this.perp, 'clearing_house', 'cancel_orders'),
+      // `cancel_orders` aborts when one of the orders is not on the book. `try_cancel_orders`
+      // takes the same arguments, cancels the orders that are and answers which.
+      target: target(
+        this.perp,
+        'clearing_house',
+        skipMissing ? 'try_cancel_orders' : 'cancel_orders'
+      ),
       typeArguments: [this.coinType, this.types.admin],
       arguments: [tx.object(market.clearingHouse), tx.object(ref.cap), tx.object(ref.account), ids],
     });

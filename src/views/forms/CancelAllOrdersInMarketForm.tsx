@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { accountTransactionManager } from '@/bonsai/AccountTransactionSupervisor';
+import { canceledOrders, ORDER_NO_LONGER_OPEN } from '@/bonsai/lib/cancelOutcome';
 import { isOperationFailure, isOperationSuccess } from '@/bonsai/lib/operationResult';
 import { BonsaiCore, BonsaiHelpers } from '@/bonsai/ontology';
 import { zipObject } from 'lodash';
@@ -63,24 +64,26 @@ export const CancelAllOrdersInMarketForm = ({
     if (isCancelling) {
       return;
     }
-    setCancellingStatus(
-      zipObject(
-        pendingPositionOrders.map((p) => p.id),
-        pendingPositionOrders.map(() => ({ type: 'pending' }))
-      )
-    );
-    pendingPositionOrders.forEach(async (p) => {
-      const result = await accountTransactionManager.cancelOrder({ orderId: p.id });
+    const ids = pendingPositionOrders.map((p) => p.id);
+    const each = (status: (id: string) => OrderCancelStatus) =>
+      setCancellingStatus(zipObject(ids, ids.map(status)));
+    each(() => ({ type: 'pending' }));
+    // The market's orders go in one transaction. A transaction per order, sent together, would
+    // have each use the account's capability and the gas coin at once.
+    accountTransactionManager.cancelAllOrders({ marketId }).then((result) => {
       if (isOperationSuccess(result)) {
-        setCancellingStatus((old) => ({ ...old, [p.id]: { type: 'success' } }));
+        const wasCanceled = canceledOrders(result.payload.canceled);
+        each((id) =>
+          wasCanceled(id)
+            ? { type: 'success' }
+            : { type: 'error', errorParams: ORDER_NO_LONGER_OPEN }
+        );
       } else if (isOperationFailure(result)) {
-        setCancellingStatus((old) => ({
-          ...old,
-          [p.id]: { type: 'error', errorParams: operationFailureToErrorParams(result) },
-        }));
+        const errorParams = operationFailureToErrorParams(result);
+        each(() => ({ type: 'error', errorParams }));
       }
     });
-  }, [isCancelling, pendingPositionOrders]);
+  }, [isCancelling, marketId, pendingPositionOrders]);
 
   useEffect(() => {
     const allResults = Object.values(cancellingStatus);
