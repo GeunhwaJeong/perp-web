@@ -17,6 +17,10 @@ EnvironmentFile=-/etc/sigma/alerts.env
 ExecStart=/opt/sigma/bin/perp-keeper --deployment /etc/sigma/perp.mainnet.json --rpc-url http://158.69.54.239:9000 --chain-id BmesG5C6R15WTWTL4feVxmf51fHXDSCMjmrF571aLiKC --key-file /etc/sigma/keeper.key --address 0xbf1fb3b05e6203a37d2aedb93a65b0c9775e0a8f20be406bbc15737698a60c07 --oracle-updates-url http://127.0.0.1:8787/v1/updates --listen-address 127.0.0.1:9191 --alert-format discord --max-slippage-bps 500
 Restart=always
 RestartSec=5
+# The intake is public, and every connection to it is an open file. At systemd's default of
+# 1,024 a crowd of connections would leave the keeper none for the full node, the price service
+# and its databases.
+LimitNOFILE=65536
 KillSignal=SIGTERM
 TimeoutStopSec=30
 NoNewPrivileges=true
