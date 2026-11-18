@@ -181,7 +181,18 @@ function validateFieldsBasic(
     const sizeValue = AttemptNumber(info.inputSummary.size?.size) ?? 0;
     const sizeIsTyped = (state.size?.value.value.length ?? 0) > 0;
     const marketMinSize = AttemptNumber(inputData.currentTradeMarketSummary?.stepSize);
-    if (sizeIsTyped && marketMinSize != null && sizeValue < marketMinSize) {
+    // The size of an order that fills from the book is what the book would fill. With nothing
+    // to fill from it is zero whatever was typed, and the reason to give is the book.
+    const emptyBookError = sizeIsTyped ? validateBookToFillFrom(inputData, summary) : undefined;
+    if (emptyBookError != null) {
+      errors.push(emptyBookError);
+    }
+    if (
+      emptyBookError == null &&
+      sizeIsTyped &&
+      marketMinSize != null &&
+      sizeValue < marketMinSize
+    ) {
       errors.push(
         simpleValidationError({
           code: 'ORDER_SIZE_BELOW_MIN_SIZE',
@@ -204,7 +215,7 @@ function validateFieldsBasic(
       );
     }
 
-    if (sizeValue <= 0) {
+    if (emptyBookError == null && sizeValue <= 0) {
       errors.push(
         simpleValidationError({
           code: 'REQUIRED_SIZE',
@@ -430,6 +441,45 @@ function validateFieldsBasic(
   }
 
   return errors;
+}
+
+/**
+ * Market, TWAP and stop market orders are sized by walking the side of the book they would
+ * fill from (`simulateMarketOrder`). That side holds nothing when the makers' orders have
+ * expired or been pulled; the API leaves orders past their expiry out of the book.
+ */
+function validateBookToFillFrom(
+  inputData: TradeFormInputData,
+  summary: TradeFormSummary
+): ValidationError | undefined {
+  const { type, side } = summary.effectiveTrade;
+  if (
+    type !== TradeFormType.MARKET &&
+    type !== TradeFormType.TWAP &&
+    type !== TradeFormType.TRIGGER_MARKET
+  ) {
+    return undefined;
+  }
+
+  const book = inputData.currentTradeMarketOrderbook;
+  if (book == null || side == null) {
+    return undefined;
+  }
+
+  const toFillFrom = side === OrderSide.BUY ? book.asks : book.bids;
+  if (toFillFrom.length > 0) {
+    return undefined;
+  }
+
+  const resting = side === OrderSide.BUY ? 'sell' : 'buy';
+  const instead = type === TradeFormType.TRIGGER_MARKET ? 'a stop limit order' : 'a limit order';
+  return simpleValidationError({
+    code: 'MARKET_ORDER_EMPTY_BOOK',
+    type: ErrorType.error,
+    fields: ['size'],
+    titleKey: STRING_KEYS.INSUFFICIENT_LIQUIDITY,
+    textFallback: `There are no ${resting} orders on the book right now. Use ${instead} instead.`,
+  });
 }
 
 function validateLimitPriceForConditionalLimitOrders(summary: TradeFormSummary): ValidationError[] {

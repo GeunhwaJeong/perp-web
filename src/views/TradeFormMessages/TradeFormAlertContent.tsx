@@ -18,7 +18,8 @@ export const TradeFormAlertContent = ({
     <AlertMessage type={AlertType.Error}>
       <div tw="inline-block">{placeOrderError}</div>
     </AlertMessage>
-  ) : primaryAlert != null && primaryAlert.resources.text?.stringKey != null ? (
+  ) : primaryAlert != null &&
+    (primaryAlert.resources.text?.stringKey ?? primaryAlert.resources.text?.fallback) != null ? (
     <ValidationAlertMessage error={primaryAlert} />
   ) : null;
 };

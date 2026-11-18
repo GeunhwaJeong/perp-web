@@ -30,23 +30,27 @@ export const ValidationAlertMessage = ({
 
   const ourLink =
     error.resources.learnMoreUrlKey != null ? links[error.resources.learnMoreUrlKey] : undefined;
+  // A text without a key carries its own words, for messages the localization does not hold.
+  const { text } = error.resources;
+  const ownWords = text != null && text.stringKey == null ? text.fallback : undefined;
   return (
     <AlertMessage
       type={error.type === ErrorType.error ? AlertType.Error : AlertType.Warning}
       className={className}
     >
       <span>
-        {stringGetter({
-          key: error.resources.text?.stringKey ?? error.resources.title?.stringKey,
-          params:
-            renderParams({ params: error.resources.text?.params }) ??
-            renderParams({ params: error.resources.title?.params }) ??
-            {},
-          fallback:
-            error.resources.text?.fallback ??
-            error.resources.title?.fallback ??
-            STRING_KEYS.UNKNOWN_ERROR,
-        })}
+        {ownWords ??
+          stringGetter({
+            key: error.resources.text?.stringKey ?? error.resources.title?.stringKey,
+            params:
+              renderParams({ params: error.resources.text?.params }) ??
+              renderParams({ params: error.resources.title?.params }) ??
+              {},
+            fallback:
+              error.resources.text?.fallback ??
+              error.resources.title?.fallback ??
+              STRING_KEYS.UNKNOWN_ERROR,
+          })}
         {ourLink != null ? (
           <>
             {' '}
