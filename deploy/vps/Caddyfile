@@ -47,10 +47,17 @@ sigma.haneul.io {
         header Strict-Transport-Security "max-age=31536000"
         header X-Content-Type-Options "nosniff"
         header Referrer-Policy "same-origin"
-        try_files {path} /entry-points/index.html
-        header /entry-points/index.html Cache-Control "public, max-age=0, must-revalidate"
-        header /assets/* Cache-Control "public, max-age=31536000, immutable"
-        file_server
+        # Caddy sorts `header` ahead of `try_files`, which held the two rules below to the path as
+        # requested: a page such as /trade/BTC-USD went out without Cache-Control, and a browser
+        # kept it for a while by its own rule. Inside `route` the directives run as written, so
+        # the rules see the path after the rewrite: a page is checked again on every visit, and
+        # only a file that exists under /assets is kept.
+        route {
+            try_files {path} /entry-points/index.html
+            header /entry-points/index.html Cache-Control "public, max-age=0, must-revalidate"
+            header /assets/* Cache-Control "public, max-age=31536000, immutable"
+            file_server
+        }
     }
 }
 
