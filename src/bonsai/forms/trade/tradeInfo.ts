@@ -1,5 +1,6 @@
 import { calculateEffectiveSelectedLeverage } from '@/bonsai/calculators/markets';
 import { calculateEffectiveMarketImfFromSelectedLeverage } from '@/bonsai/calculators/subaccount';
+import { triggeredMarketOrderPrice } from '@/bonsai/lib/ticketOrders';
 import { CanvasOrderbookLine } from '@/bonsai/types/orderbookTypes';
 import { ParentSubaccountDataBase } from '@/bonsai/types/rawTypes';
 import {
@@ -11,7 +12,6 @@ import {
 import BigNumber from 'bignumber.js';
 
 import { MAX_SUBACCOUNT_NUMBER, NUM_PARENT_SUBACCOUNTS } from '@/constants/account';
-import { MAJOR_MARKETS } from '@/constants/markets';
 import { IndexerOrderSide, IndexerPositionSide } from '@/types/indexer/indexerApiGen';
 
 import { CURRENT_SURGE_REWARDS_DETAILS } from '@/hooks/rewards/util';
@@ -44,8 +44,6 @@ import {
   TradeSummary,
 } from './types';
 
-const STOP_MARKET_ORDER_SLIPPAGE_BUFFER_MAJOR_MARKET = 0.05;
-const STOP_MARKET_ORDER_SLIPPAGE_BUFFER = 0.1;
 const MAX_ALLOCATION_BUFFER_CROSS = 0.98;
 const MAX_ALLOCATION_BUFFER_ISOLATED = 0.95;
 const DEFAULT_TARGET_LEVERAGE = 2.0;
@@ -153,73 +151,35 @@ export function calculateTradeInfo(
         });
       case TradeFormType.TRIGGER_MARKET:
         return calc((): TradeSummary => {
-          const calculated = calculateMarketOrder(
-            trade,
+          // A stop market order waits off the book as a ticket and fills once the mark reaches
+          // its trigger, against the book of that moment. The book of now has no say in it: the
+          // size is the size entered, counted at the trigger price, and the worst price is the
+          // trigger moved against the order by the share a position's stop loss gets.
+          const triggerPrice = AttemptNumber(trade.triggerPrice);
+          const stepSize = AttemptNumber(accountData.currentTradeMarketSummary?.stepSize);
+          const size = calculateLimitOrderInputSummary(
+            trade.size,
+            trade.side,
+            trade.triggerPrice,
+            trade.reduceOnly,
+            stepSize,
             baseAccount,
             accountData,
-            subaccountToUse,
-            undefined
-          );
-          const orderbookBase = accountData.currentTradeMarketOrderbook;
-
-          const slippageFromMidPrice = calculateMarketOrderSlippage(
-            calculated.marketOrder?.worstPrice,
-            orderbookBase?.midPrice
-          );
-          const slippageFromMarket = calculateMarketOrderSlippage(
-            calculated.marketOrder?.averagePrice,
-            orderbookBase?.midPrice
-          );
-          const adjustedSlippagePercentage = mapIfPresent(
-            trade.marketId,
-            slippageFromMarket,
-            (marketId, slippage) => {
-              const isMajorMarket = MAJOR_MARKETS.has(marketId);
-              const additionalBuffer = calc(() => {
-                if (isMajorMarket) {
-                  return STOP_MARKET_ORDER_SLIPPAGE_BUFFER_MAJOR_MARKET;
-                }
-                return STOP_MARKET_ORDER_SLIPPAGE_BUFFER;
-              });
-
-              return slippage + additionalBuffer;
-            }
-          );
-          const price = mapIfPresent(
-            AttemptNumber(trade.triggerPrice),
-            slippageFromMidPrice,
-            (trigger, slippage) => {
-              return trade.side === OrderSide.BUY
-                ? trigger * (1 + slippage)
-                : trigger * (1 - slippage);
-            }
-          );
+            subaccountToUse
+          ).size?.size;
+          const usdcSize = mapIfPresent(triggerPrice, size, (p, s) => p * s);
           const payloadPrice = mapIfPresent(
-            AttemptNumber(trade.triggerPrice),
-            adjustedSlippagePercentage,
-            (trigger, adjustedSlippage) => {
-              return trade.side === OrderSide.BUY
-                ? trigger * (1 + adjustedSlippage)
-                : trigger * (1 - adjustedSlippage);
-            }
+            triggerPrice,
+            trade.side,
+            trade.marketId,
+            (trigger, side, marketId) => triggeredMarketOrderPrice(side, trigger, marketId)
           );
 
-          const size = calculated.marketOrder?.size;
-          const usdcSize = mapIfPresent(price, size, (p, s) => p * s);
           const feeRate = marketTakerFee(accountData) ?? 0;
           const totalFees = calculateTradeFeeAfterDiscounts(
             accountData,
             mapIfPresent(usdcSize, (u) => u * feeRate)
           );
-
-          const isPositionClosed =
-            mapIfPresent(
-              size,
-              baseAccount?.position?.unsignedSize.toNumber(),
-              AttemptNumber(accountData.currentTradeMarketSummary?.stepSize),
-              (orderSize, positionSize, stepSize) =>
-                Math.abs(orderSize - positionSize) < stepSize / 2
-            ) ?? false;
 
           const inputSummary: TradeInputSummary = {
             size: {
@@ -228,26 +188,30 @@ export function calculateTradeInfo(
               // not supported
               allocationPercent: undefined,
             },
-            averageFillPrice: price,
-            worstFillPrice: price,
+            averageFillPrice: triggerPrice,
+            worstFillPrice: triggerPrice,
           };
-
-          const total = calculateOrderTotal(usdcSize, totalFees, trade.side);
 
           return {
             indexSlippage: 0,
             subaccountNumber: subaccountToUse,
             feeRate,
-            filled: calculated.marketOrder?.filled ?? false,
+            filled: true,
             inputSummary,
             fee: totalFees,
-            isPositionClosed,
-            slippage: slippageFromMidPrice,
-            total,
+            isPositionClosed: getIsPositionClosed(
+              size,
+              baseAccount?.position?.unsignedSize.toNumber(),
+              baseAccount?.position?.side,
+              trade.side,
+              stepSize
+            ),
+            slippage: 0,
+            total: calculateOrderTotal(usdcSize, totalFees, trade.side),
             transferToSubaccountAmount: calculateIsolatedTransferAmount(
               trade,
-              inputSummary.size?.size ?? 0,
-              price ?? 0,
+              size ?? 0,
+              triggerPrice ?? 0,
               totalFees ?? 0,
               subaccountToUse,
               baseAccount,

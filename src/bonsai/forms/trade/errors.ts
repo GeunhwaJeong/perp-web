@@ -137,9 +137,7 @@ function validateNonMarketInputData(
   const state = summary.effectiveTrade;
   if (
     inputData.currentTradeMarketOrderbook == null &&
-    (state.type === TradeFormType.MARKET ||
-      state.type === TradeFormType.TRIGGER_MARKET ||
-      state.type === TradeFormType.TWAP)
+    (state.type === TradeFormType.MARKET || state.type === TradeFormType.TWAP)
   ) {
     errors.push(
       simpleValidationError({
@@ -444,20 +442,17 @@ function validateFieldsBasic(
 }
 
 /**
- * Market, TWAP and stop market orders are sized by walking the side of the book they would
- * fill from (`simulateMarketOrder`). That side holds nothing when the makers' orders have
- * expired or been pulled; the API leaves orders past their expiry out of the book.
+ * Market and TWAP orders are sized by walking the side of the book they would fill from
+ * (`simulateMarketOrder`). That side holds nothing when the makers' orders have expired or been
+ * pulled; the API leaves orders past their expiry out of the book. A stop market order fills
+ * later and is not sized from the book.
  */
 function validateBookToFillFrom(
   inputData: TradeFormInputData,
   summary: TradeFormSummary
 ): ValidationError | undefined {
   const { type, side } = summary.effectiveTrade;
-  if (
-    type !== TradeFormType.MARKET &&
-    type !== TradeFormType.TWAP &&
-    type !== TradeFormType.TRIGGER_MARKET
-  ) {
+  if (type !== TradeFormType.MARKET && type !== TradeFormType.TWAP) {
     return undefined;
   }
 
@@ -472,13 +467,12 @@ function validateBookToFillFrom(
   }
 
   const resting = side === OrderSide.BUY ? 'sell' : 'buy';
-  const instead = type === TradeFormType.TRIGGER_MARKET ? 'a stop limit order' : 'a limit order';
   return simpleValidationError({
     code: 'MARKET_ORDER_EMPTY_BOOK',
     type: ErrorType.error,
     fields: ['size'],
     titleKey: STRING_KEYS.INSUFFICIENT_LIQUIDITY,
-    textFallback: `There are no ${resting} orders on the book right now. Use ${instead} instead.`,
+    textFallback: `There are no ${resting} orders on the book right now. Use a limit order instead.`,
   });
 }
 

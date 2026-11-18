@@ -243,16 +243,6 @@ describe('an order that fills from the book, with no orders on the book to fill 
     );
   });
 
-  it('a stop market order is pointed to a stop limit order', () => {
-    const state = order(TradeFormType.TRIGGER_MARKET, OrderSide.SELL, { triggerPrice: '95000' });
-    const result = shown(state, inputData([], []));
-
-    expect(result.code).toBe('MARKET_ORDER_EMPTY_BOOK');
-    expect(result.text).toBe(
-      'There are no buy orders on the book right now. Use a stop limit order instead.'
-    );
-  });
-
   it('nothing typed still asks for an amount', () => {
     const state = order(TradeFormType.MARKET, OrderSide.BUY, { size: undefined });
     const result = shown(state, inputData([], []));
@@ -282,6 +272,15 @@ describe('an order the empty side of the book does not hold back', () => {
 
     expect(result.codes).not.toContain('MARKET_ORDER_EMPTY_BOOK');
     expect(result.codes).not.toContain('ORDER_SIZE_BELOW_MIN_SIZE');
+  });
+
+  it('a stop market order, which fills later against the book of that moment', () => {
+    const state = order(TradeFormType.TRIGGER_MARKET, OrderSide.SELL, { triggerPrice: '95000' });
+    const result = shown(state, inputData([], []));
+
+    expect(result.codes).not.toContain('MARKET_ORDER_EMPTY_BOOK');
+    expect(result.codes).not.toContain('ORDER_SIZE_BELOW_MIN_SIZE');
+    expect(result.code).toBeUndefined();
   });
 
   it('a stop limit order', () => {
