@@ -88,8 +88,10 @@ function calculateSubaccountOrder(
     reduceOnly: !!base.reduceOnly,
     remainingSize: MustBigNumber(base.size).minus(MustBigNumber(base.totalFilled)),
     removalReason: base.removalReason,
+    expired: false,
   };
   order = maybeUpdateOrderIfExpired(order, protocolHeight);
+  order.expired = restsPastExpiry(order, protocolHeight);
 
   if (isTWAPOrder(order)) {
     return {
@@ -208,6 +210,21 @@ function maybeUpdateOrderIfExpired(
   }
 
   return order;
+}
+
+/**
+ * The engine stops filling an order when the chain's time reaches its expiry, and writes nothing
+ * at that moment: the order rests until a taker reaches it or its owner cancels it. The API
+ * reports it open for as long, so the expiry is held against the chain's time here.
+ */
+function restsPastExpiry(order: SubaccountOrder, height: HeightResponse): boolean {
+  if (order.status == null || order.expiresAtMilliseconds == null) {
+    return false;
+  }
+  if (getSimpleOrderStatus(order.status) !== OrderStatus.Open) {
+    return false;
+  }
+  return new Date(height.time).getTime() >= order.expiresAtMilliseconds;
 }
 
 const ORDER_CANCELLING_ALLOWANCE_BLOCKS = 25;

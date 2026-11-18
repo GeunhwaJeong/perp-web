@@ -48,7 +48,12 @@ import { openDialog } from '@/state/dialogs';
 
 import { mapIfPresent } from '@/lib/do';
 import { MustBigNumber } from '@/lib/numbers';
-import { getHydratedOrder, getOrderStatusInfoNew, isMarketOrderTypeNew } from '@/lib/orders';
+import {
+  EXPIRED_ORDER_NOTE,
+  getHydratedOrder,
+  getOrderStatusInfoNew,
+  isMarketOrderTypeNew,
+} from '@/lib/orders';
 import { getMarginModeFromSubaccountNumber } from '@/lib/tradeData';
 import { Nullable, orEmptyRecord } from '@/lib/typeUtils';
 
@@ -118,19 +123,19 @@ const getOrdersTableColumnDef = ({
         columnKey: 'status',
         getCellValue: (row) => row.status,
         label: stringGetter({ key: STRING_KEYS.STATUS }),
-        renderCell: ({ status, type }) => {
+        renderCell: ({ status, type, expired }) => {
           return (
             <TableCell>
               <WithTooltip
                 tooltipString={
                   status != null
-                    ? stringGetter({ key: getOrderStatusStringKey(status) })
+                    ? stringGetter({ key: getOrderStatusStringKey(status, expired) })
                     : undefined
                 }
                 side="right"
                 tw="[--tooltip-backgroundColor:--color-layer-5]"
               >
-                {status != null && <OrderStatusIconNew status={status} />}
+                {status != null && <OrderStatusIconNew status={status} expired={expired} />}
               </WithTooltip>
               {stringGetter({ key: getIndexerOrderTypeStringKey(type) })}
             </TableCell>
@@ -227,8 +232,22 @@ const getOrdersTableColumnDef = ({
         columnKey: 'expiresAtMilliseconds',
         getCellValue: (row) => row.expiresAtMilliseconds ?? Infinity,
         label: stringGetter({ key: STRING_KEYS.GOOD_TIL }),
-        renderCell: ({ expiresAtMilliseconds }) => {
+        renderCell: ({ expiresAtMilliseconds, expired }) => {
           if (!expiresAtMilliseconds) return <Output type={OutputType.Text} />;
+
+          // The time left and the time since read the same in this column, so an order past
+          // its expiry says so instead.
+          if (expired) {
+            return (
+              <WithTooltip
+                tooltipString={EXPIRED_ORDER_NOTE}
+                side="left"
+                tw="[--tooltip-backgroundColor:--color-layer-5]"
+              >
+                <span tw="text-color-warning">{stringGetter({ key: STRING_KEYS.EXPIRED })}</span>
+              </WithTooltip>
+            );
+          }
 
           return (
             <Output
@@ -278,9 +297,10 @@ const getOrdersTableColumnDef = ({
             </span>
           </TableColumnHeader>
         ),
-        renderCell: ({ marketSummary, size, status, totalFilled }) => {
+        renderCell: ({ marketSummary, size, status, totalFilled, expired }) => {
           const { statusIconColor } = getOrderStatusInfoNew({
             status: status ?? OrderStatus.Open,
+            expired,
           });
 
           return (
@@ -294,7 +314,7 @@ const getOrdersTableColumnDef = ({
               }
             >
               <span>
-                {status != null && stringGetter({ key: getOrderStatusStringKey(status) })}
+                {status != null && stringGetter({ key: getOrderStatusStringKey(status, expired) })}
               </span>
               <$InlineRow>
                 <Output

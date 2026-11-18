@@ -14,7 +14,23 @@ import { IndexerOrderSide, IndexerOrderType } from '@/types/indexer/indexerApiGe
 
 import { IconName } from '@/components/Icon';
 
-export const getOrderStatusInfoNew = ({ status }: { status: OrderStatusNew }) => {
+/** Shown beside an order that rests past its expiry (see `SubaccountOrder.expired`). */
+export const EXPIRED_ORDER_NOTE =
+  'This order has expired and can no longer fill. Cancel it to release any margin it holds.';
+
+export const getOrderStatusInfoNew = ({
+  status,
+  expired,
+}: {
+  status: OrderStatusNew;
+  expired?: boolean;
+}) => {
+  if (expired) {
+    return {
+      statusIcon: IconName.Clock,
+      statusIconColor: `var(--color-warning)`,
+    };
+  }
   switch (status) {
     case OrderStatusNew.Open: {
       return {

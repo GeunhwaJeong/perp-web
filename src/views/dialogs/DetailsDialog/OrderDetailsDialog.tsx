@@ -3,6 +3,7 @@ import { OrderFlags, OrderStatus } from '@/bonsai/types/summaryTypes';
 import BigNumber from 'bignumber.js';
 import { Link } from 'react-router-dom';
 
+import { AlertType } from '@/constants/alerts';
 import { AnalyticsEvents } from '@/constants/analytics';
 import { ButtonAction } from '@/constants/buttons';
 import { DialogProps, OrderDetailsDialogProps } from '@/constants/dialogs';
@@ -15,6 +16,7 @@ import { IndexerOrderSide, IndexerOrderType } from '@/types/indexer/indexerApiGe
 import { useAppSelectorWithArgs } from '@/hooks/useParameterizedSelector';
 import { useStringGetter } from '@/hooks/useStringGetter';
 
+import { AlertMessage } from '@/components/AlertMessage';
 import { AssetIcon } from '@/components/AssetIcon';
 import { Button } from '@/components/Button';
 import { type DetailsItem } from '@/components/Details';
@@ -35,7 +37,7 @@ import {
   getOrderStatusStringKey,
   getOrderTimeInForceStringKey,
 } from '@/lib/enumToStringKeyHelpers';
-import { isMarketOrderTypeNew, isNewOrderStatusClearable } from '@/lib/orders';
+import { EXPIRED_ORDER_NOTE, isMarketOrderTypeNew, isNewOrderStatusClearable } from '@/lib/orders';
 import { Nullable } from '@/lib/typeUtils';
 
 export const OrderDetailsDialog = ({
@@ -53,6 +55,7 @@ export const OrderDetailsDialog = ({
 
   const {
     displayId,
+    expired,
     expiresAtMilliseconds,
     marketId,
     orderFlags,
@@ -127,9 +130,9 @@ export const OrderDetailsDialog = ({
         label: stringGetter({ key: STRING_KEYS.STATUS }),
         value: (
           <div tw="inlineRow">
-            {status != null && <OrderStatusIconNew status={status} />}
+            {status != null && <OrderStatusIconNew status={status} expired={expired} />}
             <span tw="font-small-medium">
-              {stringGetter({ key: getOrderStatusStringKey(status) })}
+              {stringGetter({ key: getOrderStatusStringKey(status, expired) })}
             </span>
           </div>
         ),
@@ -212,22 +215,32 @@ export const OrderDetailsDialog = ({
 
   const isCancelDisabled = !!isOrderCanceling || (isShortTermOrder && isBestEffortCanceled);
 
+  const cancelButton =
+    isAccountViewOnly || (status != null && isNewOrderStatusClearable(status)) ? null : (
+      <Button
+        action={ButtonAction.Destroy}
+        state={{
+          isDisabled: isCancelDisabled,
+          isLoading: isOrderCanceling,
+        }}
+        onClick={onCancelClick}
+      >
+        {stringGetter({ key: STRING_KEYS.CANCEL })}
+      </Button>
+    );
+
   return (
     <DetailsDialog
       slotIcon={<AssetIcon logoUrl={marketSummary?.logo} symbol={marketSummary?.assetId} />}
       title={type != null && stringGetter({ key: getIndexerOrderTypeStringKey(type) })}
       slotFooter={
-        isAccountViewOnly || (status != null && isNewOrderStatusClearable(status)) ? null : (
-          <Button
-            action={ButtonAction.Destroy}
-            state={{
-              isDisabled: isCancelDisabled,
-              isLoading: isOrderCanceling,
-            }}
-            onClick={onCancelClick}
-          >
-            {stringGetter({ key: STRING_KEYS.CANCEL })}
-          </Button>
+        expired ? (
+          <div tw="column gap-0.75">
+            <AlertMessage type={AlertType.Warning}>{EXPIRED_ORDER_NOTE}</AlertMessage>
+            {cancelButton}
+          </div>
+        ) : (
+          cancelButton
         )
       }
       items={detailItems}

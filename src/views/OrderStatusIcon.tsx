@@ -11,9 +11,14 @@ type StyleProps = {
 
 type ElementPropsNew = {
   status: OrderStatus;
+  expired?: boolean;
 };
-export const OrderStatusIconNew = ({ className, status }: ElementPropsNew & StyleProps) => {
-  const { statusIcon, statusIconColor } = getOrderStatusInfoNew({ status });
+export const OrderStatusIconNew = ({
+  className,
+  status,
+  expired,
+}: ElementPropsNew & StyleProps) => {
+  const { statusIcon, statusIconColor } = getOrderStatusInfoNew({ status, expired });
   return <$Icon className={className} iconName={statusIcon} color={statusIconColor} />;
 };
 

@@ -217,6 +217,11 @@ export type SubaccountOrder = {
   goodTilBlockTimeSeconds: number | undefined;
   createdAtHeight: number | undefined;
   expiresAtMilliseconds: number | undefined;
+  /**
+   * The order still rests and the chain's time has reached its expiry. The engine no longer
+   * fills it, and counts it against its position's margin and order limit until it is canceled.
+   */
+  expired: boolean;
   createdAtMilliseconds: number | undefined;
   updatedAtMilliseconds: number | undefined;
   updatedAtHeight: number | undefined;

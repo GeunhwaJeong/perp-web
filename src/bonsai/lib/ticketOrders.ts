@@ -167,6 +167,7 @@ export function stopLossTakeProfitOrders(
       goodTilBlockTimeSeconds: undefined,
       createdAtHeight: undefined,
       expiresAtMilliseconds: undefined,
+      expired: false,
       createdAtMilliseconds: ticket.createdAtMs,
       updatedAtMilliseconds: ticket.updatedAtMs,
       updatedAtHeight: undefined,

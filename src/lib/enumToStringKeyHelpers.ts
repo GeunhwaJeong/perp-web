@@ -13,7 +13,11 @@ import {
 
 import { assertNever } from '@/lib/assertNever';
 
-export function getOrderStatusStringKey(status: OrderStatus | undefined): string {
+export function getOrderStatusStringKey(
+  status: OrderStatus | undefined,
+  expired?: boolean
+): string {
+  if (expired) return STRING_KEYS.EXPIRED;
   if (!status) return STRING_KEYS.PENDING;
 
   switch (status) {
