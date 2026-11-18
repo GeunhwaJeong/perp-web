@@ -356,7 +356,9 @@ export function getSubaccountOpenOrdersPriceMap(
   groupingTickSize: number,
   groupingTickSizeDecimals: number
 ) {
-  return subaccountOpenOrders.reduce(
+  // The API leaves an order past its expiry out of the book, so it marks no level either.
+  const inTheBook = subaccountOpenOrders.filter((order) => !order.expired);
+  return inTheBook.reduce(
     (acc, order) => {
       const side = order.side;
 

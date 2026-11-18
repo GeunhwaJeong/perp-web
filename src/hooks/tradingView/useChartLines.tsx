@@ -278,6 +278,7 @@ export const useChartLines = ({
         size,
         triggerPrice,
         price,
+        expired,
       } = order;
       const key = id;
       const quantity = size.toString();
@@ -296,9 +297,11 @@ export const useChartLines = ({
       );
 
       // For orders that are modified on the chart, keep showing the canceled order (with the new price) until the new order is successfully placed
+      // An order past its expiry no longer fills at its price, so it has no line; it stays in
+      // the orders table, where it is canceled.
       const shouldShow =
         (!!pendingReplacementOrder && !replacementOrderPlaced) ||
-        (!cancelReason && status != null && isNewOrderStatusOpen(status));
+        (!cancelReason && status != null && isNewOrderStatusOpen(status) && !expired);
 
       const maybeOrderLine = liveLine(key);
 

@@ -17,11 +17,12 @@ import { IconButton } from '@/components/IconButton';
 import { LoadingSpinner } from '@/components/Loading/LoadingSpinner';
 import { OrderSideTag } from '@/components/OrderSideTag';
 import { Output, OutputType } from '@/components/Output';
-import { TagSize } from '@/components/Tag';
+import { Tag, TagSign, TagSize } from '@/components/Tag';
 
 import { useAppSelector } from '@/state/appTypes';
 
 import { track } from '@/lib/analytics/analytics';
+import { EXPIRED_ORDER_NOTE } from '@/lib/orders';
 import { getIsShortTermOrder } from '@/lib/tradeData';
 import { orEmptyObj } from '@/lib/typeUtils';
 
@@ -103,6 +104,11 @@ export const SimpleOrderCard = ({ order }: { order: SubaccountOrder }) => {
         <div tw="row gap-0.5">
           <div>{stringGetter({ key: orderLabel })}</div>
           <OrderSideTag size={TagSize.Medium} orderSide={order.side} />
+          {order.expired && (
+            <Tag size={TagSize.Medium} sign={TagSign.Warning}>
+              {stringGetter({ key: STRING_KEYS.EXPIRED })}
+            </Tag>
+          )}
         </div>
         <div tw="row gap-0.5">{cancelButton}</div>
       </div>
@@ -114,6 +120,11 @@ export const SimpleOrderCard = ({ order }: { order: SubaccountOrder }) => {
           </div>
         ))}
       </div>
+      {order.expired && (
+        <div tw="bg-color-layer-3 p-0.75 text-color-text-0 font-mini-book">
+          {EXPIRED_ORDER_NOTE}
+        </div>
+      )}
     </div>
   );
 };
