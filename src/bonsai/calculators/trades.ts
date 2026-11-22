@@ -62,8 +62,9 @@ const calculateTrade = weakMapMemoize(
     fee: base.netFee,
     closedPnl: base.netRealizedPnl != null ? MustNumber(base.netRealizedPnl) : undefined,
     closedPnlPercent: derivePerTradePnlPercent(base),
+    // The API writes this in percent (9.5 for 9.5%); the app's outputs take a fraction.
     netClosedPnlPercent:
-      base.netRealizedPnlPercent != null ? MustNumber(base.netRealizedPnlPercent) : undefined,
+      base.netRealizedPnlPercent != null ? MustNumber(base.netRealizedPnlPercent) / 100 : undefined,
     createdAt: base.time,
     marginMode: base.marginMode === 'ISOLATED' ? 'ISOLATED' : 'CROSS',
     orderType: base.orderType as IndexerOrderType | undefined,
