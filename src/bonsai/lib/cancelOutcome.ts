@@ -1,5 +1,8 @@
 import type { ErrorParams } from '@/constants/errors';
 
+import { getSimpleOrderStatus } from '../calculators/orders';
+import { OrderStatus } from '../types/summaryTypes';
+
 /**
  * What became of each order of a cancel that names several. The transaction passes over an
  * order that is no longer on the book (it filled, expired or was canceled before), so the chain's
@@ -23,3 +26,19 @@ export const canceledOrders = (canceled: readonly string[]) => {
   const keys = new Set(canceled.map(key));
   return (orderId: string) => keys.has(key(orderId));
 };
+
+/**
+ * The orders a cancel of all orders names, of one market or of all. An order filled in part
+ * rests on the book with what is left of it, so it is one of them, as it is for the Cancel All
+ * button.
+ */
+export const ordersToCancel = <T extends { status?: OrderStatus; marketId: string }>(
+  orders: readonly T[],
+  marketId?: string
+): T[] =>
+  orders.filter(
+    (o) =>
+      o.status != null &&
+      getSimpleOrderStatus(o.status) === OrderStatus.Open &&
+      (marketId == null || o.marketId === marketId)
+  );

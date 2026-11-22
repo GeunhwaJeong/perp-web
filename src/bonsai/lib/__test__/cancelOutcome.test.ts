@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { canceledOrders, ORDER_NO_LONGER_OPEN } from '../cancelOutcome';
+import { OrderStatus } from '../../types/summaryTypes';
+import { canceledOrders, ORDER_NO_LONGER_OPEN, ordersToCancel } from '../cancelOutcome';
 
 describe('canceledOrders', () => {
   it('tells the orders the chain canceled from the ones the cancel passed over', () => {
@@ -25,5 +26,35 @@ describe('canceledOrders', () => {
 
   it('says of a passed-over order that it was no longer open', () => {
     expect(ORDER_NO_LONGER_OPEN).toEqual({ errorMessage: 'The order was no longer open' });
+  });
+});
+
+describe('ordersToCancel', () => {
+  const order = (id: string, status: OrderStatus | undefined, marketId = 'BTC-USD') => ({
+    id,
+    status,
+    marketId,
+  });
+  const ids = (orders: { id: string }[]) => orders.map((o) => o.id);
+
+  it('names an order filled in part along with the ones not filled at all', () => {
+    const orders = [
+      order('open', OrderStatus.Open),
+      order('part', OrderStatus.PartiallyFilled),
+      order('filled', OrderStatus.Filled),
+      order('canceled', OrderStatus.Canceled),
+      order('part-canceled', OrderStatus.PartiallyCanceled),
+      order('unknown', undefined),
+    ];
+    expect(ids(ordersToCancel(orders))).toEqual(['open', 'part']);
+  });
+
+  it('keeps to one market when given one', () => {
+    const orders = [
+      order('btc', OrderStatus.PartiallyFilled),
+      order('eth', OrderStatus.PartiallyFilled, 'ETH-USD'),
+    ];
+    expect(ids(ordersToCancel(orders, 'ETH-USD'))).toEqual(['eth']);
+    expect(ids(ordersToCancel(orders))).toEqual(['btc', 'eth']);
   });
 });

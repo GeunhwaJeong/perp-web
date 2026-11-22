@@ -106,7 +106,7 @@ import { isTruthy } from '@/lib/isTruthy';
 
 import { TradeFormPayload } from './forms/trade/types';
 import { CancelOrderPayload, PlaceOrderPayload, TriggerOrderActions } from './forms/triggers/types';
-import { canceledOrders, ORDER_NO_LONGER_OPEN } from './lib/cancelOutcome';
+import { canceledOrders, ORDER_NO_LONGER_OPEN, ordersToCancel } from './lib/cancelOutcome';
 import { unsupportedOrderTypeReason } from './lib/engineOrderSupport';
 import {
   isOperationFailure,
@@ -888,11 +888,7 @@ export class AccountTransactionSupervisor {
   }): Promise<OperationResult<{ canceled: string[] }>> {
     track(AnalyticsEvents.TradeCancelAllOrdersClick({ marketId }));
     const state = this.store.getState();
-    const openOrders = BonsaiCore.account.allOrders
-      .data(state)
-      .filter(
-        (o) => o.status === OrderStatus.Open && (marketId == null || o.marketId === marketId)
-      );
+    const openOrders = ordersToCancel(BonsaiCore.account.allOrders.data(state), marketId);
     const byMarket: Record<string, string[]> = {};
     openOrders.forEach((o) => {
       (byMarket[o.marketId] ??= []).push(o.id);
