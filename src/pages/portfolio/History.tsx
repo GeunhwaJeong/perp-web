@@ -5,7 +5,9 @@ import { STRING_KEYS } from '@/constants/localization';
 import { HistoryRoute } from '@/constants/routes';
 
 import { useBreakpoints } from '@/hooks/useBreakpoints';
+import { useEnvFeatures } from '@/hooks/useEnvFeatures';
 import { useStringGetter } from '@/hooks/useStringGetter';
+import { useTokenConfigs } from '@/hooks/useTokenConfigs';
 
 import { layoutMixins } from '@/styles/layoutMixins';
 
@@ -13,9 +15,13 @@ import { AttachedExpandingSection } from '@/components/ContentSection';
 import { NavigationMenu } from '@/components/NavigationMenu';
 import { ExportHistoryDropdown } from '@/views/ExportHistoryDropdown';
 
+import { isTruthy } from '@/lib/isTruthy';
+
 export const History = () => {
   const stringGetter = useStringGetter();
   const { isNotTablet } = useBreakpoints();
+  const { isVaultEnabled } = useEnvFeatures();
+  const { usdcLabel } = useTokenConfigs();
 
   return (
     <AttachedExpandingSection>
@@ -36,20 +42,20 @@ export const History = () => {
                   value: HistoryRoute.Transfers,
                   label: <h3>{stringGetter({ key: STRING_KEYS.TRANSFERS })}</h3>,
                   href: HistoryRoute.Transfers,
-                  tag: 'USDC',
+                  tag: usdcLabel,
                 },
-                {
+                isVaultEnabled && {
                   value: HistoryRoute.VaultTransfers,
                   label: <h3>{stringGetter({ key: STRING_KEYS.VAULT_TRANSFERS })}</h3>,
                   href: HistoryRoute.VaultTransfers,
-                  tag: 'USDC',
+                  tag: usdcLabel,
                 },
                 {
                   value: HistoryRoute.Payments,
                   label: <h3>{stringGetter({ key: STRING_KEYS.FUNDING_PAYMENTS })}</h3>,
                   href: HistoryRoute.Payments,
                 },
-              ],
+              ].filter(isTruthy),
             },
           ]}
         />

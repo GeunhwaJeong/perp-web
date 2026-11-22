@@ -6,13 +6,17 @@ import styled from 'styled-components';
 import { STRING_KEYS } from '@/constants/localization';
 import { AppRoute, HistoryRoute, PortfolioRoute } from '@/constants/routes';
 
+import { useEnvFeatures } from '@/hooks/useEnvFeatures';
 import { useStringGetter } from '@/hooks/useStringGetter';
 
 import { SimpleUiHeader } from '@/components/SimpleUiHeader';
 import { TabNavigator } from '@/components/TabNavigator';
 
+import { isTruthy } from '@/lib/isTruthy';
+
 export const SimpleUiHistory = () => {
   const stringGetter = useStringGetter();
+  const { isVaultEnabled } = useEnvFeatures();
 
   const matchTrades = useMatch(
     `${AppRoute.Portfolio}/${PortfolioRoute.History}/${HistoryRoute.Trades}`
@@ -54,11 +58,11 @@ export const SimpleUiHistory = () => {
           value: HistoryRoute.Payments,
           label: stringGetter({ key: STRING_KEYS.FUNDING_PAYMENTS_SHORT }),
         },
-        {
+        isVaultEnabled && {
           value: HistoryRoute.VaultTransfers,
           label: stringGetter({ key: STRING_KEYS.VAULT }),
         },
-      ]}
+      ].filter(isTruthy)}
       sharedContent={
         <$TableContainer>
           <Outlet />

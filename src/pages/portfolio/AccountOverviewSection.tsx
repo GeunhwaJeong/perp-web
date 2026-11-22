@@ -9,6 +9,7 @@ import { AppRoute } from '@/constants/routes';
 import { ColorToken } from '@/constants/styles/base';
 
 import { useBreakpoints } from '@/hooks/useBreakpoints';
+import { useEnvFeatures } from '@/hooks/useEnvFeatures';
 import { useLocaleSeparators } from '@/hooks/useLocaleSeparators';
 import { useStringGetter } from '@/hooks/useStringGetter';
 import { useLoadedVaultAccount, useLoadedVaultDetails } from '@/hooks/vaultsHooks';
@@ -25,6 +26,7 @@ import { getSelectedLocale } from '@/state/localizationSelectors';
 
 import { track } from '@/lib/analytics/analytics';
 import { mapIfPresent } from '@/lib/do';
+import { isTruthy } from '@/lib/isTruthy';
 import { orEmptyObj } from '@/lib/typeUtils';
 
 const EMBARRASSING_APR_THRESHOLD = 0.02;
@@ -80,6 +82,7 @@ export const AccountOverviewSection = () => {
   }, [navigate]);
 
   const { isTablet } = useBreakpoints();
+  const { isVaultEnabled } = useEnvFeatures();
 
   const pieSections = [
     {
@@ -94,7 +97,7 @@ export const AccountOverviewSection = () => {
       amount: mapIfPresent(equity, freeCollateral, (e, f) => Math.max(e - Math.max(f, 0), 0)),
       color: ColorToken.Yellow1,
     },
-    {
+    isVaultEnabled && {
       id: 'megavault',
       label: (
         <Link onClick={() => handleViewVault()} tw="text-color-text-0 underline">
@@ -105,7 +108,7 @@ export const AccountOverviewSection = () => {
       amount: vaultBalance,
       color: ColorToken.Purple1,
     },
-  ];
+  ].filter(isTruthy);
 
   const { decimal: decimalSeparator, group: groupSeparator } = useLocaleSeparators();
   const selectedLocale = useAppSelector(getSelectedLocale);
