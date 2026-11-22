@@ -179,7 +179,6 @@ export const TriggersForm = ({ positionUniqueId, onViewOrdersClick }: ElementPro
     <form onSubmit={onSubmit} tw="flexColumn gap-[1.25ch]">
       {priceInfo}
       <TriggerOrdersInputs
-        symbol={symbol}
         multipleTakeProfitOrders={multipleTakeProfitOrders}
         multipleStopLossOrders={multipleStopLossOrders}
         tickSizeDecimals={tickSizeDecimals}

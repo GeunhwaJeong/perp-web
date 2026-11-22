@@ -6,7 +6,6 @@ import { getTriggersFormState, getTriggersFormSummary } from '@/state/inputsSele
 import { TriggerOrderInputs } from './TriggerOrderInputs';
 
 type ElementProps = {
-  symbol: string;
   multipleTakeProfitOrders: boolean;
   multipleStopLossOrders: boolean;
   tickSizeDecimals?: number;
@@ -14,7 +13,6 @@ type ElementProps = {
 };
 
 export const TriggerOrdersInputs = ({
-  symbol,
   multipleTakeProfitOrders,
   multipleStopLossOrders,
   tickSizeDecimals,
@@ -26,7 +24,6 @@ export const TriggerOrdersInputs = ({
   return (
     <>
       <TriggerOrderInputs
-        symbol={symbol}
         tooltipId="take-profit"
         stringKeys={{
           header: STRING_KEYS.TAKE_PROFIT,
@@ -43,7 +40,6 @@ export const TriggerOrdersInputs = ({
         onViewOrdersClick={onViewOrdersClick}
       />
       <TriggerOrderInputs
-        symbol={symbol}
         tooltipId="stop-loss"
         stringKeys={{
           header: STRING_KEYS.STOP_LOSS,

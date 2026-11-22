@@ -30,13 +30,11 @@ import { useAppDispatch } from '@/state/appTypes';
 import { triggersFormActions } from '@/state/triggersForm';
 
 import { assertNever } from '@/lib/assertNever';
-import { getDisplayableAssetFromBaseAsset } from '@/lib/assetUtils';
 import { AttemptBigNumber, AttemptNumber, MustBigNumber, getNumberSign } from '@/lib/numbers';
 
 type InputChangeType = InputType.Currency | InputType.Percent;
 
 type ElementProps = {
-  symbol: string;
   tooltipId: TooltipStringKeys;
   stringKeys: {
     header: string;
@@ -54,7 +52,6 @@ type ElementProps = {
 };
 
 export const TriggerOrderInputs = ({
-  symbol,
   tooltipId,
   stringKeys,
   isMultiple,
@@ -218,8 +215,7 @@ export const TriggerOrderInputs = ({
           id={`${tooltipId}-price`}
           label={
             <>
-              {stringGetter({ key: stringKeys.price })}{' '}
-              <Tag>{getDisplayableAssetFromBaseAsset(symbol)}</Tag>
+              {stringGetter({ key: stringKeys.price })} <Tag>USD</Tag>
             </>
           }
           type={InputType.Currency}
