@@ -161,6 +161,11 @@ export type LocalPlaceOrderData = {
   submissionStatus: PlaceOrderStatuses;
   errorParams?: ErrorParams;
   submittedThroughCloseAll?: boolean;
+  /**
+   * The commitment of the order ticket this submission created, when it created one. No indexed
+   * order reports a ticket's status, so what becomes of the ticket is written to `cachedData`.
+   */
+  ticketCommitment?: string;
 
   // short term orders may disappear to we cache some last seen data
   cachedData: {

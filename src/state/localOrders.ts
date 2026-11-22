@@ -163,9 +163,11 @@ export const localOrdersSlice = createSlice({
         status: PlaceOrderStatuses;
         /** The order's status when no indexed order will report it, as for an order ticket. */
         cachedStatus?: OrderStatus;
+        /** The commitment of the order ticket the submission created. */
+        ticketCommitment?: string;
       }>
     ) => {
-      const { clientId, orderId, status, cachedStatus } = action.payload;
+      const { clientId, orderId, status, cachedStatus, ticketCommitment } = action.payload;
       const existing = state.localPlaceOrders[clientId];
       if (existing == null) {
         return;
@@ -174,11 +176,20 @@ export const localOrdersSlice = createSlice({
         ...existing,
         orderId: orderId ?? existing.orderId,
         submissionStatus: status,
+        ticketCommitment: ticketCommitment ?? existing.ticketCommitment,
         cachedData:
           cachedStatus != null
             ? { ...existing.cachedData, status: cachedStatus }
             : existing.cachedData,
       };
+    },
+    /** The account canceled an order ticket: the submission that created it reads Canceled. */
+    orderTicketCanceled: (state, action: PayloadAction<{ commitment: string }>) => {
+      Object.values(state.localPlaceOrders).forEach((placed) => {
+        if (placed.ticketCommitment === action.payload.commitment) {
+          placed.cachedData = { ...placed.cachedData, status: OrderStatus.Canceled };
+        }
+      });
     },
     cancelOrderConfirmed: (state, action: PayloadAction<{ uuid: string }>) => {
       const existing = state.localCancelOrders[action.payload.uuid];
@@ -282,6 +293,7 @@ export const {
   placeOrderFailed,
   placeOrderTimeout,
   placeOrderConfirmed,
+  orderTicketCanceled,
 
   cancelOrderSubmitted,
   cancelOrderFailed,

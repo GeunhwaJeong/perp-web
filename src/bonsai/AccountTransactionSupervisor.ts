@@ -94,11 +94,12 @@ import {
   cancelOrderFailed,
   cancelOrderSubmitted,
   closeAllPositionsSubmitted,
+  orderTicketCanceled,
   placeOrderConfirmed,
   placeOrderFailed,
   placeOrderSubmitted,
 } from '@/state/localOrders';
-import { ticketDetailsSaved } from '@/state/ticketDetails';
+import { normalizeCommitment, ticketDetailsSaved } from '@/state/ticketDetails';
 
 import { track } from '@/lib/analytics/analytics';
 import { operationFailureToErrorParams, wrapSimpleError } from '@/lib/errorHelpers';
@@ -1134,7 +1135,11 @@ export class AccountTransactionSupervisor {
         subaccountNumber: payload.subaccountNumber,
       })
     );
-    const settle = (result: OperationResult<any>, cachedStatus?: OrderStatus) => {
+    const settle = (
+      result: OperationResult<any>,
+      cachedStatus?: OrderStatus,
+      ticketCommitment?: string
+    ) => {
       if (isOperationFailure(result)) {
         this.store.dispatch(
           placeOrderFailed({
@@ -1148,6 +1153,7 @@ export class AccountTransactionSupervisor {
             clientId: `${payload.clientId}`,
             status: PlaceOrderStatuses.Placed,
             cachedStatus,
+            ticketCommitment,
           })
         );
       }
@@ -1221,7 +1227,8 @@ export class AccountTransactionSupervisor {
       });
       return settle(
         wrapOperationSuccess({ digest: result.digest }),
-        isTwap ? OrderStatus.Open : OrderStatus.Untriggered
+        isTwap ? OrderStatus.Open : OrderStatus.Untriggered,
+        normalizeCommitment(toHex(ticket.commitment))
       );
     } catch (error) {
       return settle(this.toFailure(error));
@@ -1261,6 +1268,16 @@ export class AccountTransactionSupervisor {
         });
       }
       const result = await signAndExecute(tx);
+      // The notification of the submission that created the ticket shows the status cached with
+      // it, which nothing else updates: a ticket is not an order the indexer reports on.
+      const canceled = BonsaiCore.account.orderTickets
+        .data(this.store.getState())
+        .find((t) => t.id === ticketId);
+      if (canceled != null) {
+        this.store.dispatch(
+          orderTicketCanceled({ commitment: normalizeCommitment(canceled.encryptedDetails) })
+        );
+      }
       this.refreshTickets();
       logBonsaiInfo(FN, 'order ticket canceled', { digest: result.digest, ticketId, type });
       return wrapOperationSuccess({ digest: result.digest });
