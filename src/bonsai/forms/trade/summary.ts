@@ -4,6 +4,7 @@ import {
 } from '@/bonsai/calculators/accountActions';
 import { getPositionUniqueId } from '@/bonsai/calculators/helpers';
 import {
+  applyRestingOrdersToLiquidationPrices,
   calculateParentSubaccountPositions,
   calculateParentSubaccountSummary,
   calculateSubaccountSummary,
@@ -15,6 +16,7 @@ import {
   OrderTimeInForce,
   OrderType,
   PositionUniqueId,
+  SubaccountOrder,
 } from '@/bonsai/types/summaryTypes';
 import { isEmpty, mapValues, orderBy } from 'lodash';
 import { weakMapMemoize } from 'reselect';
@@ -80,6 +82,7 @@ export function calculateTradeSummary(
         rawParentSubaccountData,
         markets,
         accountData.rawSelectedMarketLeverages,
+        accountData.currentTradeMarketOpenOrders,
         positionIdToUse
       )
   );
@@ -140,6 +143,7 @@ export function calculateTradeSummary(
           applyOperationsToSubaccount(rawParentSubaccountData, operations),
           markets,
           accountData.rawSelectedMarketLeverages,
+          accountData.currentTradeMarketOpenOrders,
           getPositionUniqueId(stateMarketId, tradeInfo.subaccountNumber)
         )
     );
@@ -667,6 +671,7 @@ function getRelevantAccountDetails(
   rawParentSubaccountData: ParentSubaccountDataBase,
   rawRelevantMarkets: MarketsData,
   rawSelectedMarketLeverages: { [marketId: string]: number },
+  openOrders: SubaccountOrder[],
   positionUniqueId?: PositionUniqueId
 ): TradeAccountDetails {
   const account = calculateParentSubaccountSummary(
@@ -674,10 +679,15 @@ function getRelevantAccountDetails(
     rawRelevantMarkets,
     rawSelectedMarketLeverages
   );
-  const positions = calculateParentSubaccountPositions(
-    rawParentSubaccountData,
-    rawRelevantMarkets,
-    rawSelectedMarketLeverages
+  // A position the form has simulated carries no liquidation price from the indexer; its own is
+  // worked out here, and like the indexer's it has to count the size resting orders could add.
+  const positions = applyRestingOrdersToLiquidationPrices(
+    calculateParentSubaccountPositions(
+      rawParentSubaccountData,
+      rawRelevantMarkets,
+      rawSelectedMarketLeverages
+    ),
+    openOrders
   );
   const position = positions.find(
     (p) => positionUniqueId != null && p.uniqueId === positionUniqueId

@@ -7,6 +7,7 @@ import {
   ParentSubaccountDataBase,
 } from '@/bonsai/types/rawTypes';
 import { OrderStatus, SubaccountOrder } from '@/bonsai/types/summaryTypes';
+import BigNumber from 'bignumber.js';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -126,9 +127,9 @@ const restingBid = {
   marketId: 'BTC-USD',
   side: IndexerOrderSide.BUY,
   status: OrderStatus.Open,
-  price: { toNumber: () => 81000 },
-  size: { toNumber: () => 0.001 },
-  remainingSize: { toNumber: () => 0.001 },
+  price: BigNumber(81000),
+  size: BigNumber(0.001),
+  remainingSize: BigNumber(0.001),
   marginMode: 'ISOLATED',
 } as unknown as SubaccountOrder;
 
@@ -256,5 +257,41 @@ describe('the collateral an isolated order takes', () => {
     // Both bids filled would hold 0.002 at a margin of 16.389956; a bid below the mark adds no
     // price loss, only its fee.
     expect(result.transfer).toBeCloseTo(16.389956 - 8.194978 + result.fee, 6);
+  });
+});
+
+describe('the liquidation price of the position the form simulates', () => {
+  // A long of 0.001 from 82,047 with 8.3 in the market; the indexer gives no price for it here.
+  const position = {
+    address: '0xadf3',
+    subaccountNumber: 128,
+    openPerpetualPositions: { 'BTC-USD': long },
+    assetPositions: usdc(128, 8.3 - 82.047),
+  };
+  const after = (openOrders: SubaccountOrder[]) =>
+    calculateTradeSummary(
+      order(TradeFormType.MARKET, OrderSide.BUY),
+      inputData(account(position), openOrders)
+    ).accountDetailsAfter!.position!;
+
+  it('counts the size resting orders could add, as the engine does', () => {
+    const withBid = after([restingBid]);
+
+    // The position holds 0.002 after the buy. The resting bid of 0.001 makes the engine require
+    // margin for 0.003: P = (margin - value) / (0.003 * mmf - 0.002).
+    expect(withBid.signedSize.toNumber()).toBeCloseTo(0.002, 9);
+    const margin = withBid.marginValueMaintenance.minus(withBid.value);
+    const priceFor = (net: number) =>
+      margin.div(BigNumber(net).times(withBid.adjustedMmf).minus(withBid.signedSize)).toNumber();
+    expect(withBid.liquidationPrice!.toNumber()).toBeCloseTo(priceFor(0.003), 6);
+    // Counted for its own 0.002 only, the same position would liquidate further from the mark.
+    expect(withBid.liquidationPrice!.toNumber()).toBeGreaterThan(priceFor(0.002));
+  });
+
+  it('is the plain one without resting orders', () => {
+    const alone = after([]);
+    const margin = alone.marginValueMaintenance.minus(alone.value);
+    const plain = margin.div(alone.signedSize.times(alone.adjustedMmf).minus(alone.signedSize));
+    expect(alone.liquidationPrice!.toNumber()).toBeCloseTo(plain.toNumber(), 6);
   });
 });

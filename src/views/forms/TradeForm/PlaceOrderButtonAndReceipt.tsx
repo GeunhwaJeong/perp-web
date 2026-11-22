@@ -113,6 +113,10 @@ export const PlaceOrderButtonAndReceipt = ({
 
   // approximation for whether inputs are filled by whether summary has been calculated
   const areInputsFilled = tradePayload != null;
+  // Without a size the form simulates no trade, and the position's liquidation price stays the
+  // indexer's. The form's own estimate of the same position can differ from it by the funding
+  // accrued since the last settlement, which would read as a change.
+  const hasSizeToApply = (inputSummary?.size?.size ?? 0) > 0;
 
   const renderMarginValue = () => {
     return (
@@ -204,6 +208,7 @@ export const PlaceOrderButtonAndReceipt = ({
             newValue={postOrderPositionData.liquidationPrice}
             withDiff={
               areInputsFilled &&
+              hasSizeToApply &&
               getDoubleValuesHasDiff(
                 liquidationPrice?.toNumber(),
                 postOrderPositionData.liquidationPrice?.toNumber() ??
