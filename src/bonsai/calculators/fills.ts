@@ -74,9 +74,10 @@ const calculateClosedPnl = (fill: IndexerCompositeFillObject) => {
   const positionSizeBefore = parseFloat(fill.positionSizeBefore);
   const entryPriceBefore = parseFloat(fill.entryPriceBefore);
 
-  // No position before = opening trade, only fees realize
+  // A fill that closes nothing has no closed profit: its fee stands in its own column, and the
+  // trade history shows none for it either.
   if (positionSizeBefore === 0) {
-    return -fee;
+    return undefined;
   }
 
   // Check if position is reducing (opposite side)
@@ -85,8 +86,7 @@ const calculateClosedPnl = (fill: IndexerCompositeFillObject) => {
     (fill.positionSideBefore === IndexerPositionSide.SHORT && fill.side === IndexerOrderSide.BUY);
 
   if (!isReducing) {
-    // Position increasing (same side), only fees realize
-    return -fee;
+    return undefined;
   }
 
   const size = MustNumber(fill.size ?? '0');
