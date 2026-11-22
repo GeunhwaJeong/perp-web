@@ -1,5 +1,6 @@
 import { AssetData, PerpetualMarketSummary } from '@/bonsai/types/summaryTypes';
 
+import { MarketsSortType } from '@/constants/marketList';
 import { ISOLATED_LIQUIDITY_TIER_INFO, MarketData } from '@/constants/markets';
 
 import {
@@ -10,6 +11,22 @@ import {
 import { BIG_NUMBERS, MustBigNumber } from './numbers';
 
 export const FALLBACK_MARKET_LEVERAGE = 5;
+
+/** Whether any of the markets carries a market cap. The markets here have none. */
+export const hasMarketCaps = (markets: Pick<MarketData, 'marketCap'>[]) =>
+  markets.some((market) => (market.marketCap ?? 0) > 0);
+
+/**
+ * The order a market list sorts by: the chosen one, or volume when the choice is market cap and
+ * no market carries one, which would leave the list in no order at all.
+ */
+export const getEffectiveMarketsSort = (
+  sortType: MarketsSortType,
+  markets: Pick<MarketData, 'marketCap'>[]
+) =>
+  sortType === MarketsSortType.MarketCap && !hasMarketCaps(markets)
+    ? MarketsSortType.Volume
+    : sortType;
 
 export function calculateMarketMaxLeverage({
   effectiveInitialMarginFraction,

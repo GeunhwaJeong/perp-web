@@ -32,6 +32,7 @@ import {
 import { setMarketFilter } from '@/state/perpetuals';
 import { getMarketFilter } from '@/state/perpetualsSelectors';
 
+import { getEffectiveMarketsSort, hasMarketCaps } from '@/lib/marketsHelpers';
 import { isPresent } from '@/lib/typeUtils';
 
 import MarketFilterRow from './MarketFilterRow';
@@ -137,7 +138,7 @@ export const MarketList = ({
   const filter: MarketFilters = useAppSelector(getMarketFilter);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchFilter, setSearchFilter] = useState<string>();
-  const sortType = useAppSelector(getSimpleUISortMarketsBy);
+  const chosenSortType = useAppSelector(getSimpleUISortMarketsBy);
   const positionSortType = useAppSelector(getSimpleUISortPositionsBy);
   const subaccountEquity = useAppSelector(getSubaccountEquity);
 
@@ -179,6 +180,8 @@ export const MarketList = ({
     setFilter(MarketFilters.ALL);
   }, [setFilter, setIsSearchOpen, setSearchFilter]);
 
+  const withMarketCaps = hasMarketCaps(filteredMarkets);
+  const sortType = getEffectiveMarketsSort(chosenSortType, filteredMarkets);
   const sortedMarkets = sortMarkets(filteredMarkets, sortType);
 
   const sortedPositions = sortPositions(
@@ -190,13 +193,17 @@ export const MarketList = ({
 
   const sortItems = useMemo(
     () => [
-      {
-        label: stringGetter({ key: STRING_KEYS.MARKET_CAP }),
-        value: MarketsSortType.MarketCap,
-        active: sortType === MarketsSortType.MarketCap,
-        icon: <Icon iconName={IconName.Price} />,
-        onSelect: () => setSortType(MarketsSortType.MarketCap),
-      },
+      ...(withMarketCaps
+        ? [
+            {
+              label: stringGetter({ key: STRING_KEYS.MARKET_CAP }),
+              value: MarketsSortType.MarketCap,
+              active: sortType === MarketsSortType.MarketCap,
+              icon: <Icon iconName={IconName.Price} />,
+              onSelect: () => setSortType(MarketsSortType.MarketCap),
+            },
+          ]
+        : []),
       {
         label: stringGetter({ key: STRING_KEYS.VOLUME }),
         value: MarketsSortType.Volume,
@@ -226,7 +233,7 @@ export const MarketList = ({
         onSelect: () => setSortType(MarketsSortType.Favorites),
       },
     ],
-    [stringGetter, sortType, setSortType]
+    [stringGetter, sortType, setSortType, withMarketCaps]
   );
 
   const positionSortItems = useMemo(

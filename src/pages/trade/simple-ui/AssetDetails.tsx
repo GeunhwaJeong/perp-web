@@ -66,11 +66,17 @@ export const AssetDetails = ({ isLaunchableMarket }: { isLaunchableMarket?: bool
         label: <span tw="font-small-book">{stringGetter({ key: STRING_KEYS.VOLUME })}</span>,
         value: <Output type={OutputType.CompactFiat} value={marketData.volume24H} />,
       },
-      {
-        key: 'marketCap',
-        label: <span tw="font-small-book">{stringGetter({ key: STRING_KEYS.MARKET_CAP })}</span>,
-        value: <Output type={OutputType.CompactFiat} value={marketData.marketCap} />,
-      },
+      ...(marketData.marketCap
+        ? [
+            {
+              key: 'marketCap',
+              label: (
+                <span tw="font-small-book">{stringGetter({ key: STRING_KEYS.MARKET_CAP })}</span>
+              ),
+              value: <Output type={OutputType.CompactFiat} value={marketData.marketCap} />,
+            },
+          ]
+        : []),
       {
         key: 'openInterest',
         label: <span tw="font-small-book">{stringGetter({ key: STRING_KEYS.OPEN_INTEREST })}</span>,

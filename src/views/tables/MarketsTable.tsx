@@ -32,6 +32,7 @@ import { setMarketFilter } from '@/state/perpetuals';
 import { getMarketFilter } from '@/state/perpetualsSelectors';
 
 import { formatFundingPeriod, getFundingPeriodHours } from '@/lib/fundingPeriod';
+import { hasMarketCaps } from '@/lib/marketsHelpers';
 import { MustBigNumber } from '@/lib/numbers';
 
 import { FavoriteButton } from './MarketsTable/FavoriteButton';
@@ -63,7 +64,7 @@ export const MarketsTable = forwardRef(
         ? `Funding (${formatFundingPeriod(fundingPeriods[0]!)})`
         : 'Funding';
 
-    const columns = useMemo<ColumnDef<MarketData>[]>(
+    const allColumns = useMemo<ColumnDef<MarketData>[]>(
       () =>
         isTablet
           ? ([
@@ -294,6 +295,19 @@ export const MarketsTable = forwardRef(
               },
             ] satisfies ColumnDef<MarketData>[]),
       [stringGetter, isTablet, fundingLabel]
+    );
+
+    // The markets here carry no market cap and no spot volume; a column of dashes says nothing.
+    const withMarketCaps = hasMarketCaps(filteredMarkets);
+    const withSpotVolumes = filteredMarkets.some((m) => (m.spotVolume24h ?? 0) > 0);
+    const columns = useMemo(
+      () =>
+        allColumns.filter(
+          (column) =>
+            (column.columnKey !== 'spotVolume24H' || withSpotVolumes) &&
+            (column.columnKey !== 'market-cap' || withMarketCaps)
+        ),
+      [allColumns, withSpotVolumes, withMarketCaps]
     );
 
     const setFilter = (newFilter: MarketFilters) => {
