@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 
-import { BonsaiCore, BonsaiHooks } from '@/bonsai/ontology';
+import { BonsaiCore, BonsaiHelpers, BonsaiHooks } from '@/bonsai/ontology';
 import { TooltipContextType } from '@visx/xychart';
 import { shallowEqual } from 'react-redux';
 
@@ -43,11 +43,8 @@ export const ConnectedPortfolioOverview = ({ className }: { className?: string }
   const dispatch = useAppDispatch();
 
   // Data
-  const {
-    equity: equityBN,
-    freeCollateral,
-    marginUsage,
-  } = orEmptyObj(useAppSelector(getSubaccount, shallowEqual));
+  const { equity: equityBN, marginUsage } = orEmptyObj(useAppSelector(getSubaccount, shallowEqual));
+  const buyingPower = useAppSelector(BonsaiHelpers.accountBuyingPower);
   const rawPnlData = BonsaiHooks.useParentSubaccountHistoricalPnls().data ?? EMPTY_ARR;
   const status = useAppSelector(BonsaiCore.account.parentSubaccountSummary.loading);
   const subaccount = useAppSelector(BonsaiCore.account.parentSubaccountSummary.data);
@@ -201,11 +198,7 @@ export const ConnectedPortfolioOverview = ({ className }: { className?: string }
             <WithTooltip tooltip="buying-power-simple">
               <span tw="text-color-text-0">{stringGetter({ key: STRING_KEYS.BUYING_POWER })}:</span>
             </WithTooltip>
-            <Output
-              value={freeCollateral?.times(50)}
-              type={OutputType.Fiat}
-              isLoading={isLoadingSubaccount}
-            />
+            <Output value={buyingPower} type={OutputType.Fiat} isLoading={isLoadingSubaccount} />
           </div>
           {!isLoadingSubaccount && <MarginUsageTag marginUsage={marginUsage} />}
         </>

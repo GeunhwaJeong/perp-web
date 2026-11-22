@@ -31,6 +31,7 @@ import {
   selectAccountOrdersLoading,
   selectAccountOrderTickets,
   selectAccountOrderTicketsLoading,
+  selectAccountBuyingPower,
   selectAccountTradesWithLeverage,
   selectAccountTradeHistoryLoading,
   selectAccountTransfers,
@@ -392,6 +393,7 @@ interface BonsaiHelpersShape {
     };
   };
   unopenedIsolatedPositions: BasicSelector<PendingIsolatedPosition[] | undefined>;
+  accountBuyingPower: BasicSelector<BigNumber | undefined>;
 }
 
 export const BonsaiHelpers: BonsaiHelpersShape = {
@@ -440,6 +442,7 @@ export const BonsaiHelpers: BonsaiHelpersShape = {
     },
   },
   unopenedIsolatedPositions: selectUnopenedIsolatedPositions,
+  accountBuyingPower: selectAccountBuyingPower,
 };
 
 interface BonsaiHooksShape {

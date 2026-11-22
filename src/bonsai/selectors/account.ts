@@ -12,7 +12,10 @@ import { BIG_NUMBERS, MaybeBigNumber } from '@/lib/numbers';
 
 import { calculateBlockRewards } from '../calculators/blockRewards';
 import { calculateFills } from '../calculators/fills';
-import { getMarketEffectiveInitialMarginForMarket } from '../calculators/markets';
+import {
+  getHighestMarketLeverage,
+  getMarketEffectiveInitialMarginForMarket,
+} from '../calculators/markets';
 import {
   calculateAllOrders,
   calculateOpenOrders,
@@ -293,6 +296,18 @@ export const selectCurrentMarketBuyingPower = createAppSelector(
     const maxLeverage = updatedMaxLeverage ?? defaultMaxLeverage;
 
     return freeCollateral.times(maxLeverage ?? 1);
+  }
+);
+
+/** What the free collateral buys at the highest leverage any market allows. */
+export const selectAccountBuyingPower = createAppSelector(
+  [selectRawMarketsData, selectParentSubaccountSummary],
+  (markets, parentSubaccountSummary) => {
+    const leverage = getHighestMarketLeverage(markets);
+    if (leverage == null || parentSubaccountSummary == null) {
+      return undefined;
+    }
+    return parentSubaccountSummary.freeCollateral.times(leverage);
   }
 );
 

@@ -75,6 +75,18 @@ export function getMarketEffectiveInitialMarginForMarket(market: IndexerWsBaseMa
   return effectiveIMF;
 }
 
+/**
+ * The highest leverage any of the markets allows: one over the lowest initial margin fraction in
+ * effect. Undefined while no market has one.
+ */
+export function getHighestMarketLeverage(markets: MarketsData | undefined) {
+  const fractions = Object.values(markets ?? {})
+    .map((market) => getMarketEffectiveInitialMarginForMarket(market))
+    .filter((fraction): fraction is BigNumber => fraction != null && fraction.gt(0));
+  if (fractions.length === 0) return undefined;
+  return BIG_NUMBERS.ONE.div(BigNumber.minimum(...fractions));
+}
+
 function calculateDerivedMarketDisplayItems(market: IndexerWsBaseMarketObject) {
   return {
     assetId: getAssetFromMarketId(market.ticker),
