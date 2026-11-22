@@ -11,6 +11,9 @@ import { Output, OutputType } from '@/components/Output';
 import { useAppSelector } from '@/state/appTypes';
 import { getChartDotBackground } from '@/state/appUiConfigsSelectors';
 
+/** The translation package's sentence for this names another exchange. */
+export const NO_FUNDS_NOTE = 'You have no funds on Sigma.';
+
 export const UnconnectedPortfolioOverview = ({ className }: { className?: string }) => {
   const stringGetter = useStringGetter();
   const chartDotBackground = useAppSelector(getChartDotBackground);
@@ -38,7 +41,7 @@ export const UnconnectedPortfolioOverview = ({ className }: { className?: string
         <Output tw="text-color-positive" value={0} type={OutputType.Percent} />
       </div>
       <div tw="flexColumn w-full items-center justify-center px-1.25 text-center text-color-text-0">
-        {stringGetter({ key: STRING_KEYS.NO_FUNDS })}
+        {NO_FUNDS_NOTE}
 
         <Button
           tw="mt-1 w-full"

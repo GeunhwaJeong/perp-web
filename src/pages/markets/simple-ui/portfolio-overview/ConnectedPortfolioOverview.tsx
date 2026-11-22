@@ -35,6 +35,7 @@ import { isTruthy } from '@/lib/isTruthy';
 import { orEmptyObj } from '@/lib/typeUtils';
 
 import SimplePnlChart, { getMsForPeriod, HistoricalPnlPeriod, PnlSide } from './SimplePnlChart';
+import { NO_FUNDS_NOTE } from './UnconnectedPortfolioOverview';
 
 export const ConnectedPortfolioOverview = ({ className }: { className?: string }) => {
   const selectedLocale = useAppSelector(getSelectedLocale);
@@ -182,7 +183,7 @@ export const ConnectedPortfolioOverview = ({ className }: { className?: string }
     <div tw="row absolute bottom-1 left-1.25 right-1.25 justify-between gap-0.125 font-small-book">
       {hasNoEquity ? (
         <div tw="flexColumn h-full w-full items-center justify-center gap-0.5 px-1.25 text-center text-color-text-0">
-          {stringGetter({ key: STRING_KEYS.NO_FUNDS })}
+          {NO_FUNDS_NOTE}
           <Button
             action={ButtonAction.Primary}
             slotLeft={<Icon iconName={IconName.Deposit2} />}
