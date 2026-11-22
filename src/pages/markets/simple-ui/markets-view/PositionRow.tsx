@@ -173,7 +173,11 @@ export const PositionRow = ({
     >
       <div tw="row min-w-0 flex-grow-0 gap-0.5">
         <div tw="row relative size-[2.75rem] min-w-[2.75rem] justify-center rounded-[50%]">
-          <AssetIcon logoUrl={market.logo} tw="size-[2.75rem] min-w-[2.75rem]" />
+          <AssetIcon
+            logoUrl={market.logo}
+            symbol={market.displayableAsset}
+            tw="size-[2.75rem] min-w-[2.75rem]"
+          />
           <TrendIcon positionSide={position.side} tw="absolute bottom-[-3px] right-[-4px]" />
         </div>
         <div tw="flexColumn gap-0.25">

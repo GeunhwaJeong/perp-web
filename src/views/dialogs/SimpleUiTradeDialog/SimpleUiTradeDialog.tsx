@@ -100,6 +100,7 @@ export const SimpleUiTradeDialog = ({
                   '--asset-icon-size': '2.625rem',
                 }}
                 logoUrl={logo}
+                symbol={displayableAsset}
               />
               <div tw="flexColumn ml-0.75">
                 <span tw="text-color-text-0 font-small-book">
@@ -132,6 +133,7 @@ export const SimpleUiTradeDialog = ({
                     '--asset-icon-size': '2.625rem',
                   }}
                   logoUrl={logo}
+                  symbol={displayableAsset}
                 />
                 <div tw="flexColumn ml-0.75">
                   <span tw="font-medium-bold">
@@ -192,6 +194,7 @@ export const SimpleUiTradeDialog = ({
                 '--asset-icon-size': '2rem',
               }}
               logoUrl={logo}
+              symbol={displayableAsset}
             />
             <span tw="font-medium-bold">{stringGetter({ key: STRING_KEYS.SUBMITTING_ORDER })}</span>
           </div>
@@ -204,6 +207,7 @@ export const SimpleUiTradeDialog = ({
                 '--asset-icon-size': '2rem',
               }}
               logoUrl={logo}
+              symbol={displayableAsset}
             />
             <span tw="font-medium-bold">{stringGetter({ key: STRING_KEYS.TRADE_CONFIRMED })}</span>
           </div>
@@ -216,6 +220,7 @@ export const SimpleUiTradeDialog = ({
                 '--asset-icon-size': '2rem',
               }}
               logoUrl={logo}
+              symbol={displayableAsset}
             />
             <span tw="font-medium-bold">{stringGetter({ key: STRING_KEYS.ERROR_SUBMITTING })}</span>
           </div>

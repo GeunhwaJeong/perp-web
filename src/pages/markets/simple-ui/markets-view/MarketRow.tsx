@@ -28,7 +28,11 @@ export const MarketRow = ({ className, market }: { className?: string; market: M
       to={`${AppRoute.Trade}/${market.id}`}
     >
       <div tw="row min-w-0 flex-grow-0 gap-0.5">
-        <AssetIcon logoUrl={market.logo} tw="size-[2.25rem] min-w-[2.25rem]" />
+        <AssetIcon
+          logoUrl={market.logo}
+          symbol={market.displayableAsset}
+          tw="size-[2.25rem] min-w-[2.25rem]"
+        />
         <div tw="flexColumn gap-0.25">
           <div tw="row gap-0.25 leading-[1rem]">
             <span tw="overflow-hidden text-ellipsis whitespace-nowrap">
