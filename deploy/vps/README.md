@@ -23,6 +23,11 @@ scp -r deploy/vps ubuntu@149.56.47.78:/tmp/
 ssh ubuntu@149.56.47.78 'sudo SIGMA_DB_PASSWORD=<password> bash /tmp/vps/bootstrap.sh'
 ```
 
+The bootstrap turns password logins off (`/etc/ssh/sshd_config.d/00-no-password.conf`), so the
+account that runs it needs a key in its `authorized_keys` first; without one it leaves them on
+and says so. Check with `sudo sshd -T | grep passwordauthentication`: a later file that says
+"no" does not count, because sshd keeps the first value it reads.
+
 Then the secrets, all root-owned and mode 600 under `/etc/sigma`:
 
 - `perp.mainnet.json`: `public/configs/haneul/perp.mainnet.json` with `updatesUrl` left as is (the

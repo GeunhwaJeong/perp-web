@@ -37,6 +37,20 @@ install -m 755 "$(dirname "$0")/sigma-watchdog" /usr/local/sbin/sigma-watchdog
 
 # Login bots fill sshd's default connection backlog (10) and the box drops our sessions.
 printf 'MaxStartups 50:30:200\nLoginGraceTime 20\n' > /etc/ssh/sshd_config.d/70-sigma.conf
+# Logins are by key only: the box holds the price signer's seed and the bots' keys, and the
+# login bots try passwords all day. The file has to sort before the image's 50-cloud-init.conf,
+# which says "yes" and would otherwise be the value sshd keeps. Skipped while the account that
+# runs this has no key, which would lock it out.
+keys="$(getent passwd "${SUDO_USER:-root}" | cut -d: -f6)/.ssh/authorized_keys"
+if [ -s "$keys" ]; then
+  cat > /etc/ssh/sshd_config.d/00-no-password.conf <<'CONF'
+# Password logins are off. sshd keeps the first value it reads, and 50-cloud-init.conf says
+# "yes"; this file is read before it, so the "no" here is the one that holds.
+PasswordAuthentication no
+CONF
+else
+  echo "no key in $keys: password logins are left on" >&2
+fi
 sshd -t && systemctl reload ssh
 
 install -m 644 "$(dirname "$0")/systemd/"sigma-*.service "$(dirname "$0")/systemd/"sigma-*.timer /etc/systemd/system/
