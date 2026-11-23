@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 # Watches what cannot report on itself: the services that have no alerts of their own (price
 # service, indexer, API, name issuer, Caddy, Postgres), any service that has died or hung, the
-# daily jobs (the keeper's backup, the indexer's pruning), and the machine (disk, memory, swap). Runs every minute as `sigma` from sigma-watchdog.timer and
-# posts to the same Discord webhook as the bots (PERP_ALERT_WEBHOOK_URL).
+# venues the price service forms its prices from, the daily jobs (the keeper's backup, the
+# indexer's pruning), and the machine (disk, memory, swap). Runs every minute as `sigma` from
+# sigma-watchdog.timer and posts to the same Discord webhook as the bots (PERP_ALERT_WEBHOOK_URL).
 #
 # A check has to fail on two runs in a row before it is posted, so that a restart of a few
 # seconds says nothing. A failure is posted once, again every six hours while it lasts, and
@@ -15,6 +16,7 @@
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -69,6 +71,16 @@ AVAILABLE_WARN_MB = 300
 # the venues' streams late as well, and signs prices that are older than they look.
 ORACLE_METRICS = "http://127.0.0.1:8787/metrics"
 ORACLE_LATE_WARN_S = 1.0
+# The price service signs a feed for as long as enough venues remain, and starts without a venue
+# that is down or no longer lists a market. Its venues can go one by one, and its health says
+# nothing until the last one a feed needs has gone. A venue is reported when the service has
+# had nothing from it for this long: a venue was out for three minutes at most in an ordinary
+# week and a half, and the service asks a venue it started without again every ten minutes.
+ORACLE_SOURCE_OUT_WARN_S = 600
+# A feed is reported when this many of its venues are missing from its latest price.
+ORACLE_SOURCES_MISSING_WARN = 2
+# What the service's counters read on the last run, and since when each venue's has not grown.
+ORACLE_SOURCES_FILE = os.path.join(STATE_DIR, "oracle-sources.json")
 
 
 def fetch(url, timeout=5):
@@ -110,12 +122,18 @@ def check_health(problems):
         problems["site"] = f"{SITE} does not answer ({error})"
 
 
-def check_oracle_lateness(problems):
+def oracle_metrics():
     try:
         _, body = fetch(ORACLE_METRICS)
     except Exception:  # noqa: BLE001 - the health check already reports a service that is down
+        return None
+    return body.decode(errors="replace")
+
+
+def check_oracle_lateness(problems, metrics):
+    if metrics is None:
         return
-    for line in body.decode(errors="replace").splitlines():
+    for line in metrics.splitlines():
         if line.startswith("oracle_event_loop_delay_seconds"):
             late = float(line.split()[-1])
             if late >= ORACLE_LATE_WARN_S:
@@ -124,6 +142,113 @@ def check_oracle_lateness(problems):
                     "it is falling behind the venues"
                 )
             return
+
+
+METRIC_LINE = re.compile(r"^(\w+)(?:\{(.*)\})? (\S+)$")
+METRIC_LABEL = re.compile(r'(\w+)="((?:[^"\\]|\\.)*)"')
+
+
+def samples(metrics):
+    """The samples of a Prometheus text exposition, as (name, labels, value)."""
+    for line in metrics.splitlines():
+        match = METRIC_LINE.match(line)
+        if match is None:
+            continue
+        name, labels, value = match.groups()
+        try:
+            yield name, dict(METRIC_LABEL.findall(labels or "")), float(value)
+        except ValueError:
+            continue
+
+
+def since_it_grew(before, count, could_grow, now, elapsed):
+    """
+    A counter's value and the time since which it has not grown, given what the last run kept.
+
+    The service counts from zero when it starts again. A count that fell and is above zero has
+    grown since then; one that fell to zero has not. While nothing could make the count grow,
+    the time that passes is not held against it.
+    """
+    known = isinstance(before, dict) and "count" in before and "since" in before
+    if not known or (count != before["count"] and count > 0):
+        return {"count": count, "since": now}
+    return {"count": count, "since": before["since"] if could_grow else before["since"] + elapsed}
+
+
+def check_oracle_sources(problems, now, metrics):
+    try:
+        with open(ORACLE_SOURCES_FILE) as file:
+            before = json.load(file)
+    except (OSError, ValueError):
+        before = {}
+    if not isinstance(before, dict):
+        before = {}
+
+    rounds = 0.0
+    signed, standing = {}, {}
+    used, quoted = {}, {}
+    for name, labels, value in samples(metrics or ""):
+        if name == "oracle_rounds_total":
+            rounds = value
+        elif name == "oracle_feed_signed_total":
+            signed[labels["feed"]] = value
+        elif name == "oracle_feed_sources_used":
+            standing[labels["feed"]] = value
+        elif name == "oracle_feed_source_rounds_total":
+            key = (labels["feed"], labels["source"])
+            used[key] = value if labels["outcome"] == "used" else used.get(key, 0.0)
+        elif name == "oracle_source_quotes_total":
+            key = f"{labels['exchange']}:{labels['market']}"
+            quoted[key] = quoted.get(key, 0.0) + (value if labels["result"] == "ok" else 0.0)
+    if rounds == 0:
+        # The service is down or has not run a round yet, which its health check reports. What
+        # was said of its venues stands until it runs again.
+        problems.update(before.get("problems", {}))
+        return
+
+    elapsed = max(0.0, now - before.get("at", now))
+    found = {}
+    # A venue is used only in a round that is signed. While a feed is not signed, for a reason
+    # its health check reports, the venues that did answer are not counted as used either.
+    sources = {}
+    for (feed, source), count in used.items():
+        key = f"{feed} {source}"
+        feed_signed = signed.get(feed, 0.0) > before.get("signed", {}).get(feed, float("inf"))
+        entry = since_it_grew(before.get("sources", {}).get(key), count, feed_signed, now, elapsed)
+        sources[key] = entry
+        if now - entry["since"] >= ORACLE_SOURCE_OUT_WARN_S:
+            found[f"oracle_source:{key}"] = (
+                f"the price service has left {source} out of {feed} for {duration(now - entry['since'])} "
+                f'(journalctl -u sigma-oracle | grep "left out {source}")'
+            )
+    # The markets that are no feed's venue give the rates that other venues are converted with.
+    # A round asks for them whether or not it is signed.
+    quotes = {}
+    ran = rounds > before.get("rounds", float("inf"))
+    for key, count in quoted.items():
+        if any(source == key for _, source in used):
+            continue
+        entry = since_it_grew(before.get("quotes", {}).get(key), count, ran, now, elapsed)
+        quotes[key] = entry
+        if now - entry["since"] >= ORACLE_SOURCE_OUT_WARN_S:
+            found[f"oracle_quote:{key}"] = (
+                f"the price service has had no quote of {key} for {duration(now - entry['since'])}"
+            )
+    for feed, count in standing.items():
+        venues = sum(1 for of, _ in used if of == feed)
+        # A feed that stands on none is not signed, which its health check reports.
+        if 0 < count <= venues - ORACLE_SOURCES_MISSING_WARN:
+            found[f"oracle_sources:{feed}"] = f"the price of {feed} stands on {int(count)} of its {venues} venues"
+    problems.update(found)
+
+    kept = {"at": now, "rounds": rounds, "signed": signed, "sources": sources, "quotes": quotes, "problems": found}
+    try:
+        temporary = ORACLE_SOURCES_FILE + ".part"
+        with open(temporary, "w") as file:
+            json.dump(kept, file)
+        os.replace(temporary, ORACLE_SOURCES_FILE)
+    except OSError as error:
+        print(f"failed to keep the price service's counters: {error}", file=sys.stderr)
 
 
 def meminfo():
@@ -202,7 +327,12 @@ def main():
     check_services(problems)
     check_jobs(problems)
     check_health(problems)
-    check_oracle_lateness(problems)
+    metrics = oracle_metrics()
+    check_oracle_lateness(problems, metrics)
+    try:
+        check_oracle_sources(problems, now, metrics)
+    except Exception as error:  # noqa: BLE001 - a fault in this check must not stop the others
+        problems["oracle_sources_check"] = f"the watchdog could not check the price service's venues ({error!r})"
     check_machine(problems, now)
 
     for key, message in problems.items():

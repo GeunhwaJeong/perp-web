@@ -104,7 +104,10 @@ it with `sudo systemctl enable --now sigma-indexer-prune.timer`.
 and answer their health checks, that the last run of the daily jobs did not fail, that the site
 answers, and the disk, memory and swap, and posts
 what fails twice in a row to the webhook of `alerts.env` (once, again every six hours, and when
-it is over). It also appends the price service's memory to
+it is over). It also reports a venue that the price service has had nothing from for ten
+minutes, and a feed whose price stands on two venues fewer than it has: the service goes on
+signing while venues drop out, and its health check says nothing until too few are left. It
+appends the price service's memory to
 `/var/lib/sigma-watchdog/oracle-memory.csv`. With `WATCHDOG_PING_URL` in `alerts.env` it fetches
 that URL at the end of every run, for a service outside the machine to notice when the machine
 is gone. Enable it with `sudo systemctl enable --now sigma-watchdog.timer`.
