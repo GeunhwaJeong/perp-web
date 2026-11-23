@@ -107,7 +107,7 @@ it with `sudo systemctl enable --now sigma-indexer-prune.timer`.
 
 `sigma-watchdog.timer` runs `sigma-watchdog` every minute. It checks that the services are active
 and answer their health checks, that the last run of the daily jobs did not fail, that the site
-answers, and the disk, memory and swap, and posts
+answers, the disk, memory and swap, and that the clock is kept against a time server (chrony), and posts
 what fails twice in a row to the webhook of `alerts.env` (once, again every six hours, and when
 it is over). It also reports a venue that the price service has had nothing from for ten
 minutes, and a feed whose price stands on two venues fewer than it has: the service goes on

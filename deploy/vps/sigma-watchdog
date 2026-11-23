@@ -2,7 +2,7 @@
 # Watches what cannot report on itself: the services that have no alerts of their own (price
 # service, indexer, API, name issuer, Caddy, Postgres), any service that has died or hung, the
 # venues the price service forms its prices from, the daily jobs (the keeper's backup, the
-# indexer's pruning), and the machine (disk, memory, swap). Runs every minute as `sigma` from
+# indexer's pruning), and the machine (disk, memory, swap, clock). Runs every minute as `sigma` from
 # sigma-watchdog.timer and posts to the same Discord webhook as the bots (PERP_ALERT_WEBHOOK_URL).
 #
 # A check has to fail on two runs in a row before it is posted, so that a restart of a few
@@ -90,6 +90,13 @@ PRESSURE_LOG = os.path.join(STATE_DIR, "oracle-pressure.csv")
 PRESSURE_LOG_MAX_BYTES = 5 * 2**20
 CGROUP_ROOT = "/sys/fs/cgroup"
 PROC = "/proc"
+# The price service stamps every price with this machine's clock, and the chain refuses a price
+# stamped more than 3 s ahead of its own clock and treats one stamped 10 s behind as stale. The
+# clock is set against time servers every seventeen minutes; left alone it loses about a second
+# a day. Six hours without a time server is a fifth of a second: days before prices are refused.
+CLOCK_UNSET_WARN_S = 6 * 3600
+CLOCK_OFF_WARN_S = 0.5
+CLOCK_MATTERS = "the price service stamps its prices with it, and the chain refuses them once it is seconds off"
 
 
 def fetch(url, timeout=5):
@@ -311,6 +318,42 @@ def record_oracle_pressure(now, metrics):
         print(f"failed to record what the price service waited for: {error}", file=sys.stderr)
 
 
+def clock_problem(tracking, now):
+    """
+    What is wrong with the clock, from the line `chronyc -c tracking` prints, or None. Its fields
+    are comma-separated: the fourth is when the clock was last set against a time server (Unix
+    seconds), the fifth how far it is from the servers' time now, the last whether it is
+    synchronised at all.
+    """
+    fields = tracking.strip().split(",")
+    try:
+        set_at, off, state = float(fields[3]), abs(float(fields[4])), fields[13]
+    except (ValueError, IndexError):
+        return f"the machine's clock cannot be checked (chronyc said: {tracking.strip()[:80] or 'nothing'}); {CLOCK_MATTERS}"
+    if state != "Normal":
+        return f"the machine's clock is not synchronised (chrony: {state}); {CLOCK_MATTERS}"
+    if now - set_at >= CLOCK_UNSET_WARN_S:
+        return (
+            f"the machine's clock was last set against a time server {duration(now - set_at)} ago "
+            f"and loses about a second a day; {CLOCK_MATTERS}"
+        )
+    if off >= CLOCK_OFF_WARN_S:
+        return f"the machine's clock is {off:.1f} s off the time servers; {CLOCK_MATTERS}"
+    return None
+
+
+def check_clock(problems, now):
+    try:
+        tracking = subprocess.run(
+            ["chronyc", "-c", "tracking"], capture_output=True, text=True, timeout=10
+        ).stdout
+    except (OSError, subprocess.SubprocessError) as error:
+        tracking = f"{error!r}"
+    problem = clock_problem(tracking, now)
+    if problem is not None:
+        problems["clock"] = problem
+
+
 def meminfo():
     values = {}
     with open("/proc/meminfo") as lines:
@@ -398,6 +441,7 @@ def main():
     except Exception as error:  # noqa: BLE001 - a record that cannot be kept must not stop the checks
         print(f"failed to record what the price service waited for: {error!r}", file=sys.stderr)
     check_machine(problems, now)
+    check_clock(problems, now)
 
     for key, message in problems.items():
         entry = state.setdefault(key, {"fails": 0, "since": now, "posted": None})
