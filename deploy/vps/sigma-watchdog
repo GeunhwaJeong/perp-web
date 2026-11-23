@@ -81,6 +81,15 @@ ORACLE_SOURCE_OUT_WARN_S = 600
 ORACLE_SOURCES_MISSING_WARN = 2
 # What the service's counters read on the last run, and since when each venue's has not grown.
 ORACLE_SOURCES_FILE = os.path.join(STATE_DIR, "oracle-sources.json")
+# What the price service has waited for, a row a minute. The provider takes a snapshot of the
+# machine every day at about 21:56 UTC, and for a while after it a disk request can take a
+# second. On some of those days the price service, which hardly touches the disk, ran ten
+# seconds late, and nothing kept says what it was waiting for: the kernel's counters for the
+# service start from zero whenever it restarts.
+PRESSURE_LOG = os.path.join(STATE_DIR, "oracle-pressure.csv")
+PRESSURE_LOG_MAX_BYTES = 5 * 2**20
+CGROUP_ROOT = "/sys/fs/cgroup"
+PROC = "/proc"
 
 
 def fetch(url, timeout=5):
@@ -251,6 +260,57 @@ def check_oracle_sources(problems, now, metrics):
         print(f"failed to keep the price service's counters: {error}", file=sys.stderr)
 
 
+def stalled_seconds(path):
+    """How long tasks have been stalled, from a pressure file: the total of its `some` line."""
+    try:
+        with open(path) as lines:
+            for line in lines:
+                if line.startswith("some"):
+                    for field in line.split():
+                        if field.startswith("total="):
+                            return int(field[len("total="):]) / 1e6
+    except (OSError, ValueError):
+        pass
+    return None
+
+
+def record_oracle_pressure(now, metrics):
+    """
+    Appends to PRESSURE_LOG: the time, the price service's process, the seconds its tasks have
+    been stalled on the disk, on memory and on the CPU since it started, the page faults it had
+    to read from the disk, the longest it was late to its timers in the last minute, and the
+    seconds any task on the machine has been stalled on the disk since boot. All but the
+    lateness only grow, so what happened in a minute is the difference between two rows.
+    """
+    shown = subprocess.run(
+        ["systemctl", "show", "sigma-oracle", "-p", "MainPID", "-p", "ControlGroup"], capture_output=True, text=True
+    ).stdout
+    unit = dict(line.split("=", 1) for line in shown.splitlines() if "=" in line)
+    pid, group = unit.get("MainPID", ""), unit.get("ControlGroup", "")
+    if pid in ("", "0") or not group:
+        return
+    row = [int(now), pid]
+    row += [stalled_seconds(f"{CGROUP_ROOT}{group}/{resource}.pressure") for resource in ("io", "memory", "cpu")]
+    try:
+        with open(f"{PROC}/{pid}/stat") as file:
+            # The fields after the name, which may hold spaces: the tenth of them is majflt.
+            row.append(int(file.read().rsplit(")", 1)[1].split()[9]))
+    except (OSError, ValueError, IndexError):
+        row.append(None)
+    late = None
+    for line in (metrics or "").splitlines():
+        if line.startswith("oracle_event_loop_delay_seconds"):
+            late = float(line.split()[-1])
+    row += [late, stalled_seconds(f"{PROC}/pressure/io")]
+    try:
+        if os.path.exists(PRESSURE_LOG) and os.path.getsize(PRESSURE_LOG) > PRESSURE_LOG_MAX_BYTES:
+            os.replace(PRESSURE_LOG, PRESSURE_LOG + ".1")
+        with open(PRESSURE_LOG, "a") as log:
+            log.write(",".join("" if value is None else f"{value:.3f}" if isinstance(value, float) else str(value) for value in row) + "\n")
+    except OSError as error:
+        print(f"failed to record what the price service waited for: {error}", file=sys.stderr)
+
+
 def meminfo():
     values = {}
     with open("/proc/meminfo") as lines:
@@ -333,6 +393,10 @@ def main():
         check_oracle_sources(problems, now, metrics)
     except Exception as error:  # noqa: BLE001 - a fault in this check must not stop the others
         problems["oracle_sources_check"] = f"the watchdog could not check the price service's venues ({error!r})"
+    try:
+        record_oracle_pressure(now, metrics)
+    except Exception as error:  # noqa: BLE001 - a record that cannot be kept must not stop the checks
+        print(f"failed to record what the price service waited for: {error!r}", file=sys.stderr)
     check_machine(problems, now)
 
     for key, message in problems.items():

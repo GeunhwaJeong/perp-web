@@ -113,7 +113,12 @@ it is over). It also reports a venue that the price service has had nothing from
 minutes, and a feed whose price stands on two venues fewer than it has: the service goes on
 signing while venues drop out, and its health check says nothing until too few are left. It
 appends the price service's memory to
-`/var/lib/sigma-watchdog/oracle-memory.csv`. With `WATCHDOG_PING_URL` in `alerts.env` it fetches
+`/var/lib/sigma-watchdog/oracle-memory.csv`, and to `oracle-pressure.csv` what the service has
+waited for: the time, its process id, the seconds it has been stalled on the disk, on memory
+and on the CPU, its page faults read from the disk, the longest it was late to its timers in
+the last minute, and the seconds the machine has been stalled on the disk. The provider
+snapshots the machine every day at about 21:56 UTC and the disk is slow for a while after;
+the differences between rows say what the price service waited for then. With `WATCHDOG_PING_URL` in `alerts.env` it fetches
 that URL at the end of every run, for a service outside the machine to notice when the machine
 is gone. Enable it with `sudo systemctl enable --now sigma-watchdog.timer`.
 
