@@ -16,6 +16,14 @@
  *                   the notification has to read "Canceled".
  *   tickets         What the Stop Orders tab lists. Nothing is pressed.
  *   cancel-tickets  The same list; with `--execute`, the X of every ticket that is still Open.
+ *   cancel-burst    Three limit buys of `--btc` each, `--below` percent under the index price
+ *                   and further, and then the X of all three without waiting for any of them.
+ *                   Each X is a transaction of the same wallet, and two that are built at the
+ *                   same moment cannot both go through, so the page has to send them one after
+ *                   the other. All three orders have to leave the book with no cancel failing;
+ *                   the check says how many of the cancels waited for their turn, and where the
+ *                   collateral the orders took is afterwards. It reads the chain for that
+ *                   (`--deployment <file>` for a local network other than the page's own).
  *
  * The page refuses to trade for an account that holds a conditional order another device
  * placed. So `stop-notice` does not start while a ticket is Open, and while its own ticket rests
@@ -34,13 +42,24 @@
  * `--env local`). Screenshots go to `--shots` (.deploy/page-check by default). `--headed` shows
  * the browser.
  */
+import { HaneulGrpcClient } from '@haneullabs/haneul/grpc';
 import { randomUUID } from 'node:crypto';
 import { mkdirSync, readFileSync, statSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-import { isValidMnemonic, normalizeMnemonic } from '../../src/haneul/account/mnemonic';
+import {
+  isValidMnemonic,
+  keypairFromMnemonic,
+  normalizeMnemonic,
+} from '../../src/haneul/account/mnemonic';
+import {
+  findPerpAccount,
+  readPosition,
+  unitsToCollateral,
+  type PerpDeployment,
+} from '../../src/haneul/perp';
 
 const require = createRequire(import.meta.url);
 // eslint-disable-next-line import/no-dynamic-require -- resolved from an external checkout
@@ -327,8 +346,254 @@ const listTickets = async (press: boolean) => {
   expect(left === 0, 'no ticket is Open after the X of each', `${left} left`);
 };
 
+/** What the chain holds for the check account: its balance, and its side of the market. */
+const onChain = async () => {
+  const file =
+    value('--deployment') ??
+    join(ROOT, 'public', 'configs', 'haneul', mainnet ? 'perp.mainnet.json' : 'perp.localnet.json');
+  const deployment: PerpDeployment = JSON.parse(readFileSync(file, 'utf8'));
+  if (mainnet !== (deployment.network === 'mainnet'))
+    stop(`${file} describes ${deployment.network}, not ${env}`);
+  const client = new HaneulGrpcClient({
+    network: mainnet ? 'mainnet' : 'localnet',
+    baseUrl: mainnet ? 'https://rpc.haneul.io' : 'http://127.0.0.1:9000',
+  });
+  const address = keypairFromMnemonic(phrase).toHaneulAddress();
+  const decimals = Number(deployment.collateral.decimals);
+  /** A signed ifixed (1e18) value held as a two's complement `u256`. */
+  const ifixed = (raw: bigint) => Number(raw >= 2n ** 255n ? raw - 2n ** 256n : raw) / 1e18;
+  return async () => {
+    const account = await findPerpAccount(client, deployment, address);
+    if (account == null) return stop('the check account has no trading account');
+    const position = await readPosition(client, deployment, MARKET, account.accountId);
+    return {
+      balance: unitsToCollateral(account.collateral, decimals).toNumber(),
+      inMarket: position ? ifixed(position.collateral) : 0,
+      size: position ? ifixed(position.base) : 0,
+      resting: position ? Number(position.pendingOrders) : 0,
+    };
+  };
+};
+
+// The Open Orders tab is the only table on the page while it is selected. Its rows name the
+// order's type where the Stop Orders tab says "Open"; the row of the column names does not.
+const ORDER_ROW = 'Limit';
+const orderRows = page.getByRole('row').filter({ hasText: ORDER_ROW });
+const openOrders = (): Promise<number> => orderRows.count();
+const openOrdersTab = async () => {
+  await page.getByRole('tab', { name: /^Open Orders/ }).click();
+  await page.waitForTimeout(2500);
+};
+const BURST = 3;
+
+const cancelBurst = async () => {
+  const read = await onChain();
+  await restore();
+  const header = await bodyText();
+  await snap('restored');
+  const portfolio = header.match(/Portfolio Value \$[\d,.]+/)?.[0];
+  expect(
+    portfolio != null,
+    'the restored account shows its portfolio value',
+    portfolio ?? 'no value'
+  );
+  if (portfolio == null) return;
+
+  // The X's this check presses have to be those of its own orders, and what it reads of the
+  // collateral afterwards has to be theirs.
+  const before = await read();
+  if (before.size !== 0) stop('the account has a position; close it first');
+  if (before.resting !== 0) stop('the account has resting orders; cancel them first');
+  await openOrdersTab();
+  if ((await openOrders()) > 0) stop('an order is Open; cancel it first');
+  const usd = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 6 });
+  console.log(
+    `  before: balance ${usd(before.balance)}, in the market ${usd(before.inMarket)} (the chain)`
+  );
+
+  const index = Number((header.match(/Index Price \$([\d,]+)/)?.[1] ?? '').replace(/,/g, ''));
+  if (!(index > 0)) stop('the page shows no index price');
+  // Far enough under the market that none of them trades, and apart so that the rows differ.
+  const prices = Array.from({ length: BURST }, (_, i) =>
+    Math.round(index * (1 - (below + i) / 100))
+  );
+  await page.getByRole('tab', { name: 'Buy | Long' }).click();
+  await page.getByRole('tab', { name: 'Limit' }).click();
+  await page.locator('[id="price.limitPrice"]').fill(String(prices[0]));
+  await page.locator('#trade-amount').fill(String(size));
+  await page.waitForTimeout(1500);
+  const submit = page.locator('button[type="submit"]').last();
+  await snap('form');
+  console.log(
+    `  ${BURST} limit buys of ${size} BTC at ${prices.join(', ')} (index ${index}); the form's button reads "${squash(await submit.innerText())}"`
+  );
+  if (!execute) {
+    console.log('  no --execute: no order was placed');
+    return;
+  }
+
+  /** Places one limit buy through the form and waits for its row. */
+  const place = async (price: number, rowsBefore: number) => {
+    await page.locator('[id="price.limitPrice"]').fill(String(price));
+    await page.locator('#trade-amount').fill(String(size));
+    await page.waitForTimeout(1000);
+    await submit.click();
+    const rows = await until(openOrders, (n) => n > rowsBefore, 60);
+    if (rows <= rowsBefore) stop(`the order at ${price} did not come to rest within a minute`);
+  };
+  /**
+   * Presses the X of every order row, one straight after the other, as fast as the mouse goes.
+   * From the last row up: a row leaves the table when its X is pressed, and the rows above it
+   * stay where they are. Answers how many it pressed and within how many milliseconds.
+   */
+  const pressEveryX = async () => {
+    const count = await openOrders();
+    const buttons = [];
+    for (let i = 0; i < count; i += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      buttons.push(await orderRows.nth(i).getByRole('button').last().elementHandle());
+    }
+    const since = Date.now();
+    for (let i = count - 1; i >= 0; i -= 1) {
+      // eslint-disable-next-line no-await-in-loop
+      await buttons[i].click();
+    }
+    return { pressed: buttons.length, within: Date.now() - since };
+  };
+  /**
+   * Follows the cancels until nothing rests on chain and no transaction of the wallet holds or
+   * waits for its turn. A row leaves the page as soon as its X is pressed, so the page does not
+   * say when they are through. Answers the most cancels that waited at one time, what the page
+   * said of a failure, and what the chain holds at the end.
+   */
+  const follow = async () => {
+    const since = Date.now();
+    let waited = 0;
+    let failure: string | undefined;
+    let chain = await read();
+    let readAt = Date.now();
+    while (Date.now() - since < 90_000) {
+      // eslint-disable-next-line no-await-in-loop
+      const turns = (await page.evaluate(async () => {
+        const state = await navigator.locks.query();
+        return {
+          held: (state.held ?? []).filter((l) => l.name?.startsWith('haneul:tx:')).length,
+          pending: (state.pending ?? []).filter((l) => l.name?.startsWith('haneul:tx:')).length,
+        };
+      })) as { held: number; pending: number };
+      waited = Math.max(waited, turns.pending);
+      // eslint-disable-next-line no-await-in-loop
+      const text = await bodyText();
+      failure ??= text.match(
+        /Another transaction from this wallet[^.]*\.|already locked[^.]{0,80}|[^.]{0,60}(?:could not be canceled|Cancel(?:lation)? Failed)[^.]{0,60}/i
+      )?.[0];
+      if (Date.now() - readAt > 400) {
+        // eslint-disable-next-line no-await-in-loop
+        chain = await read();
+        readAt = Date.now();
+      }
+      if (chain.resting === 0 && turns.held + turns.pending === 0) break;
+      // eslint-disable-next-line no-await-in-loop
+      await page.waitForTimeout(50);
+    }
+    // The return of the collateral is in the last cancel's own transaction: read once more.
+    chain = await read();
+    return { waited, failure, chain, seconds: ((Date.now() - since) / 1000).toFixed(1) };
+  };
+
+  let resting = true;
+  try {
+    // One order and its X alone first. That cancel empties the market, so it has to return the
+    // market's collateral to the balance, whatever was left there before the check.
+    await place(prices[0]!, 0);
+    await until(read, (c) => c.resting === 1, 30);
+    const one = await pressEveryX();
+    const alone = await follow();
+    expect(
+      one.pressed === 1 && alone.chain.resting === 0,
+      'one X alone takes its order off the book',
+      `${one.pressed} pressed, ${alone.chain.resting} resting after ${alone.seconds} s`
+    );
+    expect(
+      alone.chain.inMarket < 0.01,
+      "and returns the market's collateral to the balance",
+      `balance ${usd(alone.chain.balance)}, in the market ${usd(alone.chain.inMarket)}`
+    );
+    if (alone.chain.resting !== 0) return;
+    await until(openOrders, (n) => n === 0, 30);
+
+    for (let i = 0; i < BURST; i += 1) {
+      // One order at a time: the orders are not what is checked.
+      // eslint-disable-next-line no-await-in-loop
+      await place(prices[i]!, i);
+    }
+    const placed = await until(read, (c) => c.resting === BURST, 30);
+    expect(
+      placed.resting === BURST && (await openOrders()) === BURST,
+      `${BURST} orders rest, on the page and on chain`,
+      `${await openOrders()} rows, ${placed.resting} on chain`
+    );
+    if (placed.resting !== BURST) return;
+    console.log(
+      `  resting: balance ${usd(placed.balance)}, in the market ${usd(placed.inMarket)}; the orders took ${usd(alone.chain.balance - placed.balance)}`
+    );
+    await snap('resting');
+
+    const all = await pressEveryX();
+    const burst = await follow();
+    const after = burst.chain;
+    resting = after.resting > 0;
+    expect(
+      all.pressed === BURST,
+      `the X of ${BURST} rows was pressed, one straight after the other`,
+      `${all.pressed} pressed within ${all.within} ms`
+    );
+    expect(
+      after.resting === 0,
+      'no order rests on chain afterwards',
+      `${after.resting} resting after ${burst.seconds} s`
+    );
+    const left = await until(openOrders, (n) => n === 0, 30);
+    expect(left === 0, 'no order is listed on the page afterwards', `${left} listed`);
+    expect(
+      burst.failure == null,
+      'the page shows no cancel that failed',
+      burst.failure ?? 'none shown'
+    );
+    expect(
+      burst.waited >= 1,
+      'the cancels took turns: at least one waited for another',
+      `at most ${burst.waited} waiting at a time`
+    );
+    await snap('canceled');
+    console.log(
+      `  after: balance ${usd(after.balance)}, in the market ${usd(after.inMarket)} (the chain)`
+    );
+    // What the owner of the account reads of it, once the page has taken in the cancels.
+    await page.waitForTimeout(4000);
+    const shown = (await bodyText()).match(/Available Balance \$[\d,.]+/)?.[0];
+    console.log(`  the page shows: ${shown ?? 'no available balance'}`);
+    // A cancel is built when its X is pressed, and each of these was built while the others
+    // still rested: none of them knew that it would be the one to empty the market.
+    expect(
+      after.inMarket < 0.01,
+      "none of the account's collateral is left in the market",
+      after.inMarket < 0.01
+        ? `balance ${usd(after.balance)}`
+        : `${usd(after.inMarket)} waits there for the next cancel or withdrawal; balance ${usd(after.balance)}`
+    );
+  } finally {
+    if (resting) {
+      console.log(
+        '  ORDERS MAY STILL REST. Press Cancel All in Open Orders, or run shadow-check.ts cancel.'
+      );
+    }
+  }
+};
+
 const checks: Record<string, () => Promise<unknown>> = {
   'stop-notice': stopNotice,
+  'cancel-burst': cancelBurst,
   tickets: () => listTickets(false),
   'cancel-tickets': () => listTickets(execute),
 };
