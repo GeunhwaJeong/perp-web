@@ -24,6 +24,14 @@
  *                   the check says how many of the cancels waited for their turn, and where the
  *                   collateral the orders took is afterwards. It reads the chain for that
  *                   (`--deployment <file>` for a local network other than the page's own).
+ *   wallet-guard    What "Create account" does in a browser that already holds a wallet. A
+ *                   browser holds one wallet, so a new one takes the place of the one that is
+ *                   stored. The check restores a wallet from a phrase it makes up itself (the
+ *                   phrase file is not read) and presses "Create account" the two ways a visitor
+ *                   comes to it: from the unlock screen of a new tab, and after a disconnect.
+ *                   Each time the page has to say that the browser already has a wallet and
+ *                   name it, and Cancel has to leave that wallet stored. The check never goes
+ *                   on to replace the wallet; it sends nothing and needs no `--execute`.
  *
  * The page refuses to trade for an account that holds a conditional order another device
  * placed. So `stop-notice` does not start while a ticket is Open, and while its own ticket rests
@@ -50,6 +58,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 
 import {
+  createMnemonic,
   isValidMnemonic,
   keypairFromMnemonic,
   normalizeMnemonic,
@@ -103,6 +112,9 @@ const shots = value('--shots') ?? join(ROOT, '.deploy', 'page-check');
 mkdirSync(shots, { recursive: true });
 
 const phrase = (() => {
+  // That check is about a wallet in the browser, any wallet: it makes one up and leaves the
+  // check account's phrase unread.
+  if (check === 'wallet-guard') return createMnemonic();
   const file = value('--phrase-file') ?? join(homedir(), '.sigma', 'check.phrase');
   let mode: number;
   try {
@@ -141,11 +153,11 @@ page.on('console', (m: { type(): string; text(): string }) => {
 let shot = 0;
 /** True from the moment the phrase is typed until the restore screens have closed. */
 let phraseOnScreen = false;
-const snap = async (name: string) => {
+const snap = async (name: string, on: typeof page = page) => {
   if (phraseOnScreen) return undefined;
   shot += 1;
   const file = join(shots, `${check}-${env}-${String(shot).padStart(2, '0')}-${name}.png`);
-  await page.screenshot({ path: file });
+  await on.screenshot({ path: file });
   return file;
 };
 const bodyText = async () => squash(await page.evaluate(() => document.body.innerText));
@@ -591,15 +603,103 @@ const cancelBurst = async () => {
   }
 };
 
+/** The address of the wallet the browser stores, read without its vault. */
+const storedWallet = (on: typeof page) =>
+  on.evaluate(() => {
+    const raw = localStorage.getItem('haneul:account:v1');
+    return raw == null ? null : (JSON.parse(raw) as { address: string }).address;
+  }) as Promise<string | null>;
+const dialogText = async (on: typeof page) =>
+  squash(
+    await on.evaluate(() => document.querySelector<HTMLElement>('[role="dialog"]')?.innerText ?? '')
+  );
+
+const walletGuard = async () => {
+  const address = keypairFromMnemonic(phrase).getPublicKey().toHaneulAddress();
+  // How the page writes an address without a name.
+  const shown = `${address.slice(0, 6)}...${address.slice(-4)}`;
+  const ALREADY = /This browser already has a wallet/;
+  const signIn = (on: typeof page) =>
+    on.getByRole('button', { name: /^(Log in|Get started)$/ }).first();
+
+  await restore();
+  const held = (await storedWallet(page)) === address;
+  expect(held, 'the browser holds the wallet the check restored', shown);
+  if (!held) return;
+
+  /**
+   * Presses "Create account" on the connect screen that `on` shows and reads what follows. On a
+   * page that does not ask, the dialog stands on the first screen of a new account; the check
+   * stops there, since going on would make that account in the place of the stored wallet.
+   */
+  const pressCreate = async (on: typeof page, way: string, name: string) => {
+    await on.getByRole('button', { name: 'Create account' }).click({ timeout: 30_000 });
+    await on.waitForTimeout(1500);
+    const text = await dialogText(on);
+    await snap(name, on);
+    const asked = ALREADY.test(text);
+    expect(
+      asked,
+      `${way}, "Create account" says that the browser already has a wallet`,
+      asked ? '' : `the dialog reads "${text.replace(/^(Sign in to Sigma ?)+/, '').slice(0, 60)}"`
+    );
+    if (!asked) return;
+    expect(text.includes(shown), 'and names the wallet', shown);
+    expect(
+      /Log in to this wallet/.test(text) && /Remove it and create a new one/.test(text),
+      'and offers to log in to it before it offers to replace it'
+    );
+    await on.getByText('Cancel', { exact: true }).click();
+    await on.waitForTimeout(800);
+    const after = await dialogText(on);
+    expect(
+      /Connect a wallet/.test(after) && (await storedWallet(on)) === address,
+      'Cancel goes back and leaves the wallet stored'
+    );
+  };
+
+  // A new tab of the same browser starts locked and asks for the password; "Use a different
+  // wallet" leads from there to the connect screen.
+  const tab = await context.newPage();
+  await tab.goto(`${origin}/trade/${MARKET}`, { waitUntil: 'domcontentloaded', timeout: 90_000 });
+  await signIn(tab).click({ timeout: 60_000 });
+  await tab.getByText('Use a different wallet').click({ timeout: 30_000 });
+  await pressCreate(tab, 'from the unlock screen of a new tab', 'new-tab');
+  await tab.close();
+
+  // The tab that restored the wallet is unlocked. Once it is disconnected the dialog opens on
+  // the connect screen, with no unlock screen before it.
+  await page.getByRole('button', { name: shown }).first().click({ timeout: 30_000 });
+  await page.getByRole('button', { name: 'Disconnect' }).first().click({ timeout: 30_000 });
+  await page.getByRole('button', { name: 'Disconnect' }).last().click({ timeout: 30_000 });
+  await page.waitForTimeout(1500);
+  await signIn(page).click({ timeout: 30_000 });
+  await page.waitForTimeout(800);
+  await pressCreate(page, 'after a disconnect', 'disconnected');
+
+  expect(
+    (await storedWallet(page)) === address,
+    'the wallet the check restored is still the one the browser holds',
+    shown
+  );
+};
+
 const checks: Record<string, () => Promise<unknown>> = {
   'stop-notice': stopNotice,
   'cancel-burst': cancelBurst,
   tickets: () => listTickets(false),
   'cancel-tickets': () => listTickets(execute),
+  'wallet-guard': walletGuard,
 };
 const run =
   checks[check ?? ''] ?? fail(`unknown check ${check}; one of ${Object.keys(checks).join(', ')}`);
-console.log(`${check} on ${origin}${execute ? '' : ' (no --execute: stops before the order)'}`);
+const mode =
+  check === 'wallet-guard'
+    ? ' (sends nothing)'
+    : execute
+      ? ''
+      : ' (no --execute: stops before the order)';
+console.log(`${check} on ${origin}${mode}`);
 try {
   await run();
 } catch (error) {
