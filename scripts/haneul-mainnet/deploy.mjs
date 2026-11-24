@@ -84,7 +84,11 @@ const MARKET = {
   fundingFrequencyMs: 3_600_000n, // funding settles hourly
   fundingPeriodMs: 28_800_000n, // over an eight-hour window
   premiumTwapSampleMs: 1_000n,
-  premiumTwapPeriodMs: 60_000n,
+  // Funding pays the premium TWAP of the settlement time, and a sample weighs the time since
+  // the last one over this period. With a minute, the hour's funding was the book's mid price
+  // of the minute before the hour: on an empty book, two one-lot orders rested for 65 seconds
+  // took it to the cap. With an hour they took it to 2% of the cap.
+  premiumTwapPeriodMs: 3_600_000n,
   spreadTwapSampleMs: 1_000n,
   spreadTwapPeriodMs: 60_000n,
   // The engine counts open interest in the base asset, not in dollars: 15 BTC is about $1M at
