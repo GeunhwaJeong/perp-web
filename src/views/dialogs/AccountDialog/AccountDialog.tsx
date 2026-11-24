@@ -41,6 +41,7 @@ import { CreateScreen } from './screens/CreateScreen';
 import { ImportScreen } from './screens/ImportScreen';
 import { PasskeyScreen } from './screens/PasskeyScreen';
 import { PasswordScreen } from './screens/PasswordScreen';
+import { ReplaceScreen } from './screens/ReplaceScreen';
 import { ResetScreen, UnlockScreen } from './screens/UnlockScreen';
 import { WelcomeScreen } from './screens/WelcomeScreen';
 
@@ -52,6 +53,7 @@ const SCREENS = [
   'unlock',
   'reset',
   'connect',
+  'replace',
   'passkey',
   'welcome',
   'create',
@@ -114,6 +116,9 @@ export const AccountDialog = ({ setIsOpen: setIsOpenRaw }: DialogProps<Onboardin
   // Which kind of account the create screen's name is for.
   const [mode, setMode] = useState<'local' | 'passkey'>('local');
   const [pendingMnemonic, setPendingMnemonic] = useState<string>();
+  // True once the user has been told that the new account takes the place of the stored one and
+  // has chosen to go on. The stored account stays until the new one is made.
+  const [replaceConfirmed, setReplaceConfirmed] = useState(false);
   // Held only between the password screen and the Face ID offer, then dropped.
   const [pendingPassword, setPendingPassword] = useState<string>();
   const [isWorking, setIsWorking] = useState(false);
@@ -254,7 +259,7 @@ export const AccountDialog = ({ setIsOpen: setIsOpenRaw }: DialogProps<Onboardin
   const onCreate = (password: string) =>
     finish(async () => {
       const username = pendingName;
-      await store.create({ username, password });
+      await store.create({ username, password, replace: replaceConfirmed });
       await connectSigmaWallet();
       const address = store.address;
       if (username && address) issueName(username, address, 'local');
@@ -389,7 +394,8 @@ export const AccountDialog = ({ setIsOpen: setIsOpenRaw }: DialogProps<Onboardin
           error={selectedWalletError}
           onCreateAccount={() => {
             setMode('local');
-            go('welcome');
+            setReplaceConfirmed(false);
+            go(hasLocalAccount ? 'replace' : 'welcome');
           }}
           onLogIn={() => go(hasLocalAccount ? 'unlock' : 'import')}
           onPasskey={() => {
@@ -397,6 +403,18 @@ export const AccountDialog = ({ setIsOpen: setIsOpenRaw }: DialogProps<Onboardin
             go('passkey');
           }}
           hasLocalAccount={hasLocalAccount}
+        />
+        <ReplaceScreen
+          username={account?.username}
+          address={account?.address}
+          backedUp={account?.backedUpAt != null}
+          onLogIn={() => go('unlock')}
+          onReplace={() => {
+            setReplaceConfirmed(true);
+            go('welcome');
+          }}
+          goBack={() => go('connect')}
+          onClose={close}
         />
         <PasskeyScreen
           onCreate={() => go('create')}

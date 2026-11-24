@@ -13,6 +13,13 @@ export class NoAccountError extends Error {
   }
 }
 
+export class AccountExistsError extends Error {
+  constructor() {
+    super('This browser already has a wallet. Reload the page to log in to it or to replace it.');
+    this.name = 'AccountExistsError';
+  }
+}
+
 export class AccountLockedError extends Error {
   constructor() {
     super('Account is locked');

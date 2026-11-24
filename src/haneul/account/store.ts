@@ -12,7 +12,7 @@ import {
   sealWithPassword,
   utf8ToBytes,
 } from './crypto';
-import { AccountLockedError, NoAccountError } from './errors';
+import { AccountExistsError, AccountLockedError, NoAccountError } from './errors';
 import {
   createMnemonic,
   isValidMnemonic,
@@ -46,7 +46,7 @@ type Listener = () => void;
  * the derived key kept in memory only while unlocked. React reads it through
  * `useSyncExternalStore`; the Wallet Standard wallet reads the keypair directly.
  */
-class LocalAccountStore {
+export class LocalAccountStore {
   #snapshot: AccountSnapshot;
 
   #listeners = new Set<Listener>();
@@ -127,8 +127,28 @@ class LocalAccountStore {
     this.#emit({ account });
   }
 
+  /**
+   * A browser holds one account, so a new one takes the place of the one that is stored, and
+   * an account whose phrase was never written down cannot be brought back. Only a caller that
+   * has put that to the user passes `replace`. The storage is read as well as the snapshot:
+   * another tab may have saved an account since this one loaded.
+   */
+  #refuseToReplace(replace: boolean | undefined) {
+    if (replace) return;
+    if (this.#snapshot.account ?? loadStoredAccount()) throw new AccountExistsError();
+  }
+
   /** Creates a fresh phrase, seals it, and leaves the account unlocked. */
-  async create({ username, password }: { username?: string; password: string }) {
+  async create({
+    username,
+    password,
+    replace,
+  }: {
+    username?: string;
+    password: string;
+    replace?: boolean;
+  }) {
+    this.#refuseToReplace(replace);
     const mnemonic = createMnemonic();
     await this.#install({
       mnemonic,
@@ -139,8 +159,17 @@ class LocalAccountStore {
     return { mnemonic };
   }
 
-  /** Restores an account from its phrase; replaces whatever this device held before. */
-  async import({ mnemonic, password }: { mnemonic: string; password: string }) {
+  /** Restores an account from its phrase. */
+  async import({
+    mnemonic,
+    password,
+    replace,
+  }: {
+    mnemonic: string;
+    password: string;
+    replace?: boolean;
+  }) {
+    this.#refuseToReplace(replace);
     if (!isValidMnemonic(mnemonic)) throw new Error('That is not a valid recovery phrase');
     await this.#install({ mnemonic: normalizeMnemonic(mnemonic), password, backedUp: true });
   }
